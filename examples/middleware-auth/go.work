@@ -1,0 +1,14 @@
+go 1.26.0
+
+use (
+	../../
+	../../adapters/adapter
+	../../adapters/redis
+	../../clients/engine
+	../../clients/socket
+	../../parsers/engine
+	../../parsers/socket
+	../../servers/engine
+	../../servers/socket
+	./
+)

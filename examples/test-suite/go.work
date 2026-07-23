@@ -1,0 +1,10 @@
+go 1.26.0
+
+use (
+	../../
+	../../parsers/engine
+	../../parsers/socket
+	../../servers/engine
+	../../servers/socket
+	./
+)
