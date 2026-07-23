@@ -1,0 +1,137 @@
+# Socket.IO for Golang
+
+[![Go](https://github.com/zishang520/socket.io/actions/workflows/go.yml/badge.svg)](https://github.com/zishang520/socket.io/actions/workflows/go.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/v3)
+[![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/v3)
+
+A modern, idiomatic Go implementation of [Socket.IO](https://socket.io/), designed for real-time, bidirectional communication over WebSockets and other transports.
+
+---
+
+## ⬆️ Upgrade Guide
+
+If you are upgrading from **v1** or **v2** of this library, please refer to the [Upgrade Guide](docs/UPGRADE.md) for detailed instructions, including package replacements and migration steps.
+
+## 🚀 Getting Started
+
+Check out the [official documentation](https://github.com/zishang520/socket.io/tree/v3/docs) to get started, including examples, API references, and guides.
+
+Install a specific module:
+
+```bash
+go get github.com/zishang520/socket.io/servers/socket/v3
+```
+
+Install the PostgreSQL adapter:
+
+```bash
+go get github.com/zishang520/socket.io/adapters/postgres/v3
+```
+
+Install the Valkey adapter:
+
+```bash
+go get github.com/zishang520/socket.io/adapters/valkey/v3
+```
+
+Install the MongoDB adapter:
+
+```bash
+go get github.com/zishang520/socket.io/adapters/mongo/v3
+```
+
+---
+
+## ❓ Questions & Support
+
+The [Issues](https://github.com/zishang520/socket.io/issues) section is only for confirmed bugs or feature requests.
+
+For general help or implementation questions:
+
+- Read the [documentation](https://github.com/zishang520/socket.io/tree/v3/docs)
+- Ask in [Discussions → Q&A](https://github.com/zishang520/socket.io/discussions/new?category=q-a)
+
+---
+
+## 🔒 Security
+
+If you discover a vulnerability or security issue, **do not file a public issue**. Instead, please follow the steps in our [Security Policy](./SECURITY.md).
+
+---
+
+## 🛠 Contributing
+
+We welcome contributions of all kinds! To report bugs, suggest features, or submit pull requests:
+
+- Please read our [Contributing Guide](./CONTRIBUTING.md) for best practices
+- Ensure your changes are well-tested and formatted with `make fmt`
+- Open an issue or discussion before starting major changes
+
+Thanks to all [contributors](https://github.com/zishang520/socket.io/graphs/contributors) who make this project better ❤️
+
+---
+
+## 📦 Modules
+
+This project is a monorepo containing the following Go modules:
+
+### Go Modules
+
+#### Root
+| State | Go Module | Description |
+|-------|-----------|-------------|
+| [![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/v3) | `github.com/zishang520/socket.io/v3` | Root module with shared interfaces, types, and base definitions |
+
+---
+
+#### Servers
+| State | Go Module | Description |
+|-------|-----------|-------------|
+| [![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/servers/engine/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/servers/engine/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/servers/engine/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/servers/engine/v3) | `github.com/zishang520/socket.io/servers/engine/v3` | Engine.IO server implementation for low-level transport handling |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/servers/socket/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/servers/socket/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/servers/socket/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/servers/socket/v3) | `github.com/zishang520/socket.io/servers/socket/v3` | Socket.IO server implementation built atop the Engine.IO server |
+
+---
+
+#### Clients
+| State | Go Module | Description |
+|-------|-----------|-------------|
+| [![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/clients/engine/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/clients/engine/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/clients/engine/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/clients/engine/v3) | `github.com/zishang520/socket.io/clients/engine/v3` | Engine.IO client implementation |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/clients/socket/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/clients/socket/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/clients/socket/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/clients/socket/v3) | `github.com/zishang520/socket.io/clients/socket/v3` | Socket.IO client implementation built atop the Engine.IO client |
+
+---
+
+#### Parsers
+| State | Go Module | Description |
+|-------|-----------|-------------|
+| [![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/parsers/engine/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/parsers/engine/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/parsers/engine/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/parsers/engine/v3) | `github.com/zishang520/socket.io/parsers/engine/v3` | Packet parser for Engine.IO protocol |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/parsers/socket/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/parsers/socket/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/parsers/socket/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/parsers/socket/v3) | `github.com/zishang520/socket.io/parsers/socket/v3` | Packet parser for Socket.IO protocol |
+
+---
+
+#### Adapters
+| State | Go Module | Description |
+|-------|-----------|-------------|
+| [![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/adapters/adapter/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/adapters/adapter/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/adapters/adapter/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/adapters/adapter/v3) | `github.com/zishang520/socket.io/adapters/adapter/v3` | Base adapter interface for implementing broadcast mechanisms |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/adapters/redis/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/adapters/redis/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/adapters/redis/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/adapters/redis/v3) | `github.com/zishang520/socket.io/adapters/redis/v3` | Redis-based adapter for broadcasting messages across distributed servers |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/adapters/valkey/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/adapters/valkey/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/adapters/valkey/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/adapters/valkey/v3) | `github.com/zishang520/socket.io/adapters/valkey/v3` | Valkey-based adapter for broadcasting messages across distributed servers using Pub/Sub |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/adapters/postgres/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/adapters/postgres/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/adapters/postgres/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/adapters/postgres/v3) | `github.com/zishang520/socket.io/adapters/postgres/v3` | PostgreSQL-based adapter for broadcasting messages across distributed servers using LISTEN/NOTIFY |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/adapters/mongo/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/adapters/mongo/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/adapters/mongo/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/adapters/mongo/v3) | `github.com/zishang520/socket.io/adapters/mongo/v3` | MongoDB-based adapter for broadcasting messages across distributed servers |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/adapters/unix/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/adapters/unix/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/adapters/unix/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/adapters/unix/v3) | `github.com/zishang520/socket.io/adapters/unix/v3` | Unix Domain Socket-based adapter for broadcasting messages across processes on the same machine |
+
+---
+
+## 🧾 License
+
+This project is licensed under the [MIT License](https://opensource.org/licenses/MIT).
+
+## Sponsors
+
+CDN acceleration and security protection for this project are sponsored by [Tencent EdgeOne](https://edgeone.ai/?from=github).
+
+<p align="left">
+  <a href="https://edgeone.ai/?from=github" target="_blank">
+    <img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="Tencent EdgeOne" width="180">
+  </a>
+</p>
+
+[**Best Asian CDN, Edge, and Secure Solutions - Tencent EdgeOne**](https://edgeone.ai/?from=github)
