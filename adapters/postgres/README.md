@@ -3,27 +3,27 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/postgres/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/postgres/v3)
 [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/postgres/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/postgres/v3)
 
-## Description
+## 简介
 
-A PostgreSQL adapter for Socket.IO server in Go, allowing to scale Socket.IO applications across multiple processes or servers using PostgreSQL's `LISTEN`/`NOTIFY` mechanism.
+Socket.IO Go 服务端的 PostgreSQL 适配器，通过 PostgreSQL 的 `LISTEN`/`NOTIFY` 机制将应用扩展到多个进程或服务器。
 
-## Installation
+## 安装
 
 ```bash
 go get github.com/aqcool/socket.io/adapters/postgres/v3
 ```
 
-## Features
+## 特性
 
-- Multiple servers support via PostgreSQL LISTEN/NOTIFY
-- Automatic large payload handling via attachment table
-- Heartbeat-based node failure detection
-- Real-time communication between processes
-- Custom PostgreSQL configuration
+- 通过 PostgreSQL `LISTEN`/`NOTIFY` 支持多服务器
+- 通过附件表自动处理大型载荷
+- 基于心跳的节点故障检测
+- 进程间实时通信
+- 自定义 PostgreSQL 配置
 
-## How to use
+## 使用方法
 
-### Adapter
+### 适配器
 
 ```golang
 package main
@@ -71,7 +71,7 @@ func main() {
 }
 ```
 
-### Emitter
+### 发射器
 
 ```golang
 package main
@@ -99,9 +99,9 @@ func main() {
 }
 ```
 
-## Configuration Options
+## 配置选项
 
-### Adapter Options
+### 适配器选项
 
 ```golang
 type PostgresAdapterOptions struct {
@@ -115,7 +115,7 @@ type PostgresAdapterOptions struct {
 }
 ```
 
-### Emitter Options
+### 发射器选项
 
 ```golang
 type EmitterOptions struct {
@@ -125,18 +125,18 @@ type EmitterOptions struct {
 }
 ```
 
-## Architecture
+## 架构
 
-The PostgreSQL adapter uses two mechanisms for inter-node communication:
+PostgreSQL 适配器使用两种机制进行节点间通信：
 
-1. **LISTEN/NOTIFY** — Lightweight pub/sub for messages under the payload threshold
-2. **Attachment Table** — Stores large payloads or binary data that exceed the NOTIFY limit
+1. **LISTEN/NOTIFY**——对低于载荷阈值的消息使用轻量级发布/订阅
+2. **附件表**——存储超过 `NOTIFY` 限制的大型载荷或二进制数据
 
-Messages are serialized as JSON for direct NOTIFY, or MessagePack for attachment storage. This ensures compatibility with the Node.js `socket.io-postgres-adapter`, allowing mixed Go/Node.js deployments in the same cluster.
+直接通过 `NOTIFY` 传输的消息使用 JSON 序列化，附件存储则使用 MessagePack。这保证了与 Node.js `socket.io-postgres-adapter` 的兼容性，允许在同一集群中混合部署 Go 和 Node.js。
 
-### Database Schema
+### 数据库结构
 
-The adapter automatically creates the attachment table on startup:
+适配器会在启动时自动创建附件表：
 
 ```sql
 CREATE TABLE IF NOT EXISTS socket_io_attachments (
@@ -146,34 +146,34 @@ CREATE TABLE IF NOT EXISTS socket_io_attachments (
 );
 ```
 
-## Mixed Deployment
+## 混合部署
 
-This Go adapter is wire-compatible with the Node.js [`socket.io-postgres-adapter`](https://github.com/socketio/socket.io-postgres-adapter) and [`socket.io-postgres-emitter`](https://github.com/socketio/socket.io-postgres-emitter). You can mix Go and Node.js servers in the same cluster, as long as:
+本 Go 适配器在线路协议层兼容 Node.js 的 [`socket.io-postgres-adapter`](https://github.com/socketio/socket.io-postgres-adapter) 和 [`socket.io-postgres-emitter`](https://github.com/socketio/socket.io-postgres-emitter)。满足以下条件时，可在同一集群中混合部署 Go 和 Node.js 服务端：
 
-- Both use the same channel prefix (default: `socket.io`)
-- Both use the same attachment table name (default: `socket_io_attachments`)
-- Both use the same namespace names
+- 使用相同的频道前缀（默认：`socket.io`）
+- 使用相同的附件表名（默认：`socket_io_attachments`）
+- 使用相同的命名空间名称
 
-## Testing
+## 测试
 
-Run the test suite with:
+运行测试套件：
 
 ```bash
 make test
 ```
 
-## Contributing
+## 参与贡献
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork 本仓库
+2. 创建功能分支（`git checkout -b feature/amazing-feature`）
+3. 提交改动（`git commit -m 'Add some amazing feature'`）
+4. 推送分支（`git push origin feature/amazing-feature`）
+5. 创建拉取请求
 
-## Support
+## 支持
 
-If you encounter any issues or have questions, please file them in the [issues section](https://github.com/aqcool/socket.io/issues).
+如果遇到问题或有任何疑问，请在 [Issue 区](https://github.com/aqcool/socket.io/issues)提交。
 
-## License
+## 许可证
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+本项目采用 MIT 许可证，详情请参阅 LICENSE 文件。

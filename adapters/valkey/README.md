@@ -1,27 +1,27 @@
-# @socket.io/valkey-adapter (Go)
+# @socket.io/valkey-adapter（Go）
 
-A Valkey adapter for [Socket.IO](https://socket.io/) in Go. This module provides
-Socket.IO clustering via Valkey Pub/Sub, Valkey Sharded Pub/Sub (Valkey 7+), and
-Valkey Streams — mirroring the functionality of the `adapters/redis` module but
-using the [`valkey-go`](https://github.com/valkey-io/valkey-go) client.
+[Socket.IO](https://socket.io/) 的 Go 语言 Valkey 适配器。本模块通过 Valkey
+Pub/Sub、Valkey 分片 Pub/Sub（Valkey 7+）及 Valkey Streams 提供 Socket.IO
+集群能力；功能与 `adapters/redis` 模块一致，但使用
+[`valkey-go`](https://github.com/valkey-io/valkey-go) 客户端。
 
-## Adapter Types
+## 适配器类型
 
-| Type | Description |
+| 类型 | 说明 |
 |---|---|
-| `ValkeyAdapterBuilder` | Classic Pub/Sub — suitable for standalone and replicated Valkey |
-| `ShardedValkeyAdapterBuilder` | Sharded Pub/Sub (SSUBSCRIBE/SPUBLISH) — for Valkey Cluster |
-| `ValkeyStreamsAdapterBuilder` | Valkey Streams — persistent messages + session recovery |
+| `ValkeyAdapterBuilder` | 经典 Pub/Sub——适用于单机和主从复制 Valkey |
+| `ShardedValkeyAdapterBuilder` | 分片 Pub/Sub（SSUBSCRIBE/SPUBLISH）——适用于 Valkey Cluster |
+| `ValkeyStreamsAdapterBuilder` | Valkey Streams——支持消息持久化与会话恢复 |
 
-## Installation
+## 安装
 
 ```bash
 go get github.com/aqcool/socket.io/adapters/valkey/v3
 ```
 
-## Usage
+## 用法
 
-### Classic Pub/Sub Adapter
+### 经典 Pub/Sub 适配器
 
 ```go
 import (
@@ -46,22 +46,22 @@ server := io.NewServer(nil, nil)
 server.SetAdapter(&vkadapter.ValkeyAdapterBuilder{Valkey: valkeyClient})
 ```
 
-### Sharded Pub/Sub Adapter (Valkey Cluster)
+### 分片 Pub/Sub 适配器（Valkey Cluster）
 
 ```go
 server.SetAdapter(&vkadapter.ShardedValkeyAdapterBuilder{Valkey: valkeyClient})
 ```
 
-### Streams Adapter
+### Streams 适配器
 
 ```go
 server.SetAdapter(&vkadapter.ValkeyStreamsAdapterBuilder{Valkey: valkeyClient})
 ```
 
-### Reusing an Existing Client
+### 复用现有客户端
 
-Pass a pre-created `vk.Client` to `NewValkeyClient`. This allows you to share
-an existing connection pool instead of creating a second one:
+将预先创建的 `vk.Client` 传给 `NewValkeyClient`，即可共享现有连接池，
+无需再创建一个连接池：
 
 ```go
 // existing client created elsewhere in your application
@@ -71,10 +71,9 @@ valkeyClient := valkey.NewValkeyClient(ctx, existingClient)
 server.SetAdapter(&vkadapter.ValkeyAdapterBuilder{Valkey: valkeyClient})
 ```
 
-### Emitter
+### 发射器
 
-Use the emitter to broadcast events from a process that does not run a
-Socket.IO server:
+使用发射器可从未运行 Socket.IO 服务端的进程广播事件：
 
 ```go
 import (
@@ -92,41 +91,41 @@ e := emitter.NewEmitter(valkeyClient, nil)
 e.To("room1").Emit("hello", "world")
 ```
 
-## Configuration
+## 配置
 
 ### ValkeyAdapterOptions
 
-| Option | Type | Default | Description |
+| 选项 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| `Key` | `string` | `"socket.io"` | Channel prefix |
-| `RequestsTimeout` | `time.Duration` | `5000ms` | Inter-node request timeout |
-| `PublishOnSpecificResponseChannel` | `bool` | `false` | Route responses to per-node channels |
-| `Parser` | `valkey.Parser` | MsgPack | Encoder/decoder for messages |
+| `Key` | `string` | `"socket.io"` | 频道前缀 |
+| `RequestsTimeout` | `time.Duration` | `5000ms` | 节点间请求超时 |
+| `PublishOnSpecificResponseChannel` | `bool` | `false` | 将响应路由到各节点专用频道 |
+| `Parser` | `valkey.Parser` | MsgPack | 消息编解码器 |
 
 ### ShardedValkeyAdapterOptions
 
-| Option | Type | Default | Description |
+| 选项 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| `ChannelPrefix` | `string` | `"socket.io"` | Channel prefix |
-| `SubscriptionMode` | `SubscriptionMode` | `DynamicSubscriptionMode` | Channel strategy |
+| `ChannelPrefix` | `string` | `"socket.io"` | 频道前缀 |
+| `SubscriptionMode` | `SubscriptionMode` | `DynamicSubscriptionMode` | 频道策略 |
 
 ### ValkeyStreamsAdapterOptions
 
-| Option | Type | Default | Description |
+| 选项 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| `StreamName` | `string` | `"socket.io"` | Stream name |
-| `MaxLen` | `int64` | `10000` | Approximate stream max length |
-| `ReadCount` | `int64` | `100` | Messages per XREAD call |
-| `SessionKeyPrefix` | `string` | `"sio:session:"` | Session key prefix |
+| `StreamName` | `string` | `"socket.io"` | Stream 名称 |
+| `MaxLen` | `int64` | `10000` | Stream 近似最大长度 |
+| `ReadCount` | `int64` | `100` | 每次 XREAD 调用读取的消息数 |
+| `SessionKeyPrefix` | `string` | `"sio:session:"` | 会话键前缀 |
 
-## Subscription Modes
+## 订阅模式
 
-| Mode | Description |
+| 模式 | 说明 |
 |---|---|
-| `StaticSubscriptionMode` | 2 fixed channels per namespace |
-| `DynamicSubscriptionMode` | 2 + 1 channel per public room (default) |
-| `DynamicPrivateSubscriptionMode` | Separate channel per room (including private) |
+| `StaticSubscriptionMode` | 每个命名空间使用 2 个固定频道 |
+| `DynamicSubscriptionMode` | 2 个固定频道，加上每个公开房间 1 个频道（默认） |
+| `DynamicPrivateSubscriptionMode` | 每个房间使用独立频道（包括私有房间） |
 
-## License
+## 许可证
 
 MIT

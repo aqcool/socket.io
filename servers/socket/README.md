@@ -1,41 +1,41 @@
-# Socket.IO for Golang
+# Go 语言 Socket.IO 服务端
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/servers/socket/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/servers/socket/v3)
 [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/servers/socket/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/servers/socket/v3)
 
-## Overview
+## 概述
 
-Socket.IO is a real-time bidirectional event-based communication library for Golang. This repository contains the Socket.IO server implementation.
+Socket.IO 是面向 Go 的实时双向事件通信库。本模块提供 Socket.IO 服务端实现。
 
-## Features
+## 特性
 
-- **Protocol Support**
-  - Socket.IO v4+ protocol
-  - Binary data transmission
-  - Multiplexing (namespaces)
-  - Room support
+- **协议支持**
+  - Socket.IO v4+ 协议
+  - 二进制数据传输
+  - 多路复用（命名空间）
+  - 房间支持
 
-- **Transport Layer**
+- **传输层**
   - WebSocket
-  - HTTP long-polling
-  - WebTransport (experimental)
+  - HTTP 长轮询
+  - WebTransport（实验性）
 
-- **Advanced Features**
-  - Automatic reconnection
-  - Packet buffering
-  - Acknowledgments
-  - Broadcasting
-  - Multiple server instances support
+- **高级特性**
+  - 自动重连
+  - 数据包缓冲
+  - 确认回调
+  - 广播
+  - 多服务端实例支持
 
-## Installation
+## 安装
 
 ```bash
 go get github.com/aqcool/socket.io/servers/socket/v3
 ```
 
-## Quick Start
+## 快速开始
 
-### Basic Usage
+### 基本用法
 
 ```go
 package main
@@ -62,9 +62,9 @@ func main() {
 }
 ```
 
-## Server Integration
+## 服务端集成
 
-### Standard HTTP Server
+### 标准 HTTP 服务端
 
 ```go
 http.Handle("/socket.io/", server.ServeHandler(nil))
@@ -86,9 +86,9 @@ app := fiber.New()
 app.Use("/socket.io/", adaptor.HTTPHandler(server.ServeHandler(nil)))
 ```
 
-## Advanced Usage
+## 高级用法
 
-### Namespaces
+### 命名空间
 
 ```go
 // Create a custom namespace
@@ -100,7 +100,7 @@ nsp.On("connection", func(clients ...any) {
 })
 ```
 
-### Rooms
+### 房间
 
 ```go
 server.On("connection", func(clients ...any) {
@@ -114,7 +114,7 @@ server.On("connection", func(clients ...any) {
 })
 ```
 
-### Middleware
+### 中间件
 
 ```go
 server.Use(func(client *socket.Socket, next func()) {
@@ -123,7 +123,7 @@ server.Use(func(client *socket.Socket, next func()) {
 })
 ```
 
-## Configuration
+## 配置
 
 ```go
 opts := socket.DefaultServerOptions()
@@ -136,37 +136,37 @@ opts.SetCors(&types.Cors{
 })
 ```
 
-## Debugging
+## 调试
 
-Enable debug logging:
+启用调试日志：
 
 ```bash
 DEBUG=socket.io*
 ```
 
-## Testing
+## 测试
 
-Run the test suite:
+运行测试套件：
 
 ```bash
 make test
 ```
 
-## API Documentation
+## API 文档
 
-For detailed API documentation, please visit:
+详细 API 文档请参阅：
 
-- [GoDoc Documentation](https://pkg.go.dev/github.com/aqcool/socket.io/servers/socket/v3)
-- [Socket.IO Protocol](https://github.com/socketio/socket.io-protocol)
+- [GoDoc 文档](https://pkg.go.dev/github.com/aqcool/socket.io/servers/socket/v3)
+- [Socket.IO 协议](https://github.com/socketio/socket.io-protocol)
 
-## Contributing
+## 参与贡献
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork 本仓库
+2. 创建功能分支（`git checkout -b feature/amazing-feature`）
+3. 提交改动（`git commit -m 'Add some amazing feature'`）
+4. 推送分支（`git push origin feature/amazing-feature`）
+5. 创建拉取请求
 
-## License
+## 许可证
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+本项目采用 MIT 许可证，详情请参阅 [LICENSE](LICENSE) 文件。

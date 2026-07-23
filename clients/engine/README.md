@@ -1,48 +1,48 @@
-# Engine.IO Client for Go
+# Engine.IO Go 客户端
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/clients/engine/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/clients/engine/v3)
 [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/clients/engine/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/clients/engine/v3)
 
-A robust Go client implementation for [Engine.IO](../../servers/engine), the reliable real-time bidirectional communication layer that powers [Socket.IO](../../servers/socket).
+一个稳定可靠的 [Engine.IO](../../servers/engine) Go 客户端实现。Engine.IO 是支撑 [Socket.IO](../../servers/socket) 的实时双向通信层。
 
-## Features
+## 特性
 
-- **Multiple Transport Support**
-  - WebSocket transport
-  - HTTP long-polling transport
-  - WebTransport (experimental)
-  - Automatic transport upgrade
-  - Fallback mechanism
+- **多种传输方式**
+  - WebSocket 传输
+  - HTTP 长轮询传输
+  - WebTransport（实验性）
+  - 自动升级传输方式
+  - 回退机制
 
-- **Connection Management**
-  - Automatic reconnection
-  - Heartbeat mechanism
-  - Connection state handling
-  - Cookie support
-  - Custom headers
+- **连接管理**
+  - 自动重连
+  - 心跳机制
+  - 连接状态处理
+  - Cookie 支持
+  - 自定义请求头
 
-- **Data Handling**
-  - Binary data support
-  - Base64 encoding fallback
-  - Packet buffering
-  - Message compression
+- **数据处理**
+  - 二进制数据支持
+  - Base64 编码回退
+  - 数据包缓冲
+  - 消息压缩
 
-- **Advanced Features**
-  - Event-driven architecture
-  - Configurable timeouts
-  - Debug logging
-  - Cross-platform compatibility
-  - Protocol v3 and v4 support
+- **高级特性**
+  - 事件驱动架构
+  - 可配置超时
+  - 调试日志
+  - 跨平台兼容
+  - 支持协议 v3 和 v4
 
-## Installation
+## 安装
 
 ```bash
 go get github.com/aqcool/socket.io/clients/engine/v3
 ```
 
-## Quick Start
+## 快速开始
 
-### Basic Usage
+### 基本用法
 
 ```go
 package main
@@ -74,7 +74,7 @@ func main() {
 }
 ```
 
-### Advanced Configuration
+### 高级配置
 
 ```go
 package main
@@ -110,27 +110,27 @@ func main() {
 }
 ```
 
-## API Reference
+## API 参考
 
-### Socket States
+### Socket 状态
 
-- `SocketStateOpening`: Connection is being established
-- `SocketStateOpen`: Connection is open and ready
-- `SocketStateClosing`: Connection is closing
-- `SocketStateClosed`: Connection is closed
+- `SocketStateOpening`：正在建立连接
+- `SocketStateOpen`：连接已打开并可用
+- `SocketStateClosing`：连接正在关闭
+- `SocketStateClosed`：连接已关闭
 
-### Events
+### 事件
 
-- `open`: Connection established
-- `message`: Message received
-- `close`: Connection closed
-- `error`: Error occurred
-- `upgrade`: Transport upgraded
-- `upgradeError`: Transport upgrade failed
-- `packet`: Raw packet received
-- `drain`: Write buffer drained
+- `open`：连接已建立
+- `message`：收到消息
+- `close`：连接已关闭
+- `error`：发生错误
+- `upgrade`：传输方式升级完成
+- `upgradeError`：传输方式升级失败
+- `packet`：收到原始数据包
+- `drain`：写缓冲区已清空
 
-### Transport Types
+### 传输类型
 
 ```go
 import "github.com/aqcool/socket.io/clients/engine/v3/transports"
@@ -141,17 +141,17 @@ transports.WebSocket    // WebSocket
 transports.WebTransport // WebTransport (experimental)
 ```
 
-## Development
+## 开发
 
-### Running Tests
+### 运行测试
 
 ```bash
 make test
 ```
 
-### Debugging
+### 调试
 
-Enable debug logs:
+启用调试日志：
 
 ```go
 import "github.com/aqcool/socket.io/v3/pkg/log"
@@ -163,19 +163,19 @@ log.DEBUG = true
 make test
 ```
 
-## Contributing
+## 参与贡献
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork 本仓库
+2. 创建功能分支（`git checkout -b feature/amazing-feature`）
+3. 提交改动（`git commit -m 'Add some amazing feature'`）
+4. 推送分支（`git push origin feature/amazing-feature`）
+5. 创建拉取请求
 
-## License
+## 许可证
 
-MIT License - see [LICENSE](LICENSE) file for details.
+采用 MIT 许可证，详情请参阅 [LICENSE](LICENSE) 文件。
 
-## Related Projects
+## 相关项目
 
-- [Engine.IO Protocol](https://github.com/socketio/engine.io-protocol)
-- [Engine.IO Server](../../servers/engine)
+- [Engine.IO 协议](https://github.com/socketio/engine.io-protocol)
+- [Engine.IO 服务端](../../servers/engine)

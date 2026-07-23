@@ -1,27 +1,27 @@
-# Socket.IO Unix Domain Socket Adapter
+# Socket.IO Unix 域套接字适配器
 
-The package allows broadcasting packets between multiple Socket.IO servers using Unix Domain Sockets as the message broker.
+本包以 Unix 域套接字作为消息代理，支持在多个 Socket.IO 服务端之间广播数据包。
 
-This adapter is suitable for multi-process deployments on the same machine where low-latency IPC is desired without depending on external services like Redis or PostgreSQL.
+本适配器适用于同一主机上的多进程部署，可在不依赖 Redis 或 PostgreSQL 等外部服务的情况下实现低延迟进程间通信。
 
-## Table of Contents
+## 目录
 
-- [Installation](#installation)
-- [Usage](#usage)
-  - [Adapter](#adapter)
-  - [Emitter](#emitter)
-- [How It Works](#how-it-works)
-- [License](#license)
+- [安装](#安装)
+- [用法](#用法)
+  - [适配器](#适配器)
+  - [发射器](#发射器)
+- [工作原理](#工作原理)
+- [许可证](#许可证)
 
-## Installation
+## 安装
 
 ```bash
 go get github.com/aqcool/socket.io/adapters/unix/v3
 ```
 
-## Usage
+## 用法
 
-### Adapter
+### 适配器
 
 ```go
 package main
@@ -62,9 +62,9 @@ func main() {
 }
 ```
 
-### Emitter
+### 发射器
 
-The emitter allows you to send events to connected clients from any process, without running a full Socket.IO server:
+发射器允许从任意进程向已连接客户端发送事件，无需运行完整的 Socket.IO 服务端：
 
 ```go
 package main
@@ -101,24 +101,24 @@ func main() {
 }
 ```
 
-## How It Works
+## 工作原理
 
-Each Socket.IO server node creates a unique Unix Domain Socket listener file:
+每个 Socket.IO 服务端节点都会创建唯一的 Unix 域套接字监听文件：
 
 ```
 /tmp/socket.io.sock.{server-uid}
 ```
 
-When a message needs to be broadcast, the adapter scans the socket directory for all peer listener files matching the base path pattern and sends the message to each peer via Unix datagram sockets.
+需要广播消息时，适配器会扫描套接字目录，查找符合基础路径模式的所有对等节点监听文件，并通过 Unix 数据报套接字将消息发送给每个节点。
 
-**Message encoding:**
-- JSON for non-binary messages
-- MessagePack for binary messages
+**消息编码：**
+- 非二进制消息使用 JSON
+- 二进制消息使用 MessagePack
 
-**Peer discovery:**
-- File-system based: each node creates a `{base}.{uid}` socket file
-- Peers are discovered by scanning the socket directory
+**节点发现：**
+- 基于文件系统：每个节点创建一个 `{base}.{uid}` 套接字文件
+- 通过扫描套接字目录发现其他节点
 
-## License
+## 许可证
 
 [MIT](LICENSE)

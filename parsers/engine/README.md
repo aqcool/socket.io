@@ -3,27 +3,27 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/parsers/engine/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/parsers/engine/v3)
 [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/parsers/engine/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/parsers/engine/v3)
 
-## Description
+## 简介
 
-A Go implementation of the Engine.IO protocol parser. This package is used by both the [Engine.IO client](../../clients/engine) and [Engine.IO server](../../servers/engine) for protocol encoding and decoding.
+Engine.IO 协议解析器的 Go 实现。[Engine.IO 客户端](../../clients/engine)和 [Engine.IO 服务端](../../servers/engine)均使用本包进行协议编解码。
 
-## Installation
+## 安装
 
 ```bash
 go get github.com/aqcool/socket.io/parsers/engine/v3
 ```
 
-## Features
+## 特性
 
-- Packet encoding/decoding
-- Payload encoding/decoding
-- Binary data support
-- Protocol v3 and v4 support
-- UTF-8 encoding support
+- 数据包编解码
+- 载荷编解码
+- 二进制数据支持
+- 支持协议 v3 和 v4
+- UTF-8 编码支持
 
-## How to use
+## 使用方法
 
-### Basic Usage
+### 基本用法
 
 ```go
 package main
@@ -59,7 +59,7 @@ func main() {
 }
 ```
 
-### Working with Payloads
+### 处理载荷
 
 ```go
 func handlePayload() {
@@ -90,9 +90,9 @@ func handlePayload() {
 }
 ```
 
-## API Reference
+## API 参考
 
-### Parser Interface
+### Parser 接口
 
 #### EncodePacket
 
@@ -100,9 +100,9 @@ func handlePayload() {
 EncodePacket(packet *packet.Packet, supportsBinary bool) (types.BufferInterface, error)
 ```
 
-- `packet`: The packet to encode
-- `supportsBinary`: Enable binary support
-- Returns: Encoded packet and error if any
+- `packet`：待编码的数据包
+- `supportsBinary`：是否启用二进制支持
+- 返回：编码后的数据包及可能发生的错误
 
 #### DecodePacket
 
@@ -110,8 +110,8 @@ EncodePacket(packet *packet.Packet, supportsBinary bool) (types.BufferInterface,
 DecodePacket(data types.BufferInterface) (*packet.Packet, error)
 ```
 
-- `data`: The data to decode
-- Returns: Decoded packet and error if any
+- `data`：待解码的数据
+- 返回：解码后的数据包及可能发生的错误
 
 #### EncodePayload
 
@@ -119,8 +119,8 @@ DecodePacket(data types.BufferInterface) (*packet.Packet, error)
 EncodePayload(packets []*packet.Packet) (types.BufferInterface, error)
 ```
 
-- `packets`: Array of packets to encode
-- Returns: Encoded payload and error if any
+- `packets`：待编码的数据包数组
+- 返回：编码后的载荷及可能发生的错误
 
 #### DecodePayload
 
@@ -128,36 +128,36 @@ EncodePayload(packets []*packet.Packet) (types.BufferInterface, error)
 DecodePayload(data types.BufferInterface) ([]*packet.Packet, error)
 ```
 
-- `data`: The payload to decode
-- Returns: Array of decoded packets and error if any
+- `data`：待解码的载荷
+- 返回：解码后的数据包数组及可能发生的错误
 
-## Development
+## 开发
 
-### Prerequisites
+### 前置条件
 
 - Go 1.26.0+
 - Make
 
-### Testing
+### 测试
 
-Run the test suite:
+运行测试套件：
 
 ```bash
 make test
 ```
 
-## Contributing
+## 参与贡献
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork 本仓库
+2. 创建功能分支（`git checkout -b feature/amazing-feature`）
+3. 提交改动（`git commit -m 'Add some amazing feature'`）
+4. 推送分支（`git push origin feature/amazing-feature`）
+5. 创建拉取请求
 
-## Support
+## 支持
 
-If you encounter any issues or have questions, please file them in the [issues section](https://github.com/aqcool/socket.io/issues).
+如果遇到问题或有任何疑问，请在 [Issue 区](https://github.com/aqcool/socket.io/issues)提交。
 
-## License
+## 许可证
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+本项目采用 MIT 许可证，详情请参阅 [LICENSE](LICENSE) 文件。

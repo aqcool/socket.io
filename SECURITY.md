@@ -1,61 +1,61 @@
-# Security Policy
+# 安全策略
 
-## Supported Versions
+## 支持的版本
 
-The following versions of Socket.IO Go implementation are currently being supported with security updates:
+Socket.IO Go 实现当前为以下版本提供安全更新：
 
-| Version | Supported          |
+| 版本    | 是否支持           |
 | ------- | ------------------ |
 | 3.x.x   | :white_check_mark: |
 | 2.x.x   | :x:                |
 | 1.x.x   | :x:                |
 
-## Reporting a Vulnerability
+## 报告漏洞
 
-We take the security of Socket.IO Go implementation seriously. If you believe you have found a security vulnerability, please follow these steps:
+我们高度重视 Socket.IO Go 实现的安全性。如果你认为发现了安全漏洞，请按以下步骤报告：
 
-1. **Do Not** disclose the vulnerability publicly.
-2. Open a private [GitHub security advisory](https://github.com/aqcool/socket.io/security/advisories/new) with details of the issue.
+1. **请勿**公开披露漏洞。
+2. 创建私密的 [GitHub 安全公告](https://github.com/aqcool/socket.io/security/advisories/new)，并提供问题详情。
 
-Please include the following information in your report:
+报告中请包含以下信息：
 
-- A clear description of the vulnerability
-- Steps to reproduce the issue
-- Affected versions
-- Potential impact
-- Any possible mitigations
+- 清晰的漏洞说明
+- 问题复现步骤
+- 受影响版本
+- 潜在影响
+- 可行的缓解措施
 
-## Response Timeline
+## 响应时间
 
-- Initial response: within 48 hours
-- Status update: within 5 business days
-- Security patch: timeline will vary based on severity and complexity
+- 首次响应：48 小时内
+- 状态更新：5 个工作日内
+- 安全补丁：根据严重程度和复杂度确定发布时间
 
-## Security Update Process
+## 安全更新流程
 
-1. The security team will acknowledge receipt of your vulnerability report
-2. We will investigate and validate the issue
-3. We will develop and test a fix
-4. A security advisory will be published once the fix is ready
-5. The fix will be deployed to all supported versions
+1. 安全团队确认收到漏洞报告
+2. 调查并验证问题
+3. 开发并测试修复方案
+4. 修复完成后发布安全公告
+5. 将修复应用到所有受支持版本
 
-## Best Practices
+## 安全最佳实践
 
-When using Socket.IO in your applications, consider these security best practices:
+在应用中使用 Socket.IO 时，建议遵循以下安全最佳实践：
 
-1. Always use the latest stable version
-2. Implement proper authentication mechanisms
-3. Use secure WebSocket connections (wss://)
-4. Configure CORS policies appropriately
-5. Regularly update dependencies
+1. 始终使用最新稳定版本
+2. 实现适当的身份认证机制
+3. 使用安全的 WebSocket 连接（`wss://`）
+4. 正确配置 CORS 策略
+5. 定期更新依赖项
 
-## Public Disclosure
+## 公开披露
 
-Security vulnerabilities will be disclosed via:
+安全漏洞将通过以下渠道披露：
 
-1. GitHub Security Advisories
-2. Release notes
+1. GitHub 安全公告
+2. 发布说明
 
-## Contact
+## 联系方式
 
-For security-related inquiries, use [GitHub Private Vulnerability Reporting](https://github.com/aqcool/socket.io/security/advisories/new).
+如有安全相关问题，请使用 [GitHub 私密漏洞报告](https://github.com/aqcool/socket.io/security/advisories/new)。

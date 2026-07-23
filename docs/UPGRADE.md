@@ -1,21 +1,21 @@
-# Upgrade Guide
+# 升级指南
 
-## Table of Contents
+## 目录
 
-- [What's New in v3](#whats-new-in-v3)
-- [Upgrading from v1/v2 to v3](#upgrading-from-v1v2-to-v3)
-  - [Estimated Upgrade Time](#estimated-upgrade-time-30---60-minutes)
-  - [High Impact Changes](#high-impact-changes)
-  - [Medium Impact Changes](#medium-impact-changes)
-  - [Low Impact Changes](#low-impact-changes)
-  - [Updating Dependencies](#updating-dependencies)
-  - [Import Path Updates](#import-path-updates)
-  - [Breaking Changes](#breaking-changes)
-  - [Quick Start Example](#quick-start-example)
-  - [Testing Your Upgrade](#testing-your-upgrade)
-  - [Common Issues](#common-issues)
-  - [Need Help?](#need-help)
-- [Release Notes](#release-notes)
+- [v3 新特性](#v3-新特性)
+- [从 v1/v2 升级到 v3](#从-v1v2-升级到-v3)
+  - [预计升级时间](#预计升级时间30--60-分钟)
+  - [高影响改动](#高影响改动)
+  - [中等影响改动](#中等影响改动)
+  - [低影响改动](#低影响改动)
+  - [更新依赖](#更新依赖)
+  - [导入路径更新](#导入路径更新)
+  - [破坏性改动](#破坏性改动)
+  - [快速开始示例](#快速开始示例)
+  - [测试升级结果](#测试升级结果)
+  - [常见问题](#常见问题)
+  - [获取帮助](#获取帮助)
+- [发布说明](#发布说明)
   - [v3.0.0](#v300)
   - [v3.0.0-rc.14](#v300-rc14)
   - [v3.0.0-rc.13](#v300-rc13)
@@ -28,23 +28,23 @@
 
 ---
 
-## What's New in v3
+## v3 新特性
 
-Socket.IO for Go **v3.0.0** is a major release that brings the following key improvements:
+Socket.IO Go **v3.0.0** 是一个大版本更新，主要改进如下：
 
-| Feature | Description |
+| 特性 | 说明 |
 |---------|-------------|
-| **Monorepo Consolidation** | All previously separate repositories (`engine.io-go-parser`, `engine.io`, `socket.io-go-parser`, `socket.io-client-go`, `socket.io-go-redis`) have been merged into a single monorepo with 9 versioned submodules |
-| **Unified Version Management** | All modules share a single version definition in `pkg/version`, ensuring consistency across the entire ecosystem |
-| **Protocol Alignment** | Aligned with the Socket.IO v4+ protocol for improved compatibility with the JavaScript ecosystem |
-| **Thread Safety** | Comprehensive concurrency fixes including atomic socket flags, mutex-protected middleware, copy-on-write patterns, and goroutine leak prevention |
-| **Type Safety** | Generic `types.Atomic[T]` replacing `atomic.Value`, `types.Optional[T]` for null safety, strongly typed `Handshake` fields |
-| **New Utility Packages** | `pkg/slices` for safe slice operations, `pkg/queue` for ordered message delivery, `pkg/request` for HTTP client |
-| **Redis Cluster Support** | Sharded broadcast operator, CROSSSLOT error fixes, and dynamic channel subscription management |
-| **DoS Prevention** | HTTP body size limits on polling transport, configurable attachment count limits |
-| **Go 1.26.0** | Minimum Go version requirement updated to Go 1.26.0 |
+| **单体仓库整合** | 原先独立的多个仓库已合并为一个单体仓库，并划分为带版本的子模块 |
+| **统一版本管理** | 所有模块共享 `pkg/version` 中的版本定义，保证整个生态版本一致 |
+| **协议对齐** | 对齐 Socket.IO v4+ 协议，提高与 JavaScript 生态的兼容性 |
+| **线程安全** | 全面修复并发问题，包括原子 Socket 标志、互斥保护的中间件、写时复制及 goroutine 泄漏防护 |
+| **类型安全** | 使用泛型 `types.Atomic[T]` 替代 `atomic.Value`，提供 `types.Optional[T]` 和强类型 `Handshake` 字段 |
+| **新增工具包** | `pkg/slices` 提供安全切片操作，`pkg/queue` 保证消息顺序，`pkg/request` 提供 HTTP 客户端 |
+| **Redis Cluster 支持** | 支持分片广播、修复 CROSSSLOT 错误并提供动态频道订阅管理 |
+| **DoS 防护** | 限制 Polling 传输的 HTTP 请求体大小，并支持配置附件数量上限 |
+| **Go 1.26.0** | 最低 Go 版本更新为 1.26.0 |
 
-### Module Architecture
+### 模块架构
 
 ```
 github.com/aqcool/socket.io/
@@ -65,74 +65,74 @@ github.com/aqcool/socket.io/
 
 ---
 
-## Upgrading from v1/v2 to v3
+## 从 v1/v2 升级到 v3
 
-### Estimated Upgrade Time: 30 - 60 Minutes
+### 预计升级时间：30～60 分钟
 
-We recommend reviewing this entire upgrade guide to understand all changes. The upgrade process consolidates dependencies and updates import paths to align with the Socket.IO v4+ protocol, introducing improved performance and updated APIs.
+建议完整阅读本指南以了解全部改动。升级过程会整合依赖并更新导入路径，以对齐 Socket.IO v4+ 协议，同时带来性能提升和 API 更新。
 
-### High Impact Changes
+### 高影响改动
 
 <details>
-<summary>Dependency Structure Consolidation</summary>
+<summary>依赖结构整合</summary>
 
-All Socket.IO related packages are now consolidated under the main `github.com/aqcool/socket.io/` repository with versioned submodules.
+所有 Socket.IO 相关包现已整合到 `github.com/aqcool/socket.io/` 主仓库，并按子模块进行版本管理。
 
-**Likelihood Of Impact: Very High**
+**影响概率：非常高**
 
-This change affects every import in your application. All imports must be updated to use the new v3 paths.
+此改动会影响应用中的所有相关导入，必须全部更新为新的 v3 路径。
 </details>
 
 <details>
-<summary>Protocol Compatibility Update</summary>
+<summary>协议兼容性更新</summary>
 
-Socket.IO v3 aligns with the Socket.IO v4+ protocol, which means compatibility changes for all client connections.
+Socket.IO v3 对齐 Socket.IO v4+ 协议，因此所有客户端连接都会受到兼容性变化的影响。
 
-**Likelihood Of Impact: Very High**
+**影响概率：非常高**
 
-Your client-side Socket.IO library must be upgraded to version 4.x or higher. Clients using older versions (v2.x or v3.x) will not be able to connect to the v3 server.
+客户端 Socket.IO 库必须升级到 4.x 或更高版本。使用旧版本（v2.x 或 v3.x）的客户端无法连接 v3 服务端。
 
 ```bash
 # Update your frontend dependency
 npm install socket.io-client@^4.0.0
 ```
 
-**Action Required:**
+**必须执行：**
 
-- Coordinate with your frontend team to upgrade client libraries
-- Test all client connections after upgrade
-- Ensure backward compatibility strategy if gradual rollout is needed
+- 与前端团队协调升级客户端库
+- 升级后测试所有客户端连接
+- 如需灰度发布，请制定向后兼容策略
 
 </details>
 
 <details>
-<summary>Import Path Restructuring</summary>
+<summary>导入路径重构</summary>
 
-Every Socket.IO import path requires updating to the new v3 structure. This affects 8 major package categories.
+所有 Socket.IO 导入路径都需要更新为新的 v3 结构，涉及 8 类主要包。
 
-**Likelihood Of Impact: Very High**
+**影响概率：非常高**
 
-All package imports across your entire codebase must be systematically updated. This includes:
+需要系统性更新整个代码库中的包导入，包括：
 
-- Engine.IO Parser (`parsers/engine/v3`)
-- Socket.IO Parser (`parsers/socket/v3`)
-- Engine.IO Server (`servers/engine/v3`)
-- Socket.IO Server (`servers/socket/v3`)
-- Redis Adapter (`adapters/redis/v3`)
-- Valkey Adapter (`adapters/valkey/v3`) — new in v3
-- Engine.IO Client (`clients/engine/v3`)
-- Socket.IO Client (`clients/socket/v3`)
-- Common Types and Utils (`v3/pkg`)
+- Engine.IO 解析器（`parsers/engine/v3`）
+- Socket.IO 解析器（`parsers/socket/v3`）
+- Engine.IO 服务端（`servers/engine/v3`）
+- Socket.IO 服务端（`servers/socket/v3`）
+- Redis 适配器（`adapters/redis/v3`）
+- Valkey 适配器（`adapters/valkey/v3`，v3 新增）
+- Engine.IO 客户端（`clients/engine/v3`）
+- Socket.IO 客户端（`clients/socket/v3`）
+- 公共类型和工具（`v3/pkg`）
 
-See the [Import Path Updates](#import-path-updates) section for complete mapping tables.
+完整映射请参阅[导入路径更新](#导入路径更新)。
 </details>
 
 <details>
-<summary>Redis Adapter Type Changes</summary>
+<summary>Redis 适配器类型变更</summary>
 
-The Redis adapter has replaced `types.String` with `types.Atomic[string]` for better type safety.
+Redis 适配器已用 `types.Atomic[string]` 替换 `types.String`，以增强类型安全。
 
-**Likelihood Of Impact: High (if using Redis adapter)**
+**影响概率：高（使用 Redis 适配器时）**
 
 ```go
 // Before
@@ -146,14 +146,14 @@ var s types.Atomic[string]
 
 </details>
 
-### Medium Impact Changes
+### 中等影响改动
 
 <details>
-<summary>Socket Handshake Type Updates</summary>
+<summary>Socket 握手类型更新</summary>
 
-The `socket.Handshake` structure now uses more strongly typed fields:
+`socket.Handshake` 结构现使用更明确的强类型字段：
 
-**Likelihood Of Impact: Medium**
+**影响概率：中**
 
 ```go
 // Before
@@ -171,7 +171,7 @@ type Handshake struct {
 }
 ```
 
-Access patterns must be updated:
+必须更新访问方式：
 
 ```go
 // Before
@@ -186,11 +186,11 @@ userAgent := headers.Get("User-Agent")
 </details>
 
 <details>
-<summary>HttpContext API Refactoring</summary>
+<summary>HttpContext API 重构</summary>
 
-Several methods and properties of `*types.HttpContext` have been renamed or refactored from properties to methods.
+`*types.HttpContext` 的部分方法和属性已重命名，或由属性重构为方法。
 
-**Likelihood Of Impact: Medium**
+**影响概率：中**
 
 ```go
 // Before
@@ -214,34 +214,34 @@ func example(ctx *types.HttpContext) {
 }
 ```
 
-**Changes summary:**
+**变更摘要：**
 
-- `ResponseHeaders` → `ResponseHeaders()` (property to method)
+- `ResponseHeaders` → `ResponseHeaders()`（属性改为方法）
 - `GetHost()` → `Host()`
 - `GetMethod()` → `Method()`
 - `Gets(key)` → `Query().Gets(key)`
 - `Get(key)` → `Query().Get(key)`
 - `GetPathInfo()` → `PathInfo()`
 
-**New/Updated methods:**
+**新增或更新的方法：**
 
-| Method | Description |
+| 方法 | 说明 |
 |--------|-------------|
-| `Path()` | Returns cleaned path (without leading/trailing slashes) |
-| `UserAgent()` | Returns User-Agent header value |
-| `Secure()` | Returns `true` if TLS connection |
-| `SetStatusCode(code)` | Now returns `error` for validation |
-| `IsDone()` | Check if response has been written |
-| `Done()` | Returns `<-chan struct{}` instead of `<-chan Void` |
+| `Path()` | 返回去除首尾斜杠的规范化路径 |
+| `UserAgent()` | 返回 User-Agent 请求头值 |
+| `Secure()` | TLS 连接时返回 `true` |
+| `SetStatusCode(code)` | 现在返回用于校验的 `error` |
+| `IsDone()` | 检查响应是否已写入 |
+| `Done()` | 返回 `<-chan struct{}`，不再返回 `<-chan Void` |
 
 </details>
 
 <details>
-<summary>Config GetRaw* Method Changes</summary>
+<summary>配置项 GetRaw* 方法变更</summary>
 
-All `GetRaw*` methods now return `types.Optional[T]` instead of pointer types for better null safety:
+所有 `GetRaw*` 方法现在返回 `types.Optional[T]` 而非指针类型，以提升空值安全性：
 
-**Likelihood Of Impact: Medium**
+**影响概率：中**
 
 ```go
 // Before
@@ -262,11 +262,11 @@ func configExample(config ConnectionStateRecoveryInterface) {
 </details>
 
 <details>
-<summary>ParameterBag Package Migration</summary>
+<summary>ParameterBag 包迁移</summary>
 
-`ParameterBag` has been moved from the `utils` package to the `types` package.
+`ParameterBag` 已从 `utils` 包迁移到 `types` 包。
 
-**Likelihood Of Impact: Medium**
+**影响概率：中**
 
 ```go
 // Before
@@ -289,11 +289,11 @@ func example() {
 </details>
 
 <details>
-<summary>Adapter Utility Functions Reorganization</summary>
+<summary>适配器工具函数重组</summary>
 
-Utility functions like `SliceMap` and `Tap` have been moved from the `adapter` package to dedicated `pkg` subpackages.
+`SliceMap`、`Tap` 等工具函数已从 `adapter` 包迁移到专用的 `pkg` 子包。
 
-**Likelihood Of Impact: Medium**
+**影响概率：中**
 
 ```go
 // Before
@@ -316,39 +316,39 @@ func example() {
 }
 ```
 
-**Changes summary:**
+**变更摘要：**
 
-- `adapter.SliceMap` → `slices.Map` (moved to `pkg/slices`)
-- `adapter.Tap` → `utils.Tap` (moved to `pkg/utils`)
+- `adapter.SliceMap` → `slices.Map`（迁移至 `pkg/slices`）
+- `adapter.Tap` → `utils.Tap`（迁移至 `pkg/utils`）
 
-**New functions in `pkg/slices`:**
+**`pkg/slices` 中的新增函数：**
 
-The new `pkg/slices` package provides additional utility functions:
+新的 `pkg/slices` 包提供以下工具函数：
 
-| Function | Description |
+| 函数 | 说明 |
 |----------|-------------|
-| `Get(s, idx)` | Safely retrieves an element with bounds checking |
-| `GetAny[O](vals, idx)` | Retrieves and type-asserts from `[]any` |
-| `TryGet(s, idx)` | Returns zero value if out of bounds |
-| `TryGetAny[O](vals, idx)` | Type-asserts from `[]any` or returns zero |
-| `GetWithDefault(s, idx, def)` | Returns default value if out of bounds |
-| `GetPtr(s, idx)` | Returns pointer to element or nil |
-| `Slice(s, start)` | Safe sub-slice with bounds checking |
-| `First(s)` / `Last(s)` | Get first/last element safely |
-| `Filter(s, predicate)` | Filter elements by predicate |
-| `Map(vals, transform)` | Transform each element |
-| `Reduce(vals, initial, reducer)` | Reduce to single value |
-| `IsEmpty(s)` | Check if slice is nil or empty |
-| `IsValidIndex(s, idx)` | Check if index is valid |
+| `Get(s, idx)` | 检查边界后安全获取元素 |
+| `GetAny[O](vals, idx)` | 从 `[]any` 获取元素并进行类型断言 |
+| `TryGet(s, idx)` | 越界时返回零值 |
+| `TryGetAny[O](vals, idx)` | 从 `[]any` 进行类型断言，失败时返回零值 |
+| `GetWithDefault(s, idx, def)` | 越界时返回默认值 |
+| `GetPtr(s, idx)` | 返回元素指针，越界时返回 nil |
+| `Slice(s, start)` | 检查边界后安全截取子切片 |
+| `First(s)` / `Last(s)` | 安全获取首个或末尾元素 |
+| `Filter(s, predicate)` | 按条件筛选元素 |
+| `Map(vals, transform)` | 转换每个元素 |
+| `Reduce(vals, initial, reducer)` | 将元素归约为单个值 |
+| `IsEmpty(s)` | 检查切片是否为 nil 或空 |
+| `IsValidIndex(s, idx)` | 检查索引是否有效 |
 
 </details>
 
 <details>
-<summary>ExtendedError Type Consolidation</summary>
+<summary>ExtendedError 类型整合</summary>
 
-The `ExtendedError` type has been consolidated from separate implementations in `clients/socket` and `servers/socket` packages into a single shared implementation in `pkg/types`. This eliminates code duplication and provides a consistent error type across the entire codebase.
+`clients/socket` 和 `servers/socket` 中各自的 `ExtendedError` 已整合为 `pkg/types` 中的共享实现，消除了重复代码，并为整个代码库提供统一的错误类型。
 
-**Likelihood Of Impact: Medium**
+**影响概率：中**
 
 ```go
 // Before (client-side)
@@ -369,22 +369,22 @@ err := types.NewExtendedError("error message", map[string]any{"code": 401})
 data := err.Data  // Now uses direct field access
 ```
 
-**Key changes:**
+**主要变更：**
 
 - `clients/socket.ExtendedError` → `types.ExtendedError`
-- `servers/socket.ExtendedError` → `types.ExtendedError` (type alias maintained for backward compatibility)
-- Server-side `Data()` method replaced with `Data` field for consistency
-- Both client and server now share the same `ExtendedError` implementation
+- `servers/socket.ExtendedError` → `types.ExtendedError`（保留类型别名以向后兼容）
+- 服务端的 `Data()` 方法改为 `Data` 字段
+- 客户端和服务端现在共享同一个 `ExtendedError` 实现
 
-**Note:** The server-side `socket` package retains a type alias for `ExtendedError` and a wrapper function `NewExtendedError` for backward compatibility, so existing server code may continue to work without changes. However, client-side code must update imports.
+**注意：** 为保持向后兼容，服务端 `socket` 包保留了 `ExtendedError` 类型别名和 `NewExtendedError` 包装函数，因此现有服务端代码可能无需修改；客户端代码则必须更新导入。
 </details>
 
 <details>
-<summary>Redis SubscriptionMode Type Migration</summary>
+<summary>Redis SubscriptionMode 类型迁移</summary>
 
-The `SubscriptionMode` type has been moved from `adapters/redis/adapter` package to the root `adapters/redis` package for better organization and sharing between adapter and emitter.
+`SubscriptionMode` 已从 `adapters/redis/adapter` 包迁移到根 `adapters/redis` 包，以便适配器和发射器共享。
 
-**Likelihood Of Impact: Medium (if using Redis sharded adapter)**
+**影响概率：中（使用 Redis 分片适配器时）**
 
 ```go
 // Before
@@ -403,24 +403,24 @@ opts := adapter.NewShardedRedisAdapterOptions()
 opts.SetSubscriptionMode(redis.DynamicSubscriptionMode)
 ```
 
-**Key changes:**
+**主要变更：**
 
-| Before | After |
+| 之前 | 之后 |
 |--------|-------|
 | `adapter.SubscriptionMode` | `redis.SubscriptionMode` |
 | `adapter.StaticSubscriptionMode` | `redis.StaticSubscriptionMode` |
 | `adapter.DynamicSubscriptionMode` | `redis.DynamicSubscriptionMode` |
 | `adapter.DynamicPrivateSubscriptionMode` | `redis.DynamicPrivateSubscriptionMode` |
 
-**New additions:**
+**新增内容：**
 
-- `redis.DefaultSubscriptionMode` - Default mode constant
-- `redis.PrivateRoomIdLength` - Length constant for private room detection
-- `redis.ShouldUseDynamicChannel(mode, room)` - Shared helper function
+- `redis.DefaultSubscriptionMode`——默认模式常量
+- `redis.PrivateRoomIdLength`——用于识别私有房间的长度常量
+- `redis.ShouldUseDynamicChannel(mode, room)`——共享辅助函数
 
-**Emitter options extended:**
+**发射器选项扩展：**
 
-The `EmitterOptions` now supports sharded Pub/Sub configuration:
+`EmitterOptions` 现在支持分片 Pub/Sub 配置：
 
 ```go
 emitterOpts := emitter.NewEmitterOptions()
@@ -429,31 +429,31 @@ emitterOpts.SetSubscriptionMode(redis.DynamicSubscriptionMode)
 ```
 </details>
 
-### Low Impact Changes
+### 低影响改动
 
 <details>
-<summary>Debug Logging Improvements</summary>
+<summary>调试日志改进</summary>
 
-Debug logging has been updated to provide more consistent output across all packages.
+调试日志已更新，使所有包的输出格式更加一致。
 
-**Likelihood Of Impact: Low**
+**影响概率：低**
 
-No code changes required, but log output format may differ slightly.
+无需修改代码，但日志输出格式可能略有变化。
 </details>
 
 <details>
-<summary>Internal Type Reorganization</summary>
+<summary>内部类型重组</summary>
 
-Some internal types have been reorganized for better code maintainability. These changes should not affect public API usage but may impact code that relies on internal types.
+为提升可维护性，部分内部类型已重新组织。这些改动不会影响公开 API，但可能影响依赖内部类型的代码。
 
-**Likelihood Of Impact: Low**
+**影响概率：低**
 
-If you're importing internal packages, review your imports after upgrading.
+如果代码导入了内部包，请在升级后检查相关导入。
 </details>
 
-## Updating Dependencies
+## 更新依赖
 
-Update your `go.mod` to require the Socket.IO v3 packages:
+更新 `go.mod`，引入 Socket.IO v3 包：
 
 ```bash
 go get github.com/aqcool/socket.io/v3@latest
@@ -467,13 +467,13 @@ go get github.com/aqcool/socket.io/clients/engine/v3@latest
 go get github.com/aqcool/socket.io/clients/socket/v3@latest
 ```
 
-Clean up your dependencies after updating:
+更新后清理依赖：
 
 ```bash
 go mod tidy
 ```
 
-Example `go.mod` entries:
+`go.mod` 示例：
 
 ```go
 require (
@@ -491,29 +491,29 @@ require (
 
 ---
 
-## Import Path Updates
+## 导入路径更新
 
-Update all Socket.IO import paths throughout your application using the following reference tables:
+请参考以下表格更新应用中的所有 Socket.IO 导入路径：
 
-### Engine.IO Parser
+### Engine.IO 解析器
 
-| v1/v2 Import | v3 Import |
+| v1/v2 导入 | v3 导入 |
 |--------------|-----------|
 | `github.com/zishang520/engine.io-go-parser/packet` | `github.com/aqcool/socket.io/parsers/engine/v3/packet` |
 | `github.com/zishang520/engine.io-go-parser/parser` | `github.com/aqcool/socket.io/parsers/engine/v3/parser` |
 | `github.com/zishang520/engine.io-go-parser/types` | `github.com/aqcool/socket.io/v3/pkg/types` |
 | `github.com/zishang520/engine.io-go-parser/utils` | `github.com/aqcool/socket.io/v3/pkg/utils` |
 
-### Socket.IO Parser
+### Socket.IO 解析器
 
-| v1/v2 Import | v3 Import |
+| v1/v2 导入 | v3 导入 |
 |--------------|-----------|
 | `github.com/zishang520/socket.io-go-parser/parser` | `github.com/aqcool/socket.io/parsers/socket/v3/parser` |
 | `github.com/zishang520/socket.io-go-parser/v2/parser` | `github.com/aqcool/socket.io/parsers/socket/v3/parser` |
 
-### Engine.IO Server
+### Engine.IO 服务端
 
-| v1/v2 Import | v3 Import |
+| v1/v2 导入 | v3 导入 |
 |--------------|-----------|
 | `github.com/zishang520/engine.io/config` | `github.com/aqcool/socket.io/servers/engine/v3/config` |
 | `github.com/zishang520/engine.io/v2/config` | `github.com/aqcool/socket.io/servers/engine/v3/config` |
@@ -533,46 +533,46 @@ Update all Socket.IO import paths throughout your application using the followin
 | `github.com/zishang520/engine.io/v2/utils` | `github.com/aqcool/socket.io/v3/pkg/utils` |
 | `github.com/zishang520/engine.io/v2/webtransport` | `github.com/aqcool/socket.io/v3/pkg/webtransport` |
 
-### Socket.IO Server
+### Socket.IO 服务端
 
-| v1/v2 Import | v3 Import |
+| v1/v2 导入 | v3 导入 |
 |--------------|-----------|
 | `github.com/zishang520/socket.io/socket` | `github.com/aqcool/socket.io/servers/socket/v3` |
 | `github.com/zishang520/socket.io/v2/socket` | `github.com/aqcool/socket.io/servers/socket/v3` |
 | `github.com/zishang520/socket.io/v2/adapter` | `github.com/aqcool/socket.io/adapters/adapter/v3` |
 
-### Redis Adapter
+### Redis 适配器
 
-| v1 Import | v3 Import |
+| v1 导入 | v3 导入 |
 |-----------|-----------|
 | `github.com/zishang520/socket.io-go-redis/adapter` | `github.com/aqcool/socket.io/adapters/redis/v3/adapter` |
 | `github.com/zishang520/socket.io-go-redis/emitter` | `github.com/aqcool/socket.io/adapters/redis/v3/emitter` |
 | `github.com/zishang520/socket.io-go-redis/types` | `github.com/aqcool/socket.io/adapters/redis/v3` |
 
-### Redis Adapter Internal Migrations (v3)
+### Redis 适配器内部迁移（v3）
 
-| Before (adapter subpackage) | After (redis root package) |
+| 之前（adapter 子包） | 之后（redis 根包） |
 |-----------------------------|----------------------------|
 | `adapter.SubscriptionMode` | `redis.SubscriptionMode` |
 | `adapter.StaticSubscriptionMode` | `redis.StaticSubscriptionMode` |
 | `adapter.DynamicSubscriptionMode` | `redis.DynamicSubscriptionMode` |
 | `adapter.DynamicPrivateSubscriptionMode` | `redis.DynamicPrivateSubscriptionMode` |
 
-### Valkey Adapter (new in v3)
+### Valkey 适配器（v3 新增）
 
-The Valkey adapter is a new, independent module introduced in v3. It mirrors the `adapters/redis` module but uses the [`valkey-go`](https://github.com/valkey-io/valkey-go) client.
+Valkey 适配器是 v3 新增的独立模块，功能与 `adapters/redis` 模块一致，但使用 [`valkey-go`](https://github.com/valkey-io/valkey-go) 客户端。
 
 ```bash
 go get github.com/aqcool/socket.io/adapters/valkey/v3@latest
 ```
 
-| Package | Import Path |
+| 包 | 导入路径 |
 |---------|-------------|
-| Root types & client | `github.com/aqcool/socket.io/adapters/valkey/v3` |
-| Classic / Sharded / Streams adapters | `github.com/aqcool/socket.io/adapters/valkey/v3/adapter` |
-| Emitter | `github.com/aqcool/socket.io/adapters/valkey/v3/emitter` |
+| 根类型和客户端 | `github.com/aqcool/socket.io/adapters/valkey/v3` |
+| 经典、分片及 Streams 适配器 | `github.com/aqcool/socket.io/adapters/valkey/v3/adapter` |
+| 发射器 | `github.com/aqcool/socket.io/adapters/valkey/v3/emitter` |
 
-**Example `go.mod`:**
+**`go.mod` 示例：**
 
 ```go
 require (
@@ -580,7 +580,7 @@ require (
 )
 ```
 
-**Usage:**
+**用法：**
 
 ```go
 import (
@@ -595,7 +595,7 @@ valkeyClient := valkey.NewValkeyClient(context.Background(), client)
 server.SetAdapter(&vkadapter.ValkeyAdapterBuilder{Valkey: valkeyClient})
 ```
 
-**Read/write separation** (recommended for production):
+**读写分离**（生产环境推荐）：
 
 ```go
 pubClient, _ := vk.NewClient(vk.ClientOption{InitAddress: []string{"master:6379"}})
@@ -604,45 +604,45 @@ valkeyClient := valkey.NewValkeyClientWithSub(context.Background(), pubClient, s
 server.SetAdapter(&vkadapter.ValkeyAdapterBuilder{Valkey: valkeyClient})
 ```
 
-### Engine.IO Client
+### Engine.IO 客户端
 
-| v1 Import | v3 Import |
+| v1 导入 | v3 导入 |
 |-----------|-----------|
 | `github.com/zishang520/engine.io-client-go/engine` | `github.com/aqcool/socket.io/clients/engine/v3` |
 | `github.com/zishang520/engine.io-client-go/request` | `github.com/aqcool/socket.io/v3/pkg/request` |
 | `github.com/zishang520/engine.io-client-go/transports` | `github.com/aqcool/socket.io/clients/engine/v3/transports` |
 
-### Socket.IO Client
+### Socket.IO 客户端
 
-| v1 Import | v3 Import |
+| v1 导入 | v3 导入 |
 |-----------|-----------|
 | `github.com/zishang520/socket.io-client-go/socket` | `github.com/aqcool/socket.io/clients/socket/v3` |
 | `github.com/zishang520/socket.io-client-go/utils` | `github.com/aqcool/socket.io/v3/pkg/utils` |
 
-### Error Types (New in v3)
+### 错误类型（v3 新增）
 
-| Old Import | v3 Import |
+| 旧导入 | v3 导入 |
 |------------|-----------|
 | `clients/socket.ExtendedError` | `github.com/aqcool/socket.io/v3/pkg/types.ExtendedError` |
 | `servers/socket.ExtendedError` | `github.com/aqcool/socket.io/v3/pkg/types.ExtendedError` |
 
-> **Tip:** Use `grep -r "github.com/zishang520" .` to find all old imports, then use find-and-replace to update them systematically.
+> **提示：** 使用 `grep -r "github.com/zishang520" .` 查找所有旧导入，再通过查找替换统一更新。
 
 ---
 
-## Breaking Changes
+## 破坏性改动
 
-### Protocol Compatibility
+### 协议兼容性
 
-Socket.IO v3 aligns with the Socket.IO v4+ protocol. Ensure your client-side Socket.IO library is updated to version 4.x or higher.
+Socket.IO v3 对齐 Socket.IO v4+ 协议。请确保客户端 Socket.IO 库已升级到 4.x 或更高版本。
 
 ```bash
 npm install socket.io-client@^4.0.0
 ```
 
-### Redis Adapter Type Updates
+### Redis 适配器类型更新
 
-If you're using the Redis adapter, you must replace all instances of `types.String` with `types.Atomic[string]`:
+如果使用 Redis 适配器，必须将所有 `types.String` 替换为 `types.Atomic[string]`：
 
 ```go
 // Before
@@ -664,9 +664,9 @@ func example() {
 }
 ```
 
-### Socket Handshake Access Patterns
+### Socket 握手访问方式
 
-Update code that accesses handshake headers and query parameters:
+更新访问握手请求头和查询参数的代码：
 
 ```go
 // Before
@@ -688,9 +688,9 @@ func handleConnection(socket *socket.Socket) {
 }
 ```
 
-### Configuration Method Returns
+### 配置方法返回值
 
-Update code that uses `GetRaw*` configuration methods:
+更新使用 `GetRaw*` 配置方法的代码：
 
 ```go
 // Before
@@ -708,9 +708,9 @@ func configExample(config ConnectionStateRecoveryInterface) {
 }
 ```
 
-### ParameterBag Package Migration
+### ParameterBag 包迁移
 
-Update `*utils.ParameterBag` to `*types.ParameterBag`:
+将 `*utils.ParameterBag` 更新为 `*types.ParameterBag`：
 
 ```go
 // Before
@@ -722,9 +722,9 @@ import "github.com/aqcool/socket.io/v3/pkg/types"
 var bag *types.ParameterBag = types.NewParameterBag(nil)
 ```
 
-### Transport Upgrade Methods
+### 传输升级方法
 
-Transport upgrade methods now return `[]string` instead of `*types.Set[string]`:
+传输升级方法现在返回 `[]string`，不再返回 `*types.Set[string]`：
 
 ```go
 // Before
@@ -734,9 +734,9 @@ upgrades := transport.Upgrades() // *types.Set[string]
 upgrades := transport.Upgrades() // []string
 ```
 
-### HttpContext API Migration
+### HttpContext API 迁移
 
-| Before | After |
+| 之前 | 之后 |
 |--------|-------|
 | `ctx.ResponseHeaders` | `ctx.ResponseHeaders()` |
 | `ctx.GetHost()` | `ctx.Host()` |
@@ -745,16 +745,16 @@ upgrades := transport.Upgrades() // []string
 | `ctx.Get("key")` | `ctx.Query().Get("key")` |
 | `ctx.GetPathInfo()` | `ctx.PathInfo()` |
 
-### Utility Functions Migration
+### 工具函数迁移
 
-| Before | After |
+| 之前 | 之后 |
 |--------|-------|
 | `adapter.SliceMap(...)` | `slices.Map(...)` |
 | `adapter.Tap(...)` | `utils.Tap(...)` |
 
-### ExtendedError API Migration
+### ExtendedError API 迁移
 
-Server-side `Data()` method is now a field:
+服务端的 `Data()` 方法现已改为字段：
 
 ```go
 // Before
@@ -764,9 +764,9 @@ data := err.Data()
 data := err.Data
 ```
 
-### Redis SubscriptionMode Migration
+### Redis SubscriptionMode 迁移
 
-If using the sharded Redis adapter, update `SubscriptionMode` imports:
+如果使用 Redis 分片适配器，请更新 `SubscriptionMode` 导入：
 
 ```go
 // Before
@@ -782,9 +782,9 @@ opts.SetSubscriptionMode(redis.DynamicSubscriptionMode)
 
 ---
 
-## Quick Start Example
+## 快速开始示例
 
-Here is a minimal server example after upgrading to v3:
+以下是升级到 v3 后的最小服务端示例：
 
 ```go
 package main
@@ -821,26 +821,26 @@ func main() {
 
 ---
 
-## Testing Your Upgrade
+## 测试升级结果
 
-After completing the upgrade, thoroughly test your application:
+完成升级后，请全面测试应用：
 
-### 1. Run Test Suite
+### 1. 运行测试套件
 
 ```bash
 go test ./...
 ```
 
-### 2. Test Core Functionality
+### 2. 测试核心功能
 
-- Client connections and disconnections
-- Event emission and reception
-- Namespace and room operations
-- Redis adapter broadcasting (if applicable)
+- 客户端连接和断开
+- 事件发送和接收
+- 命名空间与房间操作
+- Redis 适配器广播（如适用）
 
-### 3. Enable Debug Logging
+### 3. 启用调试日志
 
-Set the `DEBUG` environment variable to enable verbose logging:
+设置 `DEBUG` 环境变量以启用详细日志：
 
 ```bash
 # Linux / macOS
@@ -850,17 +850,17 @@ DEBUG=socket.io:* go run main.go
 $env:DEBUG="socket.io:*"; go run main.go
 ```
 
-### 4. Verify Client Compatibility
+### 4. 验证客户端兼容性
 
-Ensure your frontend uses Socket.IO client v4.x or higher.
+确保前端使用 Socket.IO 客户端 v4.x 或更高版本。
 
 ```bash
 npm install socket.io-client@^4.0.0
 ```
 
-### 5. Run Benchmarks (Optional)
+### 5. 运行基准测试（可选）
 
-The `examples/benchmark` module provides a built-in benchmark test for validating performance:
+`examples/benchmark` 模块提供内置基准测试，可用于验证性能：
 
 ```bash
 cd examples/benchmark
@@ -869,9 +869,9 @@ go run main.go
 
 ---
 
-## Common Issues
+## 常见问题
 
-### Import Resolution Errors
+### 导入解析错误
 
 ```bash
 go mod tidy
@@ -879,15 +879,15 @@ go clean -modcache
 go mod download
 ```
 
-### Connection Protocol Mismatches
+### 连接协议不匹配
 
 ```bash
 npm install socket.io-client@^4.0.0
 ```
 
-### ExtendedError API Changes
+### ExtendedError API 变更
 
-If you encounter errors with `Data()` method calls on `ExtendedError`:
+如果调用 `ExtendedError` 的 `Data()` 方法时报错：
 
 ```go
 // Before (server-side)
@@ -899,59 +899,59 @@ data := err.Data
 
 ---
 
-## Need Help?
+## 获取帮助
 
-- [GitHub Issues](https://github.com/aqcool/socket.io/issues) — for confirmed bugs or feature requests
-- [GitHub Discussions](https://github.com/aqcool/socket.io/discussions/new?category=q-a) — for general questions and help
-- [Go Package Documentation](https://pkg.go.dev/github.com/aqcool/socket.io/v3) — API reference
-- [Socket.IO Protocol Documentation](https://socket.io/docs/v4/) — protocol specification
-- [Socket.IO Go Repository](https://github.com/aqcool/socket.io) — source code and examples
+- [GitHub Issues](https://github.com/aqcool/socket.io/issues)——用于报告已确认的缺陷或提出功能请求
+- [GitHub Discussions](https://github.com/aqcool/socket.io/discussions/new?category=q-a)——用于一般问题与使用帮助
+- [Go 包文档](https://pkg.go.dev/github.com/aqcool/socket.io/v3)——API 参考
+- [Socket.IO 协议文档](https://socket.io/docs/v4/)——协议规范
+- [Socket.IO Go 仓库](https://github.com/aqcool/socket.io)——源代码和示例
 
 ---
 
-## Release Notes
+## 发布说明
 
 ### v3.0.0
 
-> Released on 2026-04-13
+> 发布于 2026-04-13
 
-This is the **first stable release** of Socket.IO for Go v3. It includes all changes from the alpha, beta, and RC phases.
+这是 Socket.IO Go v3 的**首个稳定版本**，包含 alpha、beta 和 RC 阶段的全部改动。
 
-#### Highlights Since v2
+#### 相比 v2 的主要变化
 
-- **Monorepo consolidation**: 6 separate repositories merged into one monorepo with 9 versioned Go submodules
-- **Unified versioning**: Single version source at `pkg/version/version.go` shared by all modules
-- **Go 1.26.0 minimum**: Takes advantage of the latest Go features
-- **Protocol alignment**: Compatible with Socket.IO v4+ JavaScript clients
-- **Thread safety overhaul**: Atomic socket flags (copy-on-write), mutex-protected middleware, `sync.OnceValue` for lazy initialization, goroutine leak prevention via `runtime.SetFinalizer`
-- **Type safety improvements**: Generic `types.Atomic[T]`, `types.Optional[T]` for null safety, strongly typed `Handshake` fields (`IncomingHttpHeaders`, `ParsedUrlQuery`)
-- **New packages**: `pkg/slices` (safe slice operations), `pkg/queue` (sequential task queue for message ordering), `pkg/request` (HTTP client)
-- **Redis Cluster support**: Sharded broadcast operator, CROSSSLOT error fixes, dynamic channel subscriptions, pagination for session restoration
-- **Security hardening**: HTTP body size limits on polling (DoS prevention), configurable attachment count limits (default 10), immutable packet encoding
-- **Code quality**: golangci-lint integration, `errcheck` violations resolved, magic numbers replaced with named constants, standardized debug logging
+- **单体仓库整合**：将 6 个独立仓库合并为一个单体仓库和 9 个带版本的 Go 子模块
+- **统一版本**：所有模块共享 `pkg/version/version.go` 中的单一版本源
+- **最低 Go 1.26.0**：使用新版 Go 特性
+- **协议对齐**：兼容 Socket.IO v4+ JavaScript 客户端
+- **线程安全改造**：原子 Socket 标志（写时复制）、互斥保护中间件、使用 `sync.OnceValue` 延迟初始化，并通过 `runtime.SetFinalizer` 防止 goroutine 泄漏
+- **类型安全改进**：泛型 `types.Atomic[T]`、保证空值安全的 `types.Optional[T]`，以及强类型 `Handshake` 字段
+- **新增包**：`pkg/slices`（安全切片操作）、`pkg/queue`（保证消息顺序的串行任务队列）、`pkg/request`（HTTP 客户端）
+- **Redis Cluster 支持**：分片广播、CROSSSLOT 错误修复、动态频道订阅及会话恢复分页
+- **安全加固**：Polling 请求体大小限制（DoS 防护）、可配置附件数量上限（默认 10）及不可变数据包编码
+- **代码质量**：集成 golangci-lint、修复 `errcheck` 问题、以具名常量替代魔法数字并统一调试日志
 
-#### Migrating
+#### 迁移
 
-For a complete migration guide from v1/v2, see [Upgrading from v1/v2 to v3](#upgrading-from-v1v2-to-v3).
+从 v1/v2 迁移的完整说明请参阅[从 v1/v2 升级到 v3](#从-v1v2-升级到-v3)。
 
-#### Full Changelog
+#### 完整变更日志
 
-See the individual RC/beta/alpha release notes below for detailed per-release changes.
+各版本的详细改动请参阅下方 RC、beta 和 alpha 发布说明。
 
 ---
 
 ### v3.0.0-rc.14
 
-> Released from commit [`cc50fc2`](https://github.com/zishang520/socket.io/commit/cc50fc2)
+> 基于提交 [`cc50fc2`](https://github.com/zishang520/socket.io/commit/cc50fc2) 发布
 
-#### Breaking Changes and Behavior Updates
+#### 破坏性改动与行为更新
 
 <details>
-<summary>Parser: ERROR_PACKET Removed from Public API</summary>
+<summary>解析器：从公开 API 移除 ERROR_PACKET</summary>
 
-**Likelihood Of Impact: Low (only if directly referencing ERROR_PACKET)**
+**影响概率：低（仅限直接引用 ERROR_PACKET 的情况）**
 
-The shared mutable `ERROR_PACKET` singleton has been removed from the public API to prevent data race conditions. It has been replaced with an internal `newErrorPacket()` factory function that creates a fresh instance each time, avoiding shared mutable state across goroutines.
+为防止数据竞争，公开 API 已移除可变的共享 `ERROR_PACKET` 单例，改用内部 `newErrorPacket()` 工厂函数，每次创建新实例，避免 goroutine 之间共享可变状态。
 
 ```go
 // Before (no longer works)
@@ -963,15 +963,15 @@ var errPkt = parser.ERROR_PACKET
 // that internally create error packets as needed
 ```
 
-**Impact:** This is unlikely to affect most applications since `ERROR_PACKET` was an internal constant. If you were using it directly, you should rely on the public parser API methods instead.
+**影响：** `ERROR_PACKET` 原本属于内部常量，多数应用不受影响。如果曾直接使用它，请改用公开的解析器 API。
 </details>
 
 <details>
-<summary>Socket Packet Encoder: Encode() No Longer Mutates Input</summary>
+<summary>Socket 数据包编码器：Encode() 不再修改输入</summary>
 
-**Likelihood Of Impact: Low**
+**影响概率：低**
 
-The `Encode()` method in the Socket.IO packet encoder now creates a copy of the packet before mutation, preventing unintended side effects on the caller's packet object.
+Socket.IO 数据包编码器的 `Encode()` 方法现在会先复制数据包再修改，避免对调用方的数据包对象产生意外副作用。
 
 ```go
 // Before - Encode() modified the input packet's Type field
@@ -987,15 +987,15 @@ encoded := encoder.Encode(pkt)
 // pkt.Type remains EVENT (not mutated)
 ```
 
-**Impact:** This is a behavior fix that makes code more predictable. If your code was relying on the side effect of `Encode()` mutating the input packet, you need to update it to handle packets immutably.
+**影响：** 此行为修复使代码更可预测。如果代码依赖 `Encode()` 修改输入数据包的副作用，需要改为以不可变方式处理数据包。
 </details>
 
 <details>
-<summary>Socket.IO Parser: Configurable Attachment Count Limit</summary>
+<summary>Socket.IO 解析器：可配置的附件数量上限</summary>
 
-**Likelihood Of Impact: Low**
+**影响概率：低**
 
-The attachment limit has been reduced from a hardcoded 1000 to a configurable per-decoder instance default of 10 (aligned with the upstream Node.js implementation). The limit is now controlled via `DecoderOptions` instead of a package-level constant.
+附件上限由硬编码的 1000 调整为每个解码器实例可配置、默认 10 个（与上游 Node.js 实现一致），现通过 `DecoderOptions` 控制，不再使用包级常量。
 
 ```go
 import "github.com/aqcool/socket.io/parsers/socket/v3/parser"
@@ -1009,17 +1009,17 @@ decoder := parser.NewDecoder(&parser.DecoderOptions{
 })
 ```
 
-Packets exceeding the limit will be rejected with `parser.ErrTooManyAttachments`.
+超过上限的数据包会以 `parser.ErrTooManyAttachments` 错误拒绝。
 
-**Impact:** Applications sending more than 10 attachments in a single packet will now be rejected. If you encounter this error, split large payloads into multiple packets or configure a higher limit.
+**影响：** 单个数据包发送超过 10 个附件时将被拒绝。遇到此错误时，请将大型载荷拆分为多个数据包，或配置更高上限。
 </details>
 
 <details>
-<summary>Engine.IO Polling: HTTP Body Size Limit</summary>
+<summary>Engine.IO Polling：HTTP 请求体大小限制</summary>
 
-**Likelihood Of Impact: Medium (only if sending very large payloads via polling)**
+**影响概率：中（仅限通过 Polling 发送超大载荷的情况）**
 
-The polling transport now enforces `MaxHttpBufferSize` limit on request body reads to prevent unbounded memory consumption (DoS prevention).
+Polling 传输现在会在读取请求体时强制执行 `MaxHttpBufferSize` 限制，以防止内存无限增长（DoS 防护）。
 
 ```go
 // Before - No limit on body size
@@ -1029,7 +1029,7 @@ The polling transport now enforces `MaxHttpBufferSize` limit on request body rea
 // Large payloads exceeding the limit are truncated/rejected
 ```
 
-**Impact:** If you're sending payloads larger than `MaxHttpBufferSize` (default 1 MB) via polling transport, they will be truncated or rejected. Use WebSocket/WebTransport for larger messages or increase the limit:
+**影响：** 通过 Polling 发送大于 `MaxHttpBufferSize`（默认 1 MB）的载荷时，数据将被截断或拒绝。大型消息请使用 WebSocket/WebTransport，或提高限制：
 
 ```go
 import "github.com/aqcool/socket.io/servers/engine/v3/config"
@@ -1039,14 +1039,14 @@ opts.SetMaxHttpBufferSize(10 * 1024 * 1024) // 10 MB
 ```
 </details>
 
-#### Bug Fixes
+#### 缺陷修复
 
 <details>
-<summary>WebSocket/WebTransport: Send Loop Behavior</summary>
+<summary>WebSocket/WebTransport：发送循环行为</summary>
 
-**Likelihood Of Impact: Very Low**
+**影响概率：非常低**
 
-Fixed send loop early return bug that was previously dropping remaining packets in queue when an encoded frame was sent successfully.
+修复发送循环提前返回的问题。此前成功发送一个编码帧后，队列中的剩余数据包会被丢弃。
 
 ```go
 // Before - Send loop would return after first packet, dropping queue
@@ -1057,15 +1057,15 @@ Fixed send loop early return bug that was previously dropping remaining packets 
 // All packets in queue are sent correctly
 ```
 
-**Impact:** This is a bug fix that improves reliability. Previously, only the first queued packet would be sent; now all queued packets are sent as expected. No code changes required.
+**影响：** 此修复提升了可靠性。此前只会发送队列中的第一个数据包，现在所有数据包都会按预期发送，无需修改代码。
 </details>
 
 <details>
-<summary>Middleware Thread Safety</summary>
+<summary>中间件线程安全</summary>
 
-**Likelihood Of Impact: Very Low (only if modifying middleware during runtime)**
+**影响概率：非常低（仅限运行时修改中间件）**
 
-Engine.IO base server now protects middleware slice with `sync.RWMutex` for concurrent-safe reading and modification.
+Engine.IO 基础服务端现在使用 `sync.RWMutex` 保护中间件切片，确保并发读写安全。
 
 ```go
 // Before - Unsafe concurrent middleware modification
@@ -1077,15 +1077,15 @@ go server.Use(middleware1) // Safe
 go server.Use(middleware2) // Safe
 ```
 
-**Impact:** This is a thread safety fix. No code changes required.
+**影响：** 线程安全修复，无需修改代码。
 </details>
 
 <details>
-<summary>Socket Flags: Concurrent Mutation Safety</summary>
+<summary>Socket 标志：并发修改安全</summary>
 
-**Likelihood Of Impact: Very Low**
+**影响概率：非常低**
 
-Socket flag mutations (Compress, Volatile, Timeout) now use `atomic.Pointer` with copy-on-write to prevent race conditions.
+Socket 标志（Compress、Volatile、Timeout）现在使用带写时复制的 `atomic.Pointer`，以防止竞态。
 
 ```go
 // Before - Racing flag mutations could cause data races
@@ -1099,73 +1099,73 @@ go socket.Volatile()
 // Safe concurrent mutations
 ```
 
-**Impact:** This is a thread safety fix. No code changes required.
+**影响：** 线程安全修复，无需修改代码。
 </details>
 
 <details>
-<summary>Queue: Goroutine Leak Prevention</summary>
+<summary>队列：防止 goroutine 泄漏</summary>
 
-**Likelihood Of Impact: Very Low**
+**影响概率：非常低**
 
-The task queue now uses `runtime.SetFinalizer()` to prevent goroutine leaks when queue instances are garbage collected.
+任务队列现在使用 `runtime.SetFinalizer()`，防止队列实例被垃圾回收时发生 goroutine 泄漏。
 
-**Impact:** This is a resource leak fix. Applications with long-running queues may see reduced goroutine count. No code changes required.
+**影响：** 资源泄漏修复。使用长生命周期队列的应用可能会观察到 goroutine 数量下降，无需修改代码。
 </details>
 
 <details>
-<summary>Message Ordering and OOM Prevention</summary>
+<summary>消息顺序与 OOM 防护</summary>
 
-**Likelihood Of Impact: Very Low**
+**影响概率：非常低**
 
-Resolves [#116](https://github.com/zishang520/socket.io/issues/116). A new sequential task queue (`pkg/queue`) preserves message ordering and prevents OOM under high concurrency. Both client and server transports now use this queue for send operations.
+解决 [#116](https://github.com/zishang520/socket.io/issues/116)。新增串行任务队列（`pkg/queue`），可保持消息顺序并防止高并发下发生 OOM。客户端和服务端传输现在都使用此队列发送数据。
 
-**Impact:** This is a reliability fix. No code changes required.
+**影响：** 可靠性修复，无需修改代码。
 </details>
 
-#### Internal Improvements
+#### 内部改进
 
-- Debug logging standardized across all packages using `pkg/log`
-- Magic numbers replaced with named constants throughout the codebase
-- Client constants extracted and network monitoring leak fixed
-- Go minimum version is now 1.26.0
+- 所有包统一使用 `pkg/log` 输出调试日志
+- 整个代码库中的魔法数字替换为具名常量
+- 提取客户端常量并修复网络监控泄漏
+- 最低 Go 版本更新为 1.26.0
 
 ---
 
 ### v3.0.0-rc.13
 
-> Released from commit [`5b988b6`](https://github.com/zishang520/socket.io/commit/5b988b6)
+> 基于提交 [`5b988b6`](https://github.com/zishang520/socket.io/commit/5b988b6) 发布
 
-#### Highlights
+#### 主要变化
 
-- **Go 1.26.0 required**: Minimum Go version bumped to 1.26.0
-- **golangci-lint integration**: Linting is now integrated into the build system via `Makefiles`
-- **Improved error handling**: `errcheck` violations resolved across the entire codebase, replacing error suppression with proper handling or explicit `io.Closer` patterns
+- **要求 Go 1.26.0**：最低 Go 版本提升至 1.26.0
+- **集成 golangci-lint**：通过 `Makefiles` 将代码检查集成到构建系统
+- **改进错误处理**：修复整个代码库中的 `errcheck` 问题，以正确处理或显式 `io.Closer` 模式替代忽略错误
 
-#### Redis Adapter Improvements
+#### Redis 适配器改进
 
-- Enhanced polling mechanism and added pagination for session restoration
-- Improved dynamic channel subscription management in the sharded Redis adapter
-- Added `MessageType` validation and improved error handling
+- 增强轮询机制，并为会话恢复添加分页
+- 改进 Redis 分片适配器的动态频道订阅管理
+- 添加 `MessageType` 校验并改进错误处理
 
-#### Bug Fixes
+#### 缺陷修复
 
-- Fixed nil pointer dereference caused by race condition in Engine.IO (`76a0015`)
-- Fixed `Peek` method added to `Buffer` type with integer overflow protection (`ef32276`, `5d3ea31`)
+- 修复 Engine.IO 中竞态导致的空指针解引用（`76a0015`）
+- 为 `Buffer` 添加带整数溢出保护的 `Peek` 方法（`ef32276`、`5d3ea31`）
 
 ---
 
 ### v3.0.0-rc.12
 
-> Released from commit [`e854211`](https://github.com/zishang520/socket.io/commit/e854211)
+> 基于提交 [`e854211`](https://github.com/zishang520/socket.io/commit/e854211) 发布
 
-#### Highlights
+#### 主要变化
 
 <details>
-<summary>ExtendedError Type Consolidation</summary>
+<summary>ExtendedError 类型整合</summary>
 
-**Likelihood Of Impact: Medium**
+**影响概率：中**
 
-The `ExtendedError` type has been consolidated from separate implementations in `clients/socket` and `servers/socket` packages into a single shared implementation in `pkg/types`. This eliminates code duplication and provides a consistent error type across the entire codebase.
+`clients/socket` 和 `servers/socket` 中各自的 `ExtendedError` 已整合为 `pkg/types` 中的共享实现，消除了重复代码并统一错误类型。
 
 ```go
 // Before (client-side)
@@ -1186,22 +1186,22 @@ err := types.NewExtendedError("error message", map[string]any{"code": 401})
 data := err.Data  // Now uses direct field access
 ```
 
-**Key changes:**
+**主要变更：**
 
 - `clients/socket.ExtendedError` → `types.ExtendedError`
-- `servers/socket.ExtendedError` → `types.ExtendedError` (type alias maintained for backward compatibility)
-- Server-side `Data()` method replaced with `Data` field for consistency
-- Both client and server now share the same `ExtendedError` implementation
+- `servers/socket.ExtendedError` → `types.ExtendedError`（保留类型别名以向后兼容）
+- 服务端的 `Data()` 方法改为 `Data` 字段
+- 客户端和服务端共享同一个 `ExtendedError` 实现
 
-**Note:** The server-side `socket` package retains a type alias for `ExtendedError` and a wrapper function `NewExtendedError` for backward compatibility, so existing server code may continue to work without changes. However, client-side code must update imports.
+**注意：** 服务端 `socket` 包保留了 `ExtendedError` 类型别名和 `NewExtendedError` 包装函数以向后兼容，因此现有服务端代码可能无需修改；客户端代码必须更新导入。
 </details>
 
 <details>
-<summary>Redis SubscriptionMode Type Migration</summary>
+<summary>Redis SubscriptionMode 类型迁移</summary>
 
-**Likelihood Of Impact: Medium (if using Redis sharded adapter)**
+**影响概率：中（使用 Redis 分片适配器时）**
 
-The `SubscriptionMode` type has been moved from `adapters/redis/adapter` package to the root `adapters/redis` package for better organization and sharing between adapter and emitter.
+`SubscriptionMode` 已从 `adapters/redis/adapter` 迁移到根 `adapters/redis` 包，以便适配器和发射器共享。
 
 ```go
 // Before
@@ -1220,22 +1220,22 @@ opts := adapter.NewShardedRedisAdapterOptions()
 opts.SetSubscriptionMode(redis.DynamicSubscriptionMode)
 ```
 
-**Key changes:**
+**主要变更：**
 
-| Before | After |
+| 之前 | 之后 |
 |--------|-------|
 | `adapter.SubscriptionMode` | `redis.SubscriptionMode` |
 | `adapter.StaticSubscriptionMode` | `redis.StaticSubscriptionMode` |
 | `adapter.DynamicSubscriptionMode` | `redis.DynamicSubscriptionMode` |
 | `adapter.DynamicPrivateSubscriptionMode` | `redis.DynamicPrivateSubscriptionMode` |
 
-**New additions:**
+**新增内容：**
 
-- `redis.DefaultSubscriptionMode` - Default mode constant
-- `redis.PrivateRoomIdLength` - Length constant for private room detection
-- `redis.ShouldUseDynamicChannel(mode, room)` - Shared helper function
+- `redis.DefaultSubscriptionMode`——默认模式常量
+- `redis.PrivateRoomIdLength`——用于识别私有房间的长度常量
+- `redis.ShouldUseDynamicChannel(mode, room)`——共享辅助函数
 
-**Emitter options extended:**
+**发射器选项扩展：**
 
 ```go
 emitterOpts := emitter.NewEmitterOptions()
@@ -1244,27 +1244,27 @@ emitterOpts.SetSubscriptionMode(redis.DynamicSubscriptionMode)
 ```
 </details>
 
-#### Redis Adapter Improvements
+#### Redis 适配器改进
 
-- Added sharded broadcast operator for Redis Cluster support (`d83b4db`)
-- Fixed timeout when fetching sockets from empty rooms (`d5cfa20`)
-- Fixed Redis Cluster CROSSSLOT errors by managing separate PubSub clients per channel (`2629cc1`)
-- Improved binary packet handling and code organization
+- 添加分片广播操作器以支持 Redis Cluster（`d83b4db`）
+- 修复从空房间获取 Socket 时的超时问题（`d5cfa20`）
+- 为每个频道管理独立 PubSub 客户端，修复 Redis Cluster CROSSSLOT 错误（`2629cc1`）
+- 改进二进制数据包处理和代码组织
 
 ---
 
 ### v3.0.0-rc.8
 
-> Released from commit [`b2f5457`](https://github.com/zishang520/socket.io/commit/b2f5457)
+> 基于提交 [`b2f5457`](https://github.com/zishang520/socket.io/commit/b2f5457) 发布
 
-#### Highlights
+#### 主要变化
 
 <details>
-<summary>Adapter Utility Functions Reorganization</summary>
+<summary>适配器工具函数重组</summary>
 
-**Likelihood Of Impact: Medium**
+**影响概率：中**
 
-Utility functions `SliceMap` and `Tap` have been moved from the `adapter` package to dedicated `pkg` subpackages.
+工具函数 `SliceMap` 和 `Tap` 已从 `adapter` 包迁移到专用的 `pkg` 子包。
 
 ```go
 // Before
@@ -1287,38 +1287,38 @@ func example() {
 }
 ```
 
-**Changes summary:**
+**变更摘要：**
 
-- `adapter.SliceMap` → `slices.Map` (moved to `pkg/slices`)
-- `adapter.Tap` → `utils.Tap` (moved to `pkg/utils`)
+- `adapter.SliceMap` → `slices.Map`（迁移至 `pkg/slices`）
+- `adapter.Tap` → `utils.Tap`（迁移至 `pkg/utils`）
 
-**New functions in `pkg/slices`:**
+**`pkg/slices` 中的新增函数：**
 
-The new `pkg/slices` package provides additional utility functions:
+新的 `pkg/slices` 包提供以下工具函数：
 
-| Function | Description |
+| 函数 | 说明 |
 |----------|-------------|
-| `Get(s, idx)` | Safely retrieves an element with bounds checking |
-| `GetAny[O](vals, idx)` | Retrieves and type-asserts from `[]any` |
-| `TryGet(s, idx)` | Returns zero value if out of bounds |
-| `TryGetAny[O](vals, idx)` | Type-asserts from `[]any` or returns zero |
-| `GetWithDefault(s, idx, def)` | Returns default value if out of bounds |
-| `GetPtr(s, idx)` | Returns pointer to element or nil |
-| `Slice(s, start)` | Safe sub-slice with bounds checking |
-| `First(s)` / `Last(s)` | Get first/last element safely |
-| `Filter(s, predicate)` | Filter elements by predicate |
-| `Map(vals, transform)` | Transform each element |
-| `Reduce(vals, initial, reducer)` | Reduce to single value |
-| `IsEmpty(s)` | Check if slice is nil or empty |
-| `IsValidIndex(s, idx)` | Check if index is valid |
+| `Get(s, idx)` | 检查边界后安全获取元素 |
+| `GetAny[O](vals, idx)` | 从 `[]any` 获取元素并进行类型断言 |
+| `TryGet(s, idx)` | 越界时返回零值 |
+| `TryGetAny[O](vals, idx)` | 从 `[]any` 进行类型断言，失败时返回零值 |
+| `GetWithDefault(s, idx, def)` | 越界时返回默认值 |
+| `GetPtr(s, idx)` | 返回元素指针，越界时返回 nil |
+| `Slice(s, start)` | 检查边界后安全截取子切片 |
+| `First(s)` / `Last(s)` | 安全获取首个或末尾元素 |
+| `Filter(s, predicate)` | 按条件筛选元素 |
+| `Map(vals, transform)` | 转换每个元素 |
+| `Reduce(vals, initial, reducer)` | 将元素归约为单个值 |
+| `IsEmpty(s)` | 检查切片是否为 nil 或空 |
+| `IsValidIndex(s, idx)` | 检查索引是否有效 |
 </details>
 
 <details>
-<summary>HttpContext API Refactoring</summary>
+<summary>HttpContext API 重构</summary>
 
-**Likelihood Of Impact: Medium**
+**影响概率：中**
 
-Several methods and properties of `*types.HttpContext` have been renamed or refactored from properties to methods. All lazy-loaded methods now use `sync.OnceValue` for thread safety.
+`*types.HttpContext` 的部分方法和属性已重命名，或由属性重构为方法。所有延迟加载方法现在使用 `sync.OnceValue` 保证线程安全。
 
 ```go
 // Before
@@ -1342,33 +1342,33 @@ func example(ctx *types.HttpContext) {
 }
 ```
 
-**Changes summary:**
+**变更摘要：**
 
-- `ResponseHeaders` → `ResponseHeaders()` (property to method)
+- `ResponseHeaders` → `ResponseHeaders()`（属性改为方法）
 - `GetHost()` → `Host()`
 - `GetMethod()` → `Method()`
 - `Gets(key)` → `Query().Gets(key)`
 - `Get(key)` → `Query().Get(key)`
 - `GetPathInfo()` → `PathInfo()`
 
-**New/Updated methods:**
+**新增或更新的方法：**
 
-| Method | Description |
+| 方法 | 说明 |
 |--------|-------------|
-| `Path()` | Returns cleaned path (without leading/trailing slashes) |
-| `UserAgent()` | Returns User-Agent header value |
-| `Secure()` | Returns `true` if TLS connection |
-| `SetStatusCode(code)` | Now returns `error` for validation |
-| `IsDone()` | Check if response has been written |
-| `Done()` | Returns `<-chan struct{}` instead of `<-chan Void` |
+| `Path()` | 返回去除首尾斜杠的规范化路径 |
+| `UserAgent()` | 返回 User-Agent 请求头值 |
+| `Secure()` | TLS 连接时返回 `true` |
+| `SetStatusCode(code)` | 现在返回用于校验的 `error` |
+| `IsDone()` | 检查响应是否已写入 |
+| `Done()` | 返回 `<-chan struct{}`，不再返回 `<-chan Void` |
 </details>
 
 <details>
-<summary>ParameterBag Package Migration</summary>
+<summary>ParameterBag 包迁移</summary>
 
-**Likelihood Of Impact: Medium**
+**影响概率：中**
 
-`ParameterBag` has been moved from the `utils` package to the `types` package.
+`ParameterBag` 已从 `utils` 包迁移到 `types` 包。
 
 ```go
 // Before
@@ -1393,16 +1393,16 @@ func example() {
 
 ### v3.0.0-rc.4
 
-> Released from commit [`d7c93b5`](https://github.com/zishang520/socket.io/commit/d7c93b5)
+> 基于提交 [`d7c93b5`](https://github.com/zishang520/socket.io/commit/d7c93b5) 发布
 
-#### Highlights
+#### 主要变化
 
 <details>
-<summary>Socket Handshake Type Updates</summary>
+<summary>Socket 握手类型更新</summary>
 
-**Likelihood Of Impact: Medium**
+**影响概率：中**
 
-The `socket.Handshake` structure now uses more strongly typed fields:
+`socket.Handshake` 结构现在使用更明确的强类型字段：
 
 ```go
 // Before
@@ -1420,7 +1420,7 @@ type Handshake struct {
 }
 ```
 
-Access patterns must be updated:
+必须更新访问方式：
 
 ```go
 // Before
@@ -1434,11 +1434,11 @@ userAgent := headers.Get("User-Agent")
 </details>
 
 <details>
-<summary>Auth Parameter Standardization</summary>
+<summary>Auth 参数标准化</summary>
 
-**Likelihood Of Impact: Medium**
+**影响概率：中**
 
-The `Auth` field in `Handshake` is now standardized to `map[string]any` instead of `any`. This provides a consistent type for authentication data.
+`Handshake` 中的 `Auth` 字段已由 `any` 统一为 `map[string]any`，为身份认证数据提供一致类型。
 
 ```go
 // Before
@@ -1454,11 +1454,11 @@ token := auth["token"]
 </details>
 
 <details>
-<summary>Optional[T] Enhancements</summary>
+<summary>Optional[T] 增强</summary>
 
-**Likelihood Of Impact: Low**
+**影响概率：低**
 
-The `Optional[T]` interface now includes `IsPresent()` and `IsEmpty()` methods, and `Some.Get()` handles nil receiver gracefully.
+`Optional[T]` 接口新增 `IsPresent()` 和 `IsEmpty()` 方法，`Some.Get()` 也可安全处理 nil 接收者。
 
 ```go
 if duration := config.GetRawMaxDisconnectionDuration(); duration != nil && duration.IsPresent() {
@@ -1471,30 +1471,30 @@ if duration := config.GetRawMaxDisconnectionDuration(); duration != nil && durat
 
 ### v3.0.0-rc.2
 
-> Released from commit [`540c239`](https://github.com/zishang520/socket.io/commit/540c239)
+> 基于提交 [`540c239`](https://github.com/zishang520/socket.io/commit/540c239) 发布
 
-#### Bug Fixes
+#### 缺陷修复
 
-- Fixed panic when client sends nil payload in Socket.IO parser (`80fe0b9`)
+- 修复客户端向 Socket.IO 解析器发送 nil 载荷时的 panic（`80fe0b9`）
 
-#### Internal Changes
+#### 内部改动
 
-- Replaced `GetRaw*` method calls with direct property access for better readability (`ce8f623`)
+- 使用直接属性访问替代 `GetRaw*` 方法调用，提高可读性（`ce8f623`）
 
 ---
 
 ### v3.0.0-beta.1
 
-> Released from commit [`01f5eca`](https://github.com/zishang520/socket.io/commit/01f5eca)
+> 基于提交 [`01f5eca`](https://github.com/zishang520/socket.io/commit/01f5eca) 发布
 
-#### Highlights
+#### 主要变化
 
 <details>
-<summary>Config GetRaw* Method Changes</summary>
+<summary>配置项 GetRaw* 方法变更</summary>
 
-**Likelihood Of Impact: Medium**
+**影响概率：中**
 
-All `GetRaw*` methods now return `types.Optional[T]` instead of pointer types for better null safety:
+所有 `GetRaw*` 方法现在返回 `types.Optional[T]` 而非指针类型，以提升空值安全性：
 
 ```go
 // Before
@@ -1513,37 +1513,37 @@ func configExample(config ConnectionStateRecoveryInterface) {
 ```
 </details>
 
-#### Bug Fixes
+#### 缺陷修复
 
-- Fixed HTTP/2 connection goroutine leaks in `HTTPClient.Close()` (`069619b`)
-- Fixed timer goroutine leaks adapted from upstream (`ff5d935`)
+- 修复 `HTTPClient.Close()` 中的 HTTP/2 连接 goroutine 泄漏（`069619b`）
+- 合入上游方案，修复定时器 goroutine 泄漏（`ff5d935`）
 
 ---
 
 ### v3.0.0-alpha.0 ~ alpha.4
 
-> Alpha releases covering the initial v3 restructuring
+> 涵盖 v3 初始重构的 Alpha 版本
 
-#### Highlights
+#### 主要变化
 
-- **Dependency Consolidation**: All previously separate repositories (`engine.io-go-parser`, `engine.io`, `socket.io-go-parser`, `socket.io-client-go`, `socket.io-go-redis`) have been merged into a single monorepo with versioned submodules
-- **Import Path Restructuring**: All package import paths updated to the new `github.com/aqcool/socket.io/` namespace (see [Import Path Updates](#import-path-updates))
-- **Type-safe Atomic Types**: `atomic.Value` replaced with generic `types.Atomic[T]` for type safety (`7389549`)
-- **Redis Adapter Type Updates**: `types.String` replaced with `types.Atomic[string]`
-- **Server Options Refactoring**: Consolidated server options interfaces and structures for improved clarity (`a396fef`)
-- **Transport Upgrade Methods**: Updated to return `[]string` instead of `*types.Set[string]` (`f3c4cd8`)
-- **Version Management**: Added `cmd/socket.io` module with version command and per-module version files
+- **依赖整合**：将原先独立的多个仓库合并为一个包含带版本子模块的单体仓库
+- **导入路径重构**：所有包导入路径更新为新的 `github.com/aqcool/socket.io/` 命名空间（参阅[导入路径更新](#导入路径更新)）
+- **类型安全的原子类型**：使用泛型 `types.Atomic[T]` 替代 `atomic.Value`（`7389549`）
+- **Redis 适配器类型更新**：使用 `types.Atomic[string]` 替换 `types.String`
+- **服务端选项重构**：整合服务端选项接口和结构，提高可读性（`a396fef`）
+- **传输升级方法**：改为返回 `[]string`，不再返回 `*types.Set[string]`（`f3c4cd8`）
+- **版本管理**：新增带版本命令和各模块版本文件的 `cmd/socket.io` 模块
 
 ---
 
-## Additional Notes
+## 补充说明
 
-| Recommendation | Details |
+| 建议 | 详情 |
 |----------------|---------|
-| **Backup First** | Always backup your codebase before upgrading |
-| **Go Version** | Ensure you're using Go 1.26.0 or higher |
-| **Staged Rollout** | Consider upgrading non-critical components first |
-| **Client Coordination** | Coordinate with frontend team for Socket.IO client v4.x+ compatibility |
-| **Security Updates** | v3.0.0 includes important DoS prevention and data race fixes |
-| **Vendor Directory** | If using `go mod vendor`, run `go mod vendor` after updating dependencies |
-| **IDE Support** | Restart your IDE/language server after updating imports for accurate code completion |
+| **先行备份** | 升级前务必备份代码库 |
+| **Go 版本** | 确保使用 Go 1.26.0 或更高版本 |
+| **分阶段发布** | 建议先升级非关键组件 |
+| **客户端协调** | 与前端团队协调 Socket.IO 客户端 v4.x+ 兼容工作 |
+| **安全更新** | v3.0.0 包含重要的 DoS 防护和数据竞争修复 |
+| **Vendor 目录** | 如果使用 `go mod vendor`，请在更新依赖后再次运行该命令 |
+| **IDE 支持** | 更新导入后重启 IDE 或语言服务器，以获得准确的代码补全 |

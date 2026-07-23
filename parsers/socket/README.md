@@ -3,35 +3,35 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/parsers/socket/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/parsers/socket/v3)
 [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/parsers/socket/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/parsers/socket/v3)
 
-## Overview
+## 概述
 
-This is the Go parser for the Socket.IO protocol, responsible for encoding and decoding packets. It is shared by both the [Socket.IO client](../../clients/socket) and [Socket.IO server](../../servers/socket).
+这是 Socket.IO 协议的 Go 解析器，负责数据包的编码与解码，由 [Socket.IO 客户端](../../clients/socket)和 [Socket.IO 服务端](../../servers/socket)共同使用。
 
-### Compatibility Table
+### 兼容性表
 
-| Parser Version | Socket.IO Server Version  | Protocol Revision |
+| 解析器版本 | Socket.IO 服务端版本 | 协议修订版 |
 |----------------|---------------------------|-------------------|
 | 3.x            | 3.x                       | 5                 |
 
-## Features
+## 特性
 
-- Full support for Socket.IO protocol v5
-- Encoding and decoding of packets
-- Binary data support
-- Event-based decoding
-- Extensible and thread-safe implementation
+- 完整支持 Socket.IO 协议 v5
+- 数据包编解码
+- 二进制数据支持
+- 基于事件的解码
+- 可扩展且线程安全的实现
 
-## Installation
+## 安装
 
-To install the package, run:
+运行以下命令安装本包：
 
 ```bash
 go get github.com/aqcool/socket.io/parsers/socket/v3
 ```
 
-## Example Usage
+## 使用示例
 
-### Encoding and Decoding a Packet
+### 编解码数据包
 
 ```go
 package main
@@ -66,7 +66,7 @@ func main() {
 }
 ```
 
-### Encoding and Decoding a Packet with Binary Data
+### 编解码包含二进制数据的数据包
 
 ```go
 package main
@@ -102,9 +102,9 @@ func main() {
 }
 ```
 
-## API Reference
+## API 参考
 
-### Packet Structure
+### 数据包结构
 
 ```go
 type Packet struct {
@@ -115,7 +115,7 @@ type Packet struct {
 }
 ```
 
-### Encoder Interface
+### Encoder 接口
 
 ```go
 type Encoder interface {
@@ -123,7 +123,7 @@ type Encoder interface {
 }
 ```
 
-### Decoder Interface
+### Decoder 接口
 
 ```go
 type Decoder interface {
@@ -133,28 +133,28 @@ type Decoder interface {
 }
 ```
 
-## Tests
+## 测试
 
-Run the test suite with:
+运行测试套件：
 
 ```bash
 make test
 ```
 
-## Development
+## 开发
 
-To contribute to the project, follow these steps:
+请按以下步骤参与项目贡献：
 
-1. Fork the repository.
-2. Create a feature branch: `git checkout -b feature/amazing-feature`.
-3. Commit your changes: `git commit -m 'Add some amazing feature'`.
-4. Push to the branch: `git push origin feature/amazing-feature`.
-5. Open a Pull Request.
+1. Fork 本仓库。
+2. 创建功能分支：`git checkout -b feature/amazing-feature`。
+3. 提交改动：`git commit -m 'Add some amazing feature'`。
+4. 推送分支：`git push origin feature/amazing-feature`。
+5. 创建拉取请求。
 
-## Support
+## 支持
 
-If you encounter any issues or have questions, please file them in the [issues section](https://github.com/aqcool/socket.io/issues).
+如果遇到问题或有任何疑问，请在 [Issue 区](https://github.com/aqcool/socket.io/issues)提交。
 
-## License
+## 许可证
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+本项目采用 MIT 许可证，详情请参阅 [LICENSE](LICENSE) 文件。

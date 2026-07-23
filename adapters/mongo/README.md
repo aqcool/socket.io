@@ -3,31 +3,31 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/mongo/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/mongo/v3)
 [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/mongo/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/mongo/v3)
 
-## Description
+## 简介
 
-A MongoDB adapter for Socket.IO server in Go, allowing to scale Socket.IO applications across multiple processes or servers using MongoDB Change Streams.
+Socket.IO Go 服务端的 MongoDB 适配器，通过 MongoDB 变更流将 Socket.IO 应用扩展到多个进程或服务器。
 
-This adapter is compatible with the Node.js [@socket.io/mongo-adapter](https://github.com/socketio/socket.io-mongo-adapter) package, enabling mixed Go and Node.js deployments.
+本适配器兼容 Node.js 的 [@socket.io/mongo-adapter](https://github.com/socketio/socket.io-mongo-adapter)，支持 Go 与 Node.js 混合部署。
 
-**Note:** MongoDB must be configured as a Replica Set or Sharded Cluster to support Change Streams.
+**注意：** MongoDB 必须配置为副本集或分片集群，才能使用变更流。
 
-## Installation
+## 安装
 
 ```bash
 go get github.com/aqcool/socket.io/adapters/mongo/v3
 ```
 
-## Features
+## 特性
 
-- Multiple servers support via MongoDB Change Streams
-- Compatible with Node.js `@socket.io/mongo-adapter` for mixed deployments
-- Heartbeat-based node failure detection
-- Real-time communication between processes
-- Support for both capped collections and TTL indexes
+- 通过 MongoDB 变更流支持多服务器
+- 兼容 Node.js `@socket.io/mongo-adapter`，支持混合部署
+- 基于心跳的节点故障检测
+- 进程间实时通信
+- 同时支持固定集合和 TTL 索引
 
-## How to use
+## 使用方法
 
-### Adapter
+### 适配器
 
 ```golang
 package main
@@ -78,7 +78,7 @@ func main() {
 }
 ```
 
-### Emitter
+### 发射器
 
 ```golang
 package main
@@ -109,20 +109,20 @@ func main() {
 }
 ```
 
-## How it works
+## 工作原理
 
-The adapter uses MongoDB Change Streams to detect new documents inserted into a shared collection. When a Socket.IO server needs to broadcast a message or perform a cross-node operation, it inserts a document into the MongoDB collection. All other servers watching the same collection via Change Streams will receive the notification and process the event accordingly.
+适配器使用 MongoDB 变更流检测共享集合中新插入的文档。当 Socket.IO 服务端需要广播消息或执行跨节点操作时，会向 MongoDB 集合插入文档。其他监听同一集合的服务器会收到通知并处理相应事件。
 
-### Capped Collection vs TTL Index
+### 固定集合与 TTL 索引
 
-You can use either a **capped collection** or a **TTL index** for automatic cleanup:
+可使用**固定集合**或 **TTL 索引**进行自动清理：
 
-#### Capped Collection (recommended for most cases)
+#### 固定集合（多数场景推荐）
 ```javascript
 db.createCollection("socket.io-adapter-events", { capped: true, size: 1e6 })
 ```
 
-#### TTL Index
+#### TTL 索引
 ```javascript
 db.collection("socket.io-adapter-events").createIndex(
     { createdAt: 1 },
@@ -130,12 +130,12 @@ db.collection("socket.io-adapter-events").createIndex(
 )
 ```
 
-When using a TTL index, set the `AddCreatedAtField` option to `true`:
+使用 TTL 索引时，请将 `AddCreatedAtField` 选项设为 `true`：
 ```golang
 opts := &mgadapter.MongoAdapterOptions{}
 opts.SetAddCreatedAtField(true)
 ```
 
-## License
+## 许可证
 
 [MIT](LICENSE)

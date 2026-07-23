@@ -1,30 +1,30 @@
-# Engine.IO: The Realtime Engine for Golang
+# Engine.IO：Go 实时通信引擎
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/servers/engine/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/servers/engine/v3)
 [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/servers/engine/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/servers/engine/v3)
 
-## Overview
+## 概述
 
-Engine.IO is a transport-based cross-browser/cross-device bi-directional communication layer implementation for [Socket.IO in Go](../socket). It abstracts away the differences between various transports (WebSocket, Polling, WebTransport) and provides a unified API.
+Engine.IO 是 [Socket.IO Go 实现](../socket)基于传输层的跨浏览器、跨设备双向通信层。它屏蔽 WebSocket、Polling、WebTransport 等传输方式的差异，并提供统一 API。
 
-## Features
+## 特性
 
-- Multiple transport support (WebSocket, Polling, WebTransport)
-- Automatic transport upgrade
-- Stateful connections with heartbeat mechanism
-- Binary data support
-- Multiplexing support
-- Auto-reconnection support
-- Cross-browser compatibility
-- Engine.IO protocol v3 and v4 support
+- 支持多种传输方式（WebSocket、Polling、WebTransport）
+- 自动升级传输方式
+- 带心跳机制的有状态连接
+- 二进制数据支持
+- 多路复用支持
+- 自动重连支持
+- 跨浏览器兼容
+- 支持 Engine.IO 协议 v3 和 v4
 
-## Installation
+## 安装
 
 ```bash
 go get github.com/aqcool/socket.io/servers/engine/v3
 ```
 
-## Quick Start
+## 快速开始
 
 ```go
 package main
@@ -60,19 +60,19 @@ func main() {
 }
 ```
 
-## Usage
+## 用法
 
-### Server Initialization Methods
+### 服务端初始化方式
 
-1. **Direct Listening**
-2. **HTTP Server Integration**
-3. **Custom Request Handling**
-4. **WebSocket Integration**
-5. **WebTransport Support**
+1. **直接监听**
+2. **集成 HTTP 服务端**
+3. **自定义请求处理**
+4. **集成 WebSocket**
+5. **WebTransport 支持**
 
-## Configuration
+## 配置
 
-### Server Options
+### 服务端选项
 
 ```go
 opts := &config.ServerOptions{}
@@ -83,66 +83,66 @@ opts.SetMaxHttpBufferSize(1e6)
 // ...
 ```
 
-## Transport Implementations
+## 传输方式实现
 
-- **Polling**: XHR/JSONP transport
-- **WebSocket**: Standard WebSocket transport
-- **WebTransport**: Experimental WebTransport support
+- **Polling**：XHR/JSONP 传输
+- **WebSocket**：标准 WebSocket 传输
+- **WebTransport**：实验性 WebTransport 支持
 
-## Events
+## 事件
 
-### Server Events
+### 服务端事件
 
-- `connection`: New client connection
-- `connection_error`: Connection error
-- `flush`: Buffer flush
-- `drain`: Buffer drain
+- `connection`：新的客户端连接
+- `connection_error`：连接错误
+- `flush`：刷新缓冲区
+- `drain`：缓冲区已清空
 
-### Socket Events
+### Socket 事件
 
-- `message`: Incoming message
-- `close`: Connection closed
-- `error`: Error occurred
-- `flush`: Write buffer flush
-- `drain`: Write buffer drained
-- `packet`: Raw packet received
-- `packetCreate`: Before packet send
-- `heartbeat`: Ping/Pong received
+- `message`：收到消息
+- `close`：连接已关闭
+- `error`：发生错误
+- `flush`：刷新写缓冲区
+- `drain`：写缓冲区已清空
+- `packet`：收到原始数据包
+- `packetCreate`：发送数据包前
+- `heartbeat`：收到 Ping/Pong
 
-## Development
+## 开发
 
-### Prerequisites
+### 前置条件
 
 - Go 1.26.0+
 - Make
 
-### Testing
+### 测试
 
 ```bash
 make test
 ```
 
-### Debugging
+### 调试
 
-Set the DEBUG environment variable:
+设置 `DEBUG` 环境变量：
 
 ```bash
 DEBUG=engine*
 ```
 
-## Contributing
+## 参与贡献
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork 本仓库
+2. 创建功能分支（`git checkout -b feature/amazing-feature`）
+3. 提交改动（`git commit -m 'Add some amazing feature'`）
+4. 推送分支（`git push origin feature/amazing-feature`）
+5. 创建拉取请求
 
-## License
+## 许可证
 
-MIT License - see [LICENSE](LICENSE) for details.
+采用 MIT 许可证，详情请参阅 [LICENSE](LICENSE)。
 
-## Support
+## 支持
 
-- [Documentation](https://pkg.go.dev/github.com/aqcool/socket.io/servers/engine/v3)
-- [Issue Tracker](https://github.com/aqcool/socket.io/issues)
+- [API 文档](https://pkg.go.dev/github.com/aqcool/socket.io/servers/engine/v3)
+- [问题跟踪](https://github.com/aqcool/socket.io/issues)

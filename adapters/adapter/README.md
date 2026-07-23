@@ -3,28 +3,28 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/adapter/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/adapter/v3)
 [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/adapter/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/adapter/v3)
 
-## Description
+## 简介
 
-A base adapter implementation for Socket.IO server in Go, providing core functionality for building custom adapters and scaling Socket.IO applications.
+Socket.IO Go 服务端的基础适配器实现，提供构建自定义适配器和扩展 Socket.IO 应用所需的核心能力。
 
-## Installation
+## 安装
 
 ```bash
 go get github.com/aqcool/socket.io/adapters/adapter/v3
 ```
 
-## Features
+## 特性
 
-- Base adapter interface and implementation
-- Cluster adapter support
-- Session-aware adapter capabilities
-- Heartbeat mechanism for cluster communication
-- Remote socket handling
-- Extensible adapter architecture
+- 基础适配器接口及实现
+- 集群适配器支持
+- 会话感知适配器能力
+- 用于集群通信的心跳机制
+- 远程 Socket 处理
+- 可扩展的适配器架构
 
-## How to use
+## 使用方法
 
-Basic usage example:
+基本用法示例：
 
 ```golang
 package main
@@ -35,28 +35,28 @@ import (
 )
 
 func main() {
-    // Create Socket.IO server configuration
+    // 创建 Socket.IO 服务端配置
     config := socket.DefaultServerOptions()
 
-    // Use default adapter
+    // 使用默认适配器
     config.SetAdapter(&adapter.AdapterBuilder{})
 
-    // Create server with adapter
+    // 创建使用该适配器的服务端
     io := socket.NewServer(nil, config)
 
-    // Handle connections
+    // 处理连接
     io.On("connection", func(clients ...any) {
         client := clients[0].(*socket.Socket)
-        // Your connection handling logic
+        // 在此编写连接处理逻辑
     })
 }
 ```
 
-## Adapter Types
+## 适配器类型
 
-The package provides several adapter implementations:
+本包提供以下适配器实现：
 
-1. Base Adapter
+1. 基础适配器
 
 ```golang
 type Adapter interface {
@@ -66,7 +66,7 @@ type Adapter interface {
 }
 ```
 
-2. Cluster Adapter
+2. 集群适配器
 
 ```golang
 type ClusterAdapter interface {
@@ -76,7 +76,7 @@ type ClusterAdapter interface {
 }
 ```
 
-3. Session-Aware Adapter
+3. 会话感知适配器
 
 ```golang
 type SessionAwareAdapter interface {
@@ -87,7 +87,7 @@ type SessionAwareAdapter interface {
 }
 ```
 
-## Configuration Options
+## 配置选项
 
 ### ClusterAdapterOptions
 
@@ -98,26 +98,26 @@ type ClusterAdapterOptions struct {
 }
 ```
 
-## Testing
+## 测试
 
-Run the test suite with:
+运行测试套件：
 
 ```bash
 make test
 ```
 
-## Contributing
+## 参与贡献
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork 本仓库
+2. 创建功能分支（`git checkout -b feature/amazing-feature`）
+3. 提交改动（`git commit -m 'Add some amazing feature'`）
+4. 推送分支（`git push origin feature/amazing-feature`）
+5. 创建拉取请求
 
-## Support
+## 支持
 
-If you encounter any issues or have questions, please file them in the [issues section](https://github.com/aqcool/socket.io/issues).
+如果遇到问题或有任何疑问，请在 [Issue 区](https://github.com/aqcool/socket.io/issues)提交。
 
-## License
+## 许可证
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+本项目采用 MIT 许可证，详情请参阅 LICENSE 文件。
