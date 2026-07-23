@@ -7,8 +7,8 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	vk "github.com/valkey-io/valkey-go"
-	valkey "github.com/zishang520/socket.io/adapters/valkey/v3"
-	"github.com/zishang520/socket.io/servers/socket/v3"
+	valkey "github.com/aqcool/socket.io/adapters/valkey/v3"
+	"github.com/aqcool/socket.io/servers/socket/v3"
 )
 
 // newMiniValkeyClient starts an in-memory Redis server (miniredis) and returns

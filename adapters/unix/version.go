@@ -1,5 +1,5 @@
 package unix
 
-import "github.com/zishang520/socket.io/v3/pkg/version"
+import "github.com/aqcool/socket.io/v3/pkg/version"
 
 const VERSION = version.VERSION

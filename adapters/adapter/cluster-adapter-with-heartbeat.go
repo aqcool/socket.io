@@ -5,10 +5,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zishang520/socket.io/servers/socket/v3"
-	"github.com/zishang520/socket.io/v3/pkg/slices"
-	"github.com/zishang520/socket.io/v3/pkg/types"
-	"github.com/zishang520/socket.io/v3/pkg/utils"
+	"github.com/aqcool/socket.io/servers/socket/v3"
+	"github.com/aqcool/socket.io/v3/pkg/slices"
+	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v3/pkg/utils"
 )
 
 // ClusterAdapterWithHeartbeatBuilder is a builder for creating ClusterAdapterWithHeartbeat instances.

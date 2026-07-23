@@ -1,16 +1,16 @@
 # engine.io-go-parser
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/parsers/engine/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/parsers/engine/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/parsers/engine/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/parsers/engine/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/parsers/engine/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/parsers/engine/v3)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/parsers/engine/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/parsers/engine/v3)
 
 ## Description
 
-A Go implementation of the Engine.IO protocol parser. This package is used by both [engine.io-client-go](https://github.com/zishang520/socket.io/tree/v3/clients/engine) and [engine.io](https://github.com/zishang520/socket.io/tree/v3/servers/engine) for protocol encoding and decoding.
+A Go implementation of the Engine.IO protocol parser. This package is used by both the [Engine.IO client](../../clients/engine) and [Engine.IO server](../../servers/engine) for protocol encoding and decoding.
 
 ## Installation
 
 ```bash
-go get github.com/zishang520/socket.io/parsers/engine/v3
+go get github.com/aqcool/socket.io/parsers/engine/v3
 ```
 
 ## Features
@@ -32,8 +32,8 @@ import (
     "bytes"
     "fmt"
 
-    "github.com/zishang520/socket.io/parsers/engine/v3/packet"
-    "github.com/zishang520/socket.io/v3/pkg/types"
+    "github.com/aqcool/socket.io/parsers/engine/v3/packet"
+    "github.com/aqcool/socket.io/v3/pkg/types"
 )
 
 func main() {
@@ -156,7 +156,7 @@ make test
 
 ## Support
 
-If you encounter any issues or have questions, please file them in the [issues section](https://github.com/zishang520/socket.io/issues).
+If you encounter any issues or have questions, please file them in the [issues section](https://github.com/aqcool/socket.io/issues).
 
 ## License
 

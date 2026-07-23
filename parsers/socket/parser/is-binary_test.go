@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zishang520/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v3/pkg/types"
 )
 
 // MockBuffer is a mock implementation of BufferInterface for testing purposes

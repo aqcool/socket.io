@@ -3,7 +3,7 @@
 package emitter
 
 import (
-	"github.com/zishang520/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v3/pkg/types"
 )
 
 const (

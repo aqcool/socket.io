@@ -1,7 +1,7 @@
 package socket
 
 import (
-	"github.com/zishang520/socket.io/parsers/socket/v3/parser"
+	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
 )
 
 type (

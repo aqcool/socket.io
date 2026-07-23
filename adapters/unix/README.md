@@ -16,7 +16,7 @@ This adapter is suitable for multi-process deployments on the same machine where
 ## Installation
 
 ```bash
-go get github.com/zishang520/socket.io/adapters/unix/v3
+go get github.com/aqcool/socket.io/adapters/unix/v3
 ```
 
 ## Usage
@@ -30,9 +30,9 @@ import (
 	"context"
 	"net/http"
 
-	sio "github.com/zishang520/socket.io/servers/socket/v3"
-	"github.com/zishang520/socket.io/adapters/unix/v3"
-	unixadapter "github.com/zishang520/socket.io/adapters/unix/v3/adapter"
+	sio "github.com/aqcool/socket.io/servers/socket/v3"
+	"github.com/aqcool/socket.io/adapters/unix/v3"
+	unixadapter "github.com/aqcool/socket.io/adapters/unix/v3/adapter"
 )
 
 func main() {
@@ -73,8 +73,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zishang520/socket.io/adapters/unix/v3"
-	unixemitter "github.com/zishang520/socket.io/adapters/unix/v3/emitter"
+	"github.com/aqcool/socket.io/adapters/unix/v3"
+	unixemitter "github.com/aqcool/socket.io/adapters/unix/v3/emitter"
 )
 
 func main() {

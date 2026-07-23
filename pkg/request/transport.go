@@ -13,7 +13,7 @@ import (
 
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
-	"github.com/zishang520/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v3/pkg/types"
 )
 
 // Maximum number of retry attempts for alternative services

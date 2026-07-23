@@ -15,9 +15,7 @@ The following versions of Socket.IO Go implementation are currently being suppor
 We take the security of Socket.IO Go implementation seriously. If you believe you have found a security vulnerability, please follow these steps:
 
 1. **Do Not** disclose the vulnerability publicly.
-2. Submit a report through one of these channels:
-   - Open a [security advisory](https://github.com/zishang520/socket.io/security/advisories/new)
-   - Send an email to [maintainer's email] with details of the issue
+2. Open a private [GitHub security advisory](https://github.com/aqcool/socket.io/security/advisories/new) with details of the issue.
 
 Please include the following information in your report:
 
@@ -57,10 +55,7 @@ Security vulnerabilities will be disclosed via:
 
 1. GitHub Security Advisories
 2. Release notes
-3. The official Socket.IO Go security mailing list (if applicable)
 
 ## Contact
 
-For security-related inquiries, contact:
-
-- GitHub Security Advisory
+For security-related inquiries, use [GitHub Private Vulnerability Reporting](https://github.com/aqcool/socket.io/security/advisories/new).

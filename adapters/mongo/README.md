@@ -1,7 +1,7 @@
 # socket.io-go-mongo
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/adapters/mongo/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/adapters/mongo/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/adapters/mongo/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/adapters/mongo/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/mongo/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/mongo/v3)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/mongo/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/mongo/v3)
 
 ## Description
 
@@ -14,7 +14,7 @@ This adapter is compatible with the Node.js [@socket.io/mongo-adapter](https://g
 ## Installation
 
 ```bash
-go get github.com/zishang520/socket.io/adapters/mongo/v3
+go get github.com/aqcool/socket.io/adapters/mongo/v3
 ```
 
 ## Features
@@ -41,9 +41,9 @@ import (
 
     "go.mongodb.org/mongo-driver/v2/mongo"
     "go.mongodb.org/mongo-driver/v2/mongo/options"
-    mgadapter "github.com/zishang520/socket.io/adapters/mongo/v3/adapter"
-    mgclient "github.com/zishang520/socket.io/adapters/mongo/v3"
-    "github.com/zishang520/socket.io/servers/socket/v3"
+    mgadapter "github.com/aqcool/socket.io/adapters/mongo/v3/adapter"
+    mgclient "github.com/aqcool/socket.io/adapters/mongo/v3"
+    "github.com/aqcool/socket.io/servers/socket/v3"
 )
 
 func main() {
@@ -88,8 +88,8 @@ import (
 
     "go.mongodb.org/mongo-driver/v2/mongo"
     "go.mongodb.org/mongo-driver/v2/mongo/options"
-    mgclient "github.com/zishang520/socket.io/adapters/mongo/v3"
-    mgemitter "github.com/zishang520/socket.io/adapters/mongo/v3/emitter"
+    mgclient "github.com/aqcool/socket.io/adapters/mongo/v3"
+    mgemitter "github.com/aqcool/socket.io/adapters/mongo/v3/emitter"
 )
 
 func main() {

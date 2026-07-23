@@ -5,8 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zishang520/socket.io/v3/pkg/log"
-	"github.com/zishang520/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v3/pkg/log"
+	"github.com/aqcool/socket.io/v3/pkg/types"
 )
 
 var (

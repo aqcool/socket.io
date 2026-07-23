@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/zishang520/socket.io/servers/engine/v3/transports"
-	"github.com/zishang520/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/servers/engine/v3/transports"
+	"github.com/aqcool/socket.io/v3/pkg/types"
 )
 
 type (

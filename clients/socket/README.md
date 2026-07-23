@@ -1,7 +1,7 @@
 # Socket.IO Client for Go
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/clients/socket/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/clients/socket/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/clients/socket/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/clients/socket/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/clients/socket/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/clients/socket/v3)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/clients/socket/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/clients/socket/v3)
 
 A robust Go client implementation for [Socket.IO](https://socket.io/), featuring real-time bidirectional event-based communication.
 
@@ -36,7 +36,7 @@ A robust Go client implementation for [Socket.IO](https://socket.io/), featuring
 ## Installation
 
 ```bash
-go get github.com/zishang520/socket.io/clients/socket/v3
+go get github.com/aqcool/socket.io/clients/socket/v3
 ```
 
 ## Quick Start
@@ -49,7 +49,7 @@ package main
 import (
     "log"
 
-    "github.com/zishang520/socket.io/clients/socket/v3"
+    "github.com/aqcool/socket.io/clients/socket/v3"
 )
 
 func main() {
@@ -79,9 +79,9 @@ package main
 import (
     "time"
 
-    "github.com/zishang520/socket.io/clients/socket/v3"
-    "github.com/zishang520/socket.io/clients/engine/v3/transports"
-    "github.com/zishang520/socket.io/v3/pkg/types"
+    "github.com/aqcool/socket.io/clients/socket/v3"
+    "github.com/aqcool/socket.io/clients/engine/v3/transports"
+    "github.com/aqcool/socket.io/v3/pkg/types"
 )
 
 func main() {
@@ -158,7 +158,7 @@ Enable debug logs:
 
 
 ```go
-import "github.com/zishang520/socket.io/v3/pkg/log"
+import "github.com/aqcool/socket.io/v3/pkg/log"
 
 log.DEBUG = true
 ```
@@ -188,5 +188,5 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Related Projects
 
 - [Socket.IO](https://socket.io/)
-- [Engine.IO Client for Go](https://github.com/zishang520/socket.io/tree/v3/clients/engine)
-- [Socket.IO Server for Go](https://github.com/zishang520/socket.io/tree/v3/servers/socket)
+- [Engine.IO Client for Go](../engine)
+- [Socket.IO Server for Go](../../servers/socket)

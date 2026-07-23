@@ -1,11 +1,11 @@
 # socket.io-go-parser
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/parsers/socket/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/parsers/socket/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/parsers/socket/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/parsers/socket/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/parsers/socket/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/parsers/socket/v3)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/parsers/socket/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/parsers/socket/v3)
 
 ## Overview
 
-This is the Go parser for the Socket.IO protocol, responsible for encoding and decoding packets. It is shared by both [socket.io-client-go](https://github.com/zishang520/socket.io/tree/v3/clients/socket) and [socket.io](https://github.com/zishang520/socket.io/tree/v3/servers/socket).
+This is the Go parser for the Socket.IO protocol, responsible for encoding and decoding packets. It is shared by both the [Socket.IO client](../../clients/socket) and [Socket.IO server](../../servers/socket).
 
 ### Compatibility Table
 
@@ -26,7 +26,7 @@ This is the Go parser for the Socket.IO protocol, responsible for encoding and d
 To install the package, run:
 
 ```bash
-go get github.com/zishang520/socket.io/parsers/socket/v3
+go get github.com/aqcool/socket.io/parsers/socket/v3
 ```
 
 ## Example Usage
@@ -37,8 +37,8 @@ go get github.com/zishang520/socket.io/parsers/socket/v3
 package main
 
 import (
-    "github.com/zishang520/socket.io/v3/pkg/utils"
-    "github.com/zishang520/socket.io/parsers/socket/v3/parser"
+    "github.com/aqcool/socket.io/v3/pkg/utils"
+    "github.com/aqcool/socket.io/parsers/socket/v3/parser"
 )
 
 func main() {
@@ -72,8 +72,8 @@ func main() {
 package main
 
 import (
-    "github.com/zishang520/socket.io/v3/pkg/utils"
-    "github.com/zishang520/socket.io/parsers/socket/v3/parser"
+    "github.com/aqcool/socket.io/v3/pkg/utils"
+    "github.com/aqcool/socket.io/parsers/socket/v3/parser"
 )
 
 func main() {
@@ -153,7 +153,7 @@ To contribute to the project, follow these steps:
 
 ## Support
 
-If you encounter any issues or have questions, please file them in the [issues section](https://github.com/zishang520/socket.io/issues).
+If you encounter any issues or have questions, please file them in the [issues section](https://github.com/aqcool/socket.io/issues).
 
 ## License
 

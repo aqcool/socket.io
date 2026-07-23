@@ -1,11 +1,11 @@
 # Engine.IO: The Realtime Engine for Golang
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/servers/engine/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/servers/engine/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/servers/engine/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/servers/engine/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/servers/engine/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/servers/engine/v3)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/servers/engine/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/servers/engine/v3)
 
 ## Overview
 
-Engine.IO is a transport-based cross-browser/cross-device bi-directional communication layer implementation for [Socket.IO in Go](https://github.com/zishang520/socket.io/tree/v3/servers/socket). It abstracts away the differences between various transports (WebSocket, Polling, WebTransport) and provides a unified API.
+Engine.IO is a transport-based cross-browser/cross-device bi-directional communication layer implementation for [Socket.IO in Go](../socket). It abstracts away the differences between various transports (WebSocket, Polling, WebTransport) and provides a unified API.
 
 ## Features
 
@@ -21,7 +21,7 @@ Engine.IO is a transport-based cross-browser/cross-device bi-directional communi
 ## Installation
 
 ```bash
-go get github.com/zishang520/socket.io/servers/engine/v3
+go get github.com/aqcool/socket.io/servers/engine/v3
 ```
 
 ## Quick Start
@@ -30,9 +30,9 @@ go get github.com/zishang520/socket.io/servers/engine/v3
 package main
 
 import (
-    "github.com/zishang520/socket.io/servers/engine/v3"
-    "github.com/zishang520/socket.io/servers/engine/v3/config"
-    "github.com/zishang520/socket.io/v3/pkg/types"
+    "github.com/aqcool/socket.io/servers/engine/v3"
+    "github.com/aqcool/socket.io/servers/engine/v3/config"
+    "github.com/aqcool/socket.io/v3/pkg/types"
 )
 
 func main() {
@@ -144,5 +144,5 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Support
 
-- [Documentation](https://pkg.go.dev/github.com/zishang520/socket.io/servers/engine/v3)
-- [Issue Tracker](https://github.com/zishang520/socket.io/issues)
+- [Documentation](https://pkg.go.dev/github.com/aqcool/socket.io/servers/engine/v3)
+- [Issue Tracker](https://github.com/aqcool/socket.io/issues)

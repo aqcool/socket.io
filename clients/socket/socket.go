@@ -8,12 +8,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zishang520/socket.io/parsers/engine/v3/packet"
-	"github.com/zishang520/socket.io/parsers/socket/v3/parser"
-	"github.com/zishang520/socket.io/servers/socket/v3"
-	"github.com/zishang520/socket.io/v3/pkg/slices"
-	"github.com/zishang520/socket.io/v3/pkg/types"
-	"github.com/zishang520/socket.io/v3/pkg/utils"
+	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
+	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
+	"github.com/aqcool/socket.io/servers/socket/v3"
+	"github.com/aqcool/socket.io/v3/pkg/slices"
+	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v3/pkg/utils"
 )
 
 // Socket represents a Socket.IO connection to a specific namespace.

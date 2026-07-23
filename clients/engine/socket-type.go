@@ -4,8 +4,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/zishang520/socket.io/parsers/engine/v3/packet"
-	"github.com/zishang520/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
+	"github.com/aqcool/socket.io/v3/pkg/types"
 )
 
 // SocketWithoutUpgrade provides a WebSocket-like interface to connect to an Engine.IO server.

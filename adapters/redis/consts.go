@@ -3,7 +3,7 @@
 package redis
 
 import (
-	"github.com/zishang520/socket.io/adapters/adapter/v3"
+	"github.com/aqcool/socket.io/adapters/adapter/v3"
 )
 
 // Message types for Socket.IO Redis adapter inter-node communication.

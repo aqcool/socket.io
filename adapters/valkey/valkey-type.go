@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/zishang520/socket.io/adapters/adapter/v3"
-	"github.com/zishang520/socket.io/parsers/socket/v3/parser"
-	"github.com/zishang520/socket.io/servers/socket/v3"
+	"github.com/aqcool/socket.io/adapters/adapter/v3"
+	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
+	"github.com/aqcool/socket.io/servers/socket/v3"
 )
 
 // ErrNilValkeyPacket indicates an attempt to unmarshal into a nil ValkeyPacket.

@@ -5,7 +5,7 @@ package mongo
 import (
 	"errors"
 
-	"github.com/zishang520/socket.io/adapters/adapter/v3"
+	"github.com/aqcool/socket.io/adapters/adapter/v3"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 

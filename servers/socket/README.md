@@ -1,7 +1,7 @@
 # Socket.IO for Golang
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/servers/socket/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/servers/socket/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/servers/socket/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/servers/socket/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/servers/socket/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/servers/socket/v3)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/servers/socket/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/servers/socket/v3)
 
 ## Overview
 
@@ -30,7 +30,7 @@ Socket.IO is a real-time bidirectional event-based communication library for Gol
 ## Installation
 
 ```bash
-go get github.com/zishang520/socket.io/servers/socket/v3
+go get github.com/aqcool/socket.io/servers/socket/v3
 ```
 
 ## Quick Start
@@ -41,8 +41,8 @@ go get github.com/zishang520/socket.io/servers/socket/v3
 package main
 
 import (
-    "github.com/zishang520/socket.io/servers/socket/v3"
-    "github.com/zishang520/socket.io/v3/pkg/types"
+    "github.com/aqcool/socket.io/servers/socket/v3"
+    "github.com/aqcool/socket.io/v3/pkg/types"
 )
 
 func main() {
@@ -156,7 +156,7 @@ make test
 
 For detailed API documentation, please visit:
 
-- [GoDoc Documentation](https://pkg.go.dev/github.com/zishang520/socket.io/servers/socket/v3)
+- [GoDoc Documentation](https://pkg.go.dev/github.com/aqcool/socket.io/servers/socket/v3)
 - [Socket.IO Protocol](https://github.com/socketio/socket.io-protocol)
 
 ## Contributing

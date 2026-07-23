@@ -4,8 +4,8 @@ package adapter
 import (
 	"time"
 
-	"github.com/zishang520/socket.io/adapters/redis/v3/emitter"
-	"github.com/zishang520/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/adapters/redis/v3/emitter"
+	"github.com/aqcool/socket.io/v3/pkg/types"
 )
 
 // Default configuration values for RedisAdapterOptions.

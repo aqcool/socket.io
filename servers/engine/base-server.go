@@ -8,13 +8,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zishang520/socket.io/servers/engine/v3/config"
-	"github.com/zishang520/socket.io/servers/engine/v3/errors"
-	"github.com/zishang520/socket.io/servers/engine/v3/transports"
-	"github.com/zishang520/socket.io/v3/pkg/log"
-	"github.com/zishang520/socket.io/v3/pkg/slices"
-	"github.com/zishang520/socket.io/v3/pkg/types"
-	"github.com/zishang520/socket.io/v3/pkg/utils"
+	"github.com/aqcool/socket.io/servers/engine/v3/config"
+	"github.com/aqcool/socket.io/servers/engine/v3/errors"
+	"github.com/aqcool/socket.io/servers/engine/v3/transports"
+	"github.com/aqcool/socket.io/v3/pkg/log"
+	"github.com/aqcool/socket.io/v3/pkg/slices"
+	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v3/pkg/utils"
 )
 
 var (

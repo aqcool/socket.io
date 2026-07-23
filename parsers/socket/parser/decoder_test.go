@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zishang520/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v3/pkg/types"
 )
 
 func TestNewDecoder(t *testing.T) {

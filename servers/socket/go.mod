@@ -1,14 +1,14 @@
-module github.com/zishang520/socket.io/servers/socket/v3
+module github.com/aqcool/socket.io/servers/socket/v3
 
 go 1.26.0
 
 require (
 	github.com/andybalholm/brotli v1.2.1
+	github.com/aqcool/socket.io/parsers/engine/v3 v3.0.4
+	github.com/aqcool/socket.io/parsers/socket/v3 v3.0.4
+	github.com/aqcool/socket.io/servers/engine/v3 v3.0.4
+	github.com/aqcool/socket.io/v3 v3.0.4
 	github.com/klauspost/compress v1.18.6
-	github.com/zishang520/socket.io/parsers/engine/v3 v3.0.4
-	github.com/zishang520/socket.io/parsers/socket/v3 v3.0.4
-	github.com/zishang520/socket.io/servers/engine/v3 v3.0.4
-	github.com/zishang520/socket.io/v3 v3.0.4
 )
 
 require (
@@ -28,8 +28,8 @@ require (
 )
 
 replace (
-	github.com/zishang520/socket.io/parsers/engine/v3 => ../../parsers/engine
-	github.com/zishang520/socket.io/parsers/socket/v3 => ../../parsers/socket
-	github.com/zishang520/socket.io/servers/engine/v3 => ../../servers/engine
-	github.com/zishang520/socket.io/v3 => ../../
+	github.com/aqcool/socket.io/parsers/engine/v3 => ../../parsers/engine
+	github.com/aqcool/socket.io/parsers/socket/v3 => ../../parsers/socket
+	github.com/aqcool/socket.io/servers/engine/v3 => ../../servers/engine
+	github.com/aqcool/socket.io/v3 => ../../
 )

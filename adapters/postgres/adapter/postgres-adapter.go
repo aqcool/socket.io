@@ -9,13 +9,13 @@ import (
 	"strconv"
 
 	"github.com/vmihailenco/msgpack/v5"
-	"github.com/zishang520/socket.io/adapters/adapter/v3"
-	"github.com/zishang520/socket.io/adapters/postgres/v3"
-	"github.com/zishang520/socket.io/parsers/socket/v3/parser"
-	"github.com/zishang520/socket.io/servers/socket/v3"
-	"github.com/zishang520/socket.io/v3/pkg/log"
-	"github.com/zishang520/socket.io/v3/pkg/types"
-	"github.com/zishang520/socket.io/v3/pkg/utils"
+	"github.com/aqcool/socket.io/adapters/adapter/v3"
+	"github.com/aqcool/socket.io/adapters/postgres/v3"
+	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
+	"github.com/aqcool/socket.io/servers/socket/v3"
+	"github.com/aqcool/socket.io/v3/pkg/log"
+	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v3/pkg/utils"
 )
 
 // postgresLog is the logger for the PostgreSQL adapter.

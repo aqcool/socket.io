@@ -3,7 +3,7 @@ package adapter
 import (
 	"time"
 
-	"github.com/zishang520/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v3/pkg/types"
 )
 
 // ClusterAdapterOptionsInterface defines the interface for cluster adapter options.

@@ -1,7 +1,7 @@
 # socket.io-go-postgres
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/zishang520/socket.io/adapters/postgres/v3.svg)](https://pkg.go.dev/github.com/zishang520/socket.io/adapters/postgres/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/zishang520/socket.io/adapters/postgres/v3)](https://goreportcard.com/report/github.com/zishang520/socket.io/adapters/postgres/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/postgres/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/postgres/v3)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/postgres/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/postgres/v3)
 
 ## Description
 
@@ -10,7 +10,7 @@ A PostgreSQL adapter for Socket.IO server in Go, allowing to scale Socket.IO app
 ## Installation
 
 ```bash
-go get github.com/zishang520/socket.io/adapters/postgres/v3
+go get github.com/aqcool/socket.io/adapters/postgres/v3
 ```
 
 ## Features
@@ -36,9 +36,9 @@ import (
     "syscall"
 
     "github.com/jackc/pgx/v5/pgxpool"
-    "github.com/zishang520/socket.io/adapters/postgres/v3"
-    pgadapter "github.com/zishang520/socket.io/adapters/postgres/v3/adapter"
-    "github.com/zishang520/socket.io/servers/socket/v3"
+    "github.com/aqcool/socket.io/adapters/postgres/v3"
+    pgadapter "github.com/aqcool/socket.io/adapters/postgres/v3/adapter"
+    "github.com/aqcool/socket.io/servers/socket/v3"
 )
 
 func main() {
@@ -80,8 +80,8 @@ import (
     "context"
 
     "github.com/jackc/pgx/v5/pgxpool"
-    "github.com/zishang520/socket.io/adapters/postgres/v3"
-    pgemitter "github.com/zishang520/socket.io/adapters/postgres/v3/emitter"
+    "github.com/aqcool/socket.io/adapters/postgres/v3"
+    pgemitter "github.com/aqcool/socket.io/adapters/postgres/v3/emitter"
 )
 
 func main() {
@@ -172,7 +172,7 @@ make test
 
 ## Support
 
-If you encounter any issues or have questions, please file them in the [issues section](https://github.com/zishang520/socket.io/issues).
+If you encounter any issues or have questions, please file them in the [issues section](https://github.com/aqcool/socket.io/issues).
 
 ## License
 

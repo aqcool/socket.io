@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zishang520/socket.io/servers/engine/v3/transports"
+	"github.com/aqcool/socket.io/servers/engine/v3/transports"
 )
 
 func TestDefaultWSBufferSizes(t *testing.T) {

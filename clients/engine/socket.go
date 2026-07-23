@@ -8,7 +8,7 @@
 // protocols like Socket.IO.
 package engine
 
-import "github.com/zishang520/socket.io/v3/pkg/types"
+import "github.com/aqcool/socket.io/v3/pkg/types"
 
 // Socket provides a WebSocket-like interface to connect to an Engine.IO server.
 // It supports multiple transport protocols including HTTP long-polling, WebSocket,
@@ -23,9 +23,9 @@ import "github.com/zishang520/socket.io/v3/pkg/types"
 // Example usage:
 //
 //	import (
-//		"github.com/zishang520/socket.io/clients/engine/v3"
-//		"github.com/zishang520/socket.io/clients/engine/v3/transports"
-//		"github.com/zishang520/socket.io/v3/pkg/types"
+//		"github.com/aqcool/socket.io/clients/engine/v3"
+//		"github.com/aqcool/socket.io/clients/engine/v3/transports"
+//		"github.com/aqcool/socket.io/v3/pkg/types"
 //	)
 //
 //	func main() {

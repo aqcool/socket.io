@@ -38,7 +38,7 @@ set MODULES=%MODULES% clients/engine
 set MODULES=%MODULES% clients/socket
 set "TEST_TIMEOUT=60s"
 set "VERSION_FILE=pkg\version\version.go"
-set "CORE_DEPENDENCY=github.com/zishang520/socket.io"
+set "CORE_DEPENDENCY=github.com/aqcool/socket.io"
 
 :: Check for Go installation
 where go >nul 2>nul

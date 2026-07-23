@@ -13,14 +13,14 @@ import (
 	"time"
 
 	wt "github.com/quic-go/webtransport-go"
-	"github.com/zishang520/socket.io/parsers/engine/v3/packet"
-	"github.com/zishang520/socket.io/parsers/engine/v3/parser"
-	"github.com/zishang520/socket.io/servers/engine/v3/transports"
-	"github.com/zishang520/socket.io/v3/pkg/queue"
-	"github.com/zishang520/socket.io/v3/pkg/request"
-	"github.com/zishang520/socket.io/v3/pkg/slices"
-	"github.com/zishang520/socket.io/v3/pkg/types"
-	"github.com/zishang520/socket.io/v3/pkg/webtransport"
+	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
+	"github.com/aqcool/socket.io/parsers/engine/v3/parser"
+	"github.com/aqcool/socket.io/servers/engine/v3/transports"
+	"github.com/aqcool/socket.io/v3/pkg/queue"
+	"github.com/aqcool/socket.io/v3/pkg/request"
+	"github.com/aqcool/socket.io/v3/pkg/slices"
+	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v3/pkg/webtransport"
 )
 
 // webTransport implements the WebTransport transport for Engine.IO.

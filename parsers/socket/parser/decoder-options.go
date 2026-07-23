@@ -1,6 +1,6 @@
 package parser
 
-import "github.com/zishang520/socket.io/v3/pkg/types"
+import "github.com/aqcool/socket.io/v3/pkg/types"
 
 // DecoderOptions holds configuration options for the Decoder.
 type (

@@ -16,7 +16,7 @@ using the [`valkey-go`](https://github.com/valkey-io/valkey-go) client.
 ## Installation
 
 ```bash
-go get github.com/zishang520/socket.io/adapters/valkey/v3
+go get github.com/aqcool/socket.io/adapters/valkey/v3
 ```
 
 ## Usage
@@ -28,9 +28,9 @@ import (
     "context"
 
     vk "github.com/valkey-io/valkey-go"
-    io "github.com/zishang520/socket.io/servers/socket/v3"
-    vkadapter "github.com/zishang520/socket.io/adapters/valkey/v3/adapter"
-    valkey "github.com/zishang520/socket.io/adapters/valkey/v3"
+    io "github.com/aqcool/socket.io/servers/socket/v3"
+    vkadapter "github.com/aqcool/socket.io/adapters/valkey/v3/adapter"
+    valkey "github.com/aqcool/socket.io/adapters/valkey/v3"
 )
 
 client, err := vk.NewClient(vk.ClientOption{
@@ -81,8 +81,8 @@ import (
     "context"
 
     vk "github.com/valkey-io/valkey-go"
-    valkey "github.com/zishang520/socket.io/adapters/valkey/v3"
-    "github.com/zishang520/socket.io/adapters/valkey/v3/emitter"
+    valkey "github.com/aqcool/socket.io/adapters/valkey/v3"
+    "github.com/aqcool/socket.io/adapters/valkey/v3/emitter"
 )
 
 client, _ := vk.NewClient(vk.ClientOption{InitAddress: []string{"localhost:6379"}})

@@ -3,8 +3,8 @@
 package adapter
 
 import (
-	"github.com/zishang520/socket.io/adapters/adapter/v3"
-	"github.com/zishang520/socket.io/adapters/redis/v3"
+	"github.com/aqcool/socket.io/adapters/adapter/v3"
+	"github.com/aqcool/socket.io/adapters/redis/v3"
 )
 
 type (

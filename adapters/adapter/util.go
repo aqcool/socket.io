@@ -5,9 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 
-	"github.com/zishang520/socket.io/servers/socket/v3"
-	"github.com/zishang520/socket.io/v3/pkg/log"
-	"github.com/zishang520/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/servers/socket/v3"
+	"github.com/aqcool/socket.io/v3/pkg/log"
+	"github.com/aqcool/socket.io/v3/pkg/types"
 )
 
 var adapterLog = log.NewLog("socket.io-adapter")
