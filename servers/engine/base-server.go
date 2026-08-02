@@ -2,7 +2,10 @@
 package engine
 
 import (
+	"bytes"
+	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -26,7 +29,7 @@ var (
 	BAD_HANDSHAKE_METHOD         = &types.CodeMessage{Code: 2, Message: `Bad handshake method`}
 	BAD_REQUEST                  = &types.CodeMessage{Code: 3, Message: `Bad request`}
 	FORBIDDEN                    = &types.CodeMessage{Code: 4, Message: `Forbidden`}
-	UNSUPPORTED_PROTOCOL_VERSION = &types.CodeMessage{Code: 4, Message: `Unsupported protocol version`}
+	UNSUPPORTED_PROTOCOL_VERSION = &types.CodeMessage{Code: 5, Message: `Unsupported protocol version`}
 )
 
 type baseServer struct {
@@ -44,6 +47,16 @@ type baseServer struct {
 	clientsCount atomic.Uint64
 	middlewares  []Middleware
 	middlewareMu sync.RWMutex
+}
+
+type transportStarter interface {
+	Start()
+}
+
+func startTransport(transport transports.Transport) {
+	if starter, ok := transport.(transportStarter); ok {
+		starter.Start()
+	}
 }
 
 func MakeBaseServer() BaseServer {
@@ -79,7 +92,11 @@ func (bs *baseServer) ClientsCount() uint64 {
 }
 
 func (bs *baseServer) Middlewares() []Middleware {
-	return bs.middlewares
+	bs.middlewareMu.RLock()
+	defer bs.middlewareMu.RUnlock()
+	middlewares := make([]Middleware, len(bs.middlewares))
+	copy(middlewares, bs.middlewares)
+	return middlewares
 }
 
 func (bs *baseServer) Transports() *types.Set[string] {
@@ -107,6 +124,7 @@ func (bs *baseServer) Construct(opt any) {
 	options.SetAllowEIO3(false)
 
 	bs.opts = options.Assign(opts)
+	bs.snapshotInitialPacket()
 
 	bs.transports = types.NewSet[string]()
 	bs._transportsByName = map[string]TransportCtor{}
@@ -120,16 +138,30 @@ func (bs *baseServer) Construct(opt any) {
 
 	if opts != nil {
 		if cookie := opts.Cookie(); cookie != nil {
+			cookie = cloneCookie(cookie)
 			if len(cookie.Name) == 0 {
 				cookie.Name = "io"
 			}
-			if len(cookie.Path) > 0 {
-				cookie.HttpOnly = true
+			cookie.Path = "/"
+			cookie.HttpOnly = true
+			if cookieOptions, ok := bs.opts.(interface {
+				GetRawCookiePath() types.Optional[string]
+				CookiePath() string
+				GetRawCookieHttpOnly() types.Optional[bool]
+				CookieHttpOnly() bool
+			}); ok {
+				if cookieOptions.GetRawCookiePath() != nil {
+					cookie.Path = cookieOptions.CookiePath()
+				} else if opts.Cookie().Path != "" {
+					cookie.Path = opts.Cookie().Path
+				}
+				if cookieOptions.GetRawCookieHttpOnly() != nil {
+					cookie.HttpOnly = cookieOptions.CookieHttpOnly()
+				}
+			} else if opts.Cookie().Path != "" {
+				cookie.Path = opts.Cookie().Path
 			}
-			if len(cookie.Path) == 0 {
-				cookie.Path = "/"
-			}
-			if cookie.SameSite == http.SameSiteDefaultMode {
+			if cookie.SameSite == 0 || cookie.SameSite == http.SameSiteDefaultMode {
 				cookie.SameSite = http.SameSiteLaxMode
 			}
 			bs.opts.SetCookie(cookie)
@@ -141,6 +173,44 @@ func (bs *baseServer) Construct(opt any) {
 	}
 
 	bs._proto_.Init()
+}
+
+// snapshotInitialPacket turns the caller-owned, potentially one-shot reader
+// into an immutable template. Each connection clones this template before
+// encoding it, so concurrent and subsequent handshakes receive the same
+// initial packet.
+func (bs *baseServer) snapshotInitialPacket() {
+	initialPacket := bs.opts.InitialPacket()
+	if initialPacket == nil {
+		return
+	}
+
+	switch value := initialPacket.(type) {
+	case types.BufferInterface:
+		bs.opts.SetInitialPacket(value.Clone())
+	case *strings.Reader:
+		reader := *value
+		data, err := io.ReadAll(&reader)
+		if err != nil {
+			serverLog.Debug("reading initial packet: %s", err)
+		}
+		bs.opts.SetInitialPacket(types.NewStringBuffer(data))
+	case *bytes.Reader:
+		reader := *value
+		data, err := io.ReadAll(&reader)
+		if err != nil {
+			serverLog.Debug("reading initial packet: %s", err)
+		}
+		bs.opts.SetInitialPacket(types.NewBytesBuffer(data))
+	case *bytes.Buffer:
+		bs.opts.SetInitialPacket(types.NewBytesBuffer(append([]byte(nil), value.Bytes()...)))
+	default:
+		data, err := io.ReadAll(initialPacket)
+		if err != nil {
+			serverLog.Debug("reading initial packet: %s", err)
+		}
+		bs.opts.SetInitialPacket(types.NewBytesBuffer(data))
+	}
 }
 
 // abstract
@@ -155,10 +225,12 @@ func (bs *baseServer) ComputePath(options config.AttachOptionsInterface) string 
 		if options.GetRawPath() != nil {
 			path = strings.TrimRight(options.Path(), "/")
 		}
-		if options.GetRawAddTrailingSlash() == nil || options.AddTrailingSlash() {
-			// normalize path
-			path += "/"
-		}
+	}
+	if options == nil || options.GetRawAddTrailingSlash() == nil || options.AddTrailingSlash() {
+		// The official default is addTrailingSlash=true. Keeping the slash on
+		// the registered route also makes the Go mux treat it as a prefix, so
+		// paths such as /engine.io/default/ reach Engine.IO as they do in Node.
+		path += "/"
 	}
 
 	return path
@@ -174,6 +246,31 @@ func (bs *baseServer) Upgrades(transport string) []string {
 		return nil
 	}
 	return ctor.UpgradesTo()
+}
+
+// protocolVersion returns the explicitly requested Engine.IO protocol version.
+// Engine.IO clients must send EIO on the handshake and every follow-up request.
+func (bs *baseServer) protocolVersion(ctx *types.HttpContext) (int, bool) {
+	values, exists := ctx.Query().All()["EIO"]
+	if !exists || len(values) != 1 {
+		return 0, false
+	}
+	switch values[0] {
+	case "4":
+		return 4, true
+	case "3":
+		return 3, bs.opts.AllowEIO3()
+	default:
+		return 0, false
+	}
+}
+
+func unsupportedProtocolContext(ctx *types.HttpContext) map[string]any {
+	value := ctx.Query().Peek("EIO")
+	if protocol, err := strconv.Atoi(value); err == nil {
+		return map[string]any{"protocol": protocol}
+	}
+	return map[string]any{"protocol": value}
 }
 
 // Verifies a request.
@@ -192,6 +289,12 @@ func (bs *baseServer) Verify(ctx *types.HttpContext, upgrade bool) (*types.CodeM
 		return BAD_REQUEST, map[string]any{"name": "INVALID_ORIGIN", "origin": origin}
 	}
 
+	protocol, supported := bs.protocolVersion(ctx)
+	if !supported {
+		serverLog.Debug(`unsupported protocol version "%s"`, ctx.Query().Peek("EIO"))
+		return UNSUPPORTED_PROTOCOL_VERSION, unsupportedProtocolContext(ctx)
+	}
+
 	// sid check
 	sid := ctx.Query().Peek("sid")
 	if len(sid) > 0 {
@@ -204,6 +307,14 @@ func (bs *baseServer) Verify(ctx *types.HttpContext, upgrade bool) (*types.CodeM
 		if !ok {
 			serverLog.Debug(`unknown sid "%s"`, sid)
 			return UNKNOWN_SID, map[string]any{"sid": sid}
+		}
+		if socket.Protocol() != protocol {
+			serverLog.Debug(`protocol mismatch for sid "%s": got %d, expected %d`, sid, protocol, socket.Protocol())
+			return UNSUPPORTED_PROTOCOL_VERSION, map[string]any{
+				"name":     "PROTOCOL_MISMATCH",
+				"protocol": protocol,
+				"expected": socket.Protocol(),
+			}
 		}
 		if previousTransport := socket.Transport().Name(); !upgrade && previousTransport != transport {
 			serverLog.Debug("bad request: unexpected transport without upgrade")
@@ -292,24 +403,41 @@ func (bs *baseServer) GenerateId(*types.HttpContext) string {
 
 // Handshakes a new client.
 func (bs *baseServer) Handshake(transportName string, ctx *types.HttpContext) (*types.CodeMessage, transports.Transport) {
-	protocol := 3 // 3rd revision by default
-	if ctx.Query().Peek("EIO") == "4" {
-		protocol = 4
+	id, err := bs.generateId(ctx)
+	if err != nil {
+		context := map[string]any{"name": "ID_GENERATION_ERROR", "error": err}
+		bs.Emit("connection_error", &types.ErrorMessage{
+			CodeMessage: BAD_REQUEST,
+			Req:         ctx,
+			Context:     context,
+		})
+		return BAD_REQUEST, nil
 	}
+	return bs.handshakeWithID(transportName, ctx, id)
+}
 
-	if protocol == 3 && !bs.opts.AllowEIO3() {
-		serverLog.Debug("unsupported protocol version")
+func (bs *baseServer) generateId(ctx *types.HttpContext) (string, error) {
+	if options, ok := bs.opts.(interface {
+		GetRawGenerateId() types.Optional[config.IdGenerator]
+		GenerateId() config.IdGenerator
+	}); ok && options.GetRawGenerateId() != nil {
+		return options.GenerateId()(ctx)
+	}
+	return bs._proto_.GenerateId(ctx), nil
+}
+
+func (bs *baseServer) handshakeWithID(transportName string, ctx *types.HttpContext, id string) (*types.CodeMessage, transports.Transport) {
+	protocol, supported := bs.protocolVersion(ctx)
+	if !supported {
+		serverLog.Debug(`unsupported protocol version "%s"`, ctx.Query().Peek("EIO"))
 		bs.Emit("connection_error", &types.ErrorMessage{
 			CodeMessage: UNSUPPORTED_PROTOCOL_VERSION,
 			Req:         ctx,
-			Context: map[string]any{
-				"protocol": protocol,
-			},
+			Context:     unsupportedProtocolContext(ctx),
 		})
 		return UNSUPPORTED_PROTOCOL_VERSION, nil
 	}
 
-	id := bs.GenerateId(ctx)
 	serverLog.Debug(`handshaking client "%s" (%s)`, id, transportName)
 
 	ctx.IdleTimeout = bs.opts.IdleTimeout()
@@ -336,10 +464,8 @@ func (bs *baseServer) Handshake(transportName string, ctx *types.HttpContext) (*
 
 	_ = transport.On("headers", func(args ...any) {
 		headers, req := slices.TryGetAny[*types.ParameterBag](args, 0), slices.TryGetAny[*types.HttpContext](args, 1)
-		if !ctx.Query().Has("sid") {
-			if cookie := bs.opts.Cookie(); cookie != nil {
-				headers.Set("Set-Cookie", cookie.String())
-			}
+		if req != nil && !req.Query().Has("sid") {
+			addSessionCookie(headers, bs.opts.Cookie(), id)
 			bs.Emit("initial_headers", headers, req)
 		}
 		bs.Emit("headers", headers, req)
@@ -347,19 +473,70 @@ func (bs *baseServer) Handshake(transportName string, ctx *types.HttpContext) (*
 
 	transport.OnRequest(ctx)
 
-	socket := NewSocket(id, bs, transport, ctx, protocol)
-
-	bs.clients.Store(id, socket)
+	engineSocket := newSocketForHandshake(id, bs, transport, ctx, protocol)
+	// Register the SID before queuing the OPEN packet. WebSocket writes run on
+	// an asynchronous queue in Go, so the peer can otherwise observe its SID
+	// before Clients() does, unlike the atomic ordering of the official event
+	// loop implementation.
+	bs.clients.Store(id, engineSocket)
 	bs.clientsCount.Add(1)
 
-	_ = socket.Once("close", func(...any) {
-		bs.clients.Delete(id)
-		bs.clientsCount.Add(^uint64(0))
+	var registered atomic.Bool
+	registered.Store(true)
+	removeClient := func() {
+		if registered.CompareAndSwap(true, false) {
+			bs.clients.Delete(id)
+			bs.clientsCount.Add(^uint64(0))
+		}
+	}
+	_ = engineSocket.Once("close", func(...any) {
+		removeClient()
 	})
 
-	bs.Emit("connection", socket)
+	if !engineSocket.(*socket).onOpen() {
+		removeClient()
+		engineSocket.(*socket).markConnectionReady()
+		transport.Discard()
+		transport.Close()
+		return BAD_REQUEST, nil
+	}
+	// The transport constructor must not dispatch packets before Socket has
+	// installed its listeners. This ordering is implicit in Node.js but must be
+	// explicit with Go transport reader goroutines.
+	startTransport(transport)
+	concreteSocket := engineSocket.(*socket)
+	if emitter, ok := bs._proto_.(interface{ emitConnection(Socket) }); ok {
+		emitter.emitConnection(engineSocket)
+	} else {
+		concreteSocket.beginConnectionAnnouncement()
+		if engineSocket.ReadyState() != "open" {
+			concreteSocket.finishConnectionAnnouncement()
+			concreteSocket.markConnectionReady()
+			return BAD_REQUEST, nil
+		}
+		bs.Emit("connection", engineSocket)
+		concreteSocket.finishConnectionAnnouncement()
+	}
+	concreteSocket.markConnectionReady()
 
 	return nil, transport
+}
+
+func cloneCookie(cookie *http.Cookie) *http.Cookie {
+	if cookie == nil {
+		return nil
+	}
+	cloned := *cookie
+	return &cloned
+}
+
+func addSessionCookie(headers *types.ParameterBag, cookie *http.Cookie, id string) {
+	if headers == nil || cookie == nil {
+		return
+	}
+	sessionCookie := cloneCookie(cookie)
+	sessionCookie.Value = id
+	headers.Add("Set-Cookie", sessionCookie.String())
 }
 
 // abstract

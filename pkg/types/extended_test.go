@@ -1,6 +1,7 @@
 package types
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"strings"
@@ -165,6 +166,31 @@ func TestBytesBuffer(t *testing.T) {
 			t.Errorf("GoString of nil = %q, want <nil>", buf.GoString())
 		}
 	})
+}
+
+func TestBytesBufferMsgpackRoundTrip(t *testing.T) {
+	original := &BytesBuffer{Buffer: NewBuffer([]byte{0, 1, 2, 127, 255})}
+	encoded, err := msgpack.Marshal(original)
+	if err != nil {
+		t.Fatalf("MarshalMsgpack failed: %v", err)
+	}
+
+	var generic any
+	if err := msgpack.Unmarshal(encoded, &generic); err != nil {
+		t.Fatalf("generic MessagePack decode failed: %v", err)
+	}
+	decodedBytes, ok := generic.([]byte)
+	if !ok || !bytes.Equal(decodedBytes, original.Bytes()) {
+		t.Fatalf("expected MessagePack binary value, got %T(%v)", generic, generic)
+	}
+
+	var decoded BytesBuffer
+	if err := msgpack.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("UnmarshalMsgpack failed: %v", err)
+	}
+	if !bytes.Equal(decoded.Bytes(), original.Bytes()) {
+		t.Fatalf("unexpected round-trip bytes: %v", decoded.Bytes())
+	}
 }
 
 func TestStringBuffer(t *testing.T) {

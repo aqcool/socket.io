@@ -1,3 +1,4 @@
 .vscode
-/vendor
+vendor/
 /bin/*
+node_modules/

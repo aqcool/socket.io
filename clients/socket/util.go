@@ -61,10 +61,8 @@ func processExtendedError(d map[string]any) (*types.ExtendedError, error) {
 		return nil, err
 	}
 
-	data, err := extractValue[any](d, "data")
-	if err != nil {
-		return nil, err
-	}
+	// The data field is optional in the official CONNECT_ERROR payload.
+	data := d["data"]
 
 	return &types.ExtendedError{
 		Message: message,

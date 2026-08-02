@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -122,8 +123,8 @@ func TestDestroy(t *testing.T) {
 	d := NewDecoder().(*decoder)
 	d.reconstructor.Store(newBinaryReconstructor(&Packet{}))
 	d.Destroy()
-	if d.reconstructor.Load().packet.Load() != nil {
-		t.Error("Destroy() did not clear the reconstructor")
+	if d.reconstructor.Load() != nil {
+		t.Error("Destroy() did not release the reconstructor")
 	}
 }
 
@@ -235,7 +236,7 @@ func TestDecoderErrorCases(t *testing.T) {
 
 	// Test case: Illegal attachments
 	err = d.Add("5abc[\"data\"]")
-	if err == nil || err.Error() != "illegal attachments" {
+	if err == nil || err.Error() != "Illegal attachments" {
 		t.Errorf("Expected error for illegal attachments, got: %v", err)
 	}
 
@@ -442,8 +443,8 @@ func TestBinaryPacketReconstruction(t *testing.T) {
 		t.Fatal("Packet should be emitted after binary data")
 	}
 
-	if decodedPacket.Type != BINARY_EVENT {
-		t.Errorf("Expected BINARY_EVENT type, got %v", decodedPacket.Type)
+	if decodedPacket.Type != EVENT {
+		t.Errorf("Expected EVENT type, got %v", decodedPacket.Type)
 	}
 
 	data, ok := decodedPacket.Data.([]any)
@@ -499,27 +500,14 @@ func TestMultipleBinaryAttachments(t *testing.T) {
 	}
 }
 
-// TestZeroAttachments tests BINARY_EVENT with 0 attachments
+// TestZeroAttachments tests the 4.2.7 rule that a binary packet must declare
+// at least one attachment.
 func TestZeroAttachments(t *testing.T) {
 	d := NewDecoder().(*decoder)
 
-	var decodedPacket *Packet
-	_ = d.On("decoded", func(args ...any) {
-		if len(args) > 0 {
-			if p, ok := args[0].(*Packet); ok {
-				decodedPacket = p
-			}
-		}
-	})
-
-	// BINARY_EVENT with 0 attachments should emit immediately
 	err := d.Add(`50-["event","data"]`)
-	if err != nil {
-		t.Fatalf("Add error: %v", err)
-	}
-
-	if decodedPacket == nil {
-		t.Fatal("Packet with 0 attachments should be emitted immediately")
+	if !errors.Is(err, ErrInvalidAttachmentCount) {
+		t.Fatalf("Add() error = %v, want %v", err, ErrInvalidAttachmentCount)
 	}
 }
 
@@ -593,5 +581,77 @@ func TestDecoderOptionsMaxAttachments(t *testing.T) {
 	d5 := NewDecoder(nil).(*decoder)
 	if d5.opts.MaxAttachments() != DefaultMaxAttachments {
 		t.Errorf("Decoder with nil opts should use default %d, got %d", DefaultMaxAttachments, d5.opts.MaxAttachments())
+	}
+}
+
+func TestDecoderOfficialInvalidAttachmentCounts(t *testing.T) {
+	for _, input := range []string{"5", "51", "50-", "5a-", "51.23-"} {
+		t.Run(input, func(t *testing.T) {
+			err := NewDecoder().Add(input)
+			if !errors.Is(err, ErrInvalidAttachmentCount) {
+				t.Fatalf("Add(%q) error = %v, want %v", input, err, ErrInvalidAttachmentCount)
+			}
+			if err.Error() != "Illegal attachments" {
+				t.Fatalf("Add(%q) error text = %q, want %q", input, err, "Illegal attachments")
+			}
+		})
+	}
+}
+
+func TestDecoderOfficialMaxAttachmentsOption(t *testing.T) {
+	opts := DefaultDecoderOptions()
+	opts.SetMaxAttachments(2)
+
+	err := NewDecoder(opts).Add(
+		`53-["hello",{"_placeholder":true,"num":0},{"_placeholder":true,"num":1},{"_placeholder":true,"num":2}]`,
+	)
+	if !errors.Is(err, ErrTooManyAttachments) {
+		t.Fatalf("Add() error = %v, want %v", err, ErrTooManyAttachments)
+	}
+}
+
+func TestDecoderOfficialLegacyReviverConstructor(t *testing.T) {
+	reviver := func(key string, value any) any {
+		if key == "a" {
+			return strings.ToUpper(value.(string))
+		}
+		return value
+	}
+
+	assertRevivedPacket(t, NewDecoder(reviver))
+}
+
+func TestDecoderOfficialReviverOption(t *testing.T) {
+	opts := DefaultDecoderOptions()
+	opts.SetReviver(func(key string, value any) any {
+		if key == "a" {
+			return strings.ToUpper(value.(string))
+		}
+		return value
+	})
+
+	assertRevivedPacket(t, NewDecoder(opts))
+}
+
+func assertRevivedPacket(t *testing.T, decoder Decoder) {
+	t.Helper()
+
+	var decoded *Packet
+	if err := decoder.On("decoded", func(args ...any) {
+		decoded, _ = args[0].(*Packet)
+	}); err != nil {
+		t.Fatalf("On() error = %v", err)
+	}
+
+	if err := decoder.Add(`2["b",{"a":"val"}]`); err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+	if decoded == nil {
+		t.Fatal("decoded event was not emitted")
+	}
+
+	want := []any{"b", map[string]any{"a": "VAL"}}
+	if !reflect.DeepEqual(decoded.Data, want) {
+		t.Fatalf("decoded data = %#v, want %#v", decoded.Data, want)
 	}
 }

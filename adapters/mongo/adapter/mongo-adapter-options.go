@@ -15,6 +15,10 @@ const (
 
 	// DefaultHeartbeatTimeout is the default timeout for heartbeat responses.
 	DefaultHeartbeatTimeout int64 = 10_000
+
+	// DefaultRequestsTimeout is the default wait for responses from other
+	// Socket.IO server instances, matching @socket.io/mongo-adapter@0.4.0.
+	DefaultRequestsTimeout = 5_000 * time.Millisecond
 )
 
 type (
@@ -30,6 +34,10 @@ type (
 		SetErrorHandler(func(error))
 		GetRawErrorHandler() types.Optional[func(error)]
 		ErrorHandler() func(error)
+
+		SetRequestsTimeout(time.Duration)
+		GetRawRequestsTimeout() types.Optional[time.Duration]
+		RequestsTimeout() time.Duration
 	}
 
 	// MongoAdapterOptions holds configuration for the MongoDB adapter.
@@ -45,6 +53,7 @@ type (
 
 		addCreatedAtField types.Optional[bool]
 		errorHandler      types.Optional[func(error)]
+		requestsTimeout   types.Optional[time.Duration]
 	}
 )
 
@@ -67,6 +76,9 @@ func (s *MongoAdapterOptions) Assign(data MongoAdapterOptionsInterface) MongoAda
 	}
 	if data.GetRawErrorHandler() != nil {
 		s.SetErrorHandler(data.ErrorHandler())
+	}
+	if data.GetRawRequestsTimeout() != nil {
+		s.SetRequestsTimeout(data.RequestsTimeout())
 	}
 
 	return s
@@ -107,4 +119,23 @@ func (s *MongoAdapterOptions) ErrorHandler() func(error) {
 		return nil
 	}
 	return s.errorHandler.Get()
+}
+
+// SetRequestsTimeout sets how long the adapter waits for inter-node responses.
+func (s *MongoAdapterOptions) SetRequestsTimeout(timeout time.Duration) {
+	s.requestsTimeout = types.NewSome(timeout)
+}
+
+// GetRawRequestsTimeout returns the explicitly configured requests timeout.
+func (s *MongoAdapterOptions) GetRawRequestsTimeout() types.Optional[time.Duration] {
+	return s.requestsTimeout
+}
+
+// RequestsTimeout returns the configured requests timeout, or zero when unset.
+// Builders apply DefaultRequestsTimeout before constructing an adapter.
+func (s *MongoAdapterOptions) RequestsTimeout() time.Duration {
+	if s.requestsTimeout == nil {
+		return 0
+	}
+	return s.requestsTimeout.Get()
 }

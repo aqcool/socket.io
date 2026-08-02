@@ -10,6 +10,14 @@ type (
 	}
 )
 
+func (*SessionAwareAdapterBuilder) SupportsConnectionStateRecovery() bool { return true }
+
+func (*SessionAwareAdapterBuilder) Capabilities() socket.AdapterCapabilities {
+	capabilities := (&AdapterBuilder{}).Capabilities()
+	capabilities.ConnectionStateRecovery = true
+	return capabilities
+}
+
 // New creates a new SessionAwareAdapter for the given Namespace.
 func (*SessionAwareAdapterBuilder) New(nsp socket.Namespace) Adapter {
 	return NewSessionAwareAdapter(nsp)

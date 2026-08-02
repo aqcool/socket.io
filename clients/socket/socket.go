@@ -1,8 +1,11 @@
 package socket
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -15,6 +18,8 @@ import (
 	"github.com/aqcool/socket.io/v3/pkg/types"
 	"github.com/aqcool/socket.io/v3/pkg/utils"
 )
+
+var ErrBufferOverflow = errors.New("socket.io-client: buffer overflow")
 
 // Socket represents a Socket.IO connection to a specific namespace.
 // It implements an event-driven interface for real-time bidirectional communication.
@@ -64,7 +69,11 @@ type Socket struct {
 	recovered atomic.Bool
 
 	// auth stores the authentication credentials for namespace access.
-	auth map[string]any
+	auth         map[string]any
+	authProvider AuthProvider
+	authMu       sync.RWMutex
+	authCancel   context.CancelFunc
+	authAttempt  atomic.Uint64
 
 	// receiveBuffer stores packets received before the CONNECT packet.
 	receiveBuffer *types.Slice[[]any]
@@ -77,6 +86,11 @@ type Socket struct {
 
 	// _queueSeq generates unique IDs for queued packets.
 	_queueSeq atomic.Uint64
+
+	bufferMu           sync.Mutex
+	sendBufferBytes    atomic.Int64
+	receiveBufferBytes atomic.Int64
+	retryQueueBytes    atomic.Int64
 
 	// nsp is the namespace this socket belongs to.
 	nsp string
@@ -134,6 +148,11 @@ func (s *Socket) Io() *Manager {
 	return s.io
 }
 
+// Nsp returns the namespace of this Socket.
+func (s *Socket) Nsp() string {
+	return s.nsp
+}
+
 // Id returns the session identifier for this socket, only available when connected.
 func (s *Socket) Id() string {
 	return s.id.Load()
@@ -151,7 +170,9 @@ func (s *Socket) Recovered() bool {
 
 // Auth returns the authentication credentials for namespace access.
 func (s *Socket) Auth() map[string]any {
-	return s.auth
+	s.authMu.RLock()
+	defer s.authMu.RUnlock()
+	return cloneAuth(s.auth)
 }
 
 // ReceiveBuffer returns the buffer of packets received before the CONNECT packet.
@@ -174,8 +195,9 @@ func (s *Socket) Construct(io *Manager, nsp string, opts SocketOptionsInterface)
 	s.nsp = nsp
 	s._opts = DefaultSocketOptions().Assign(opts)
 	if auth := s._opts.Auth(); auth != nil {
-		s.auth = auth
+		s.auth = cloneAuth(auth)
 	}
+	s.authProvider = s._opts.AuthProvider()
 
 	if s.io._autoConnect {
 		s.Open()
@@ -257,6 +279,25 @@ func (s *Socket) Connect() *Socket {
 	return s
 }
 
+// SetAuth updates the authentication data for this namespace only.
+func (s *Socket) SetAuth(auth map[string]any) *Socket {
+	s.authMu.Lock()
+	defer s.authMu.Unlock()
+	s.auth = cloneAuth(auth)
+	s._opts.SetAuth(cloneAuth(auth))
+	return s
+}
+
+// SetAuthProvider updates the dynamic authentication provider for this
+// namespace. The provider is called before every connection and reconnection.
+func (s *Socket) SetAuthProvider(provider AuthProvider) *Socket {
+	s.authMu.Lock()
+	defer s.authMu.Unlock()
+	s.authProvider = provider
+	s._opts.SetAuthProvider(provider)
+	return s
+}
+
 // Open is an alias for Connect.
 func (s *Socket) Open() *Socket {
 	return s.Connect()
@@ -305,8 +346,12 @@ func (s *Socket) Emit(ev string, args ...any) error {
 	flags := s.flags.Swap(&Flags{})
 
 	if s._opts.Retries() > 0 && !flags.FromQueue && !flags.Volatile {
-		s._addToQueue(data)
-		return nil
+		return s._addToQueue(data, flags)
+	}
+
+	compress := true
+	if flags.Compress != nil {
+		compress = *flags.Compress
 	}
 
 	packet := &Packet{
@@ -315,7 +360,7 @@ func (s *Socket) Emit(ev string, args ...any) error {
 			Data: data,
 		},
 		Options: &packet.Options{
-			Compress: flags.Compress,
+			Compress: utils.Ptr(compress),
 		},
 	}
 
@@ -349,7 +394,8 @@ func (s *Socket) Emit(ev string, args ...any) error {
 		s.notifyOutgoingListeners(packet)
 		s.packet(packet)
 	} else {
-		s.sendBuffer.Push(packet)
+		_, err := s.enqueueSendPacket(packet)
+		return err
 	}
 
 	return nil
@@ -369,13 +415,7 @@ func (s *Socket) _registerAckCallback(id uint64, ack socket.Ack, timeout *time.D
 
 	timer := utils.SetTimeout(func() {
 		s.acks.Delete(id)
-		s.sendBuffer.RemoveAll(func(p *Packet) bool {
-			if p.Id != nil && *p.Id == id {
-				socketLog.Debug("removing packet with ack id %d from the buffer", id)
-				return true
-			}
-			return false
-		})
+		s.removeBufferedAck(id)
 		socketLog.Debug("event with ack id %d has timed out after %d ms", id, *timeout)
 		ack(nil, errors.New("operation has timed out"))
 	}, *timeout)
@@ -408,7 +448,7 @@ func (s *Socket) EmitWithAck(ev string, args ...any) func(socket.Ack) {
 // _addToQueue adds the packet to the queue.
 //
 // args: The packet arguments.
-func (s *Socket) _addToQueue(args []any) {
+func (s *Socket) _addToQueue(args []any, flags *Flags) error {
 	args_len := len(args)
 	ack, withAck := args[args_len-1].(socket.Ack)
 	if withAck {
@@ -417,7 +457,9 @@ func (s *Socket) _addToQueue(args []any) {
 
 	packet := &QueuedPacket{
 		Id:    s._queueSeq.Add(1) - 1,
-		Flags: s.flags.Load(),
+		Flags: cloneQueueFlags(flags),
+		Size:  estimateBufferBytes(args),
+		Ack:   ack,
 	}
 
 	args = append(args, func(responseArgs []any, err error) {
@@ -429,14 +471,18 @@ func (s *Socket) _addToQueue(args []any) {
 		if err != nil {
 			if tryCount := packet.TryCount.Load(); float64(tryCount) > s._opts.Retries() {
 				socketLog.Debug("packet [%d] is discarded after %d tries", packet.Id, tryCount)
-				_, _ = s._queue.Shift()
+				if !s.shiftRetryQueue(packet) {
+					return
+				}
 				if ack != nil {
 					ack(nil, err)
 				}
 			}
 		} else {
 			socketLog.Debug("packet [%d] was successfully sent", packet.Id)
-			_, _ = s._queue.Shift()
+			if !s.shiftRetryQueue(packet) {
+				return
+			}
 			if ack != nil {
 				ack(responseArgs, nil)
 			}
@@ -447,8 +493,33 @@ func (s *Socket) _addToQueue(args []any) {
 
 	packet.Args = args
 
-	s._queue.Push(packet)
+	accepted, overflowErr := s.enqueueRetryPacket(packet)
+	if !accepted {
+		if ack != nil {
+			ack(nil, ErrBufferOverflow)
+		}
+		return overflowErr
+	}
 	s._drainQueue(false)
+	return nil
+}
+
+func cloneQueueFlags(flags *Flags) *Flags {
+	cloned := &Flags{FromQueue: true}
+	if flags == nil {
+		return cloned
+	}
+	cloned.Options = flags.Options
+	if flags.Compress != nil {
+		compress := *flags.Compress
+		cloned.Compress = &compress
+	}
+	cloned.Volatile = flags.Volatile
+	if flags.Timeout != nil {
+		timeout := *flags.Timeout
+		cloned.Timeout = &timeout
+	}
+	return cloned
 }
 
 // _drainQueue sends the first packet of the queue and waits for an acknowledgement from the server.
@@ -486,13 +557,54 @@ func (s *Socket) packet(packet *Packet) {
 // onopen is called upon engine `open`.
 func (s *Socket) onopen(...any) {
 	socketLog.Debug("transport is open - connecting")
-	s._sendConnectPacket(s.auth)
+	s.authMu.RLock()
+	provider := s.authProvider
+	staticAuth := cloneAuth(s.auth)
+	s.authMu.RUnlock()
+	if provider == nil {
+		s._sendConnectPacket(staticAuth)
+		return
+	}
+
+	s.cancelAuthAttempt()
+	attempt := s.authAttempt.Add(1)
+	ctx := context.Background()
+	var cancel context.CancelFunc
+	if timeout := s.io.Timeout(); timeout != nil && *timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, *timeout)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+	s.authMu.Lock()
+	s.authCancel = cancel
+	s.authMu.Unlock()
+
+	go func() {
+		auth, err := provider(ctx)
+		cancel()
+		if attempt != s.authAttempt.Load() {
+			return
+		}
+		if err != nil {
+			s.EventEmitter.Emit("connect_error", err)
+			return
+		}
+		s.authMu.Lock()
+		defer s.authMu.Unlock()
+		if attempt != s.authAttempt.Load() {
+			return
+		}
+		s.auth = cloneAuth(auth)
+		s._opts.SetAuth(cloneAuth(auth))
+		s._sendConnectPacket(auth)
+	}()
 }
 
 // _sendConnectPacket sends a CONNECT packet to initiate the Socket.IO session.
 //
 // data: The data to send.
 func (s *Socket) _sendConnectPacket(data map[string]any) {
+	data = cloneAuth(data)
 	if _pid := s._pid.Load(); _pid != "" {
 		if data == nil {
 			data = map[string]any{}
@@ -523,10 +635,210 @@ func (s *Socket) onerror(errs ...any) {
 // description: The error description.
 func (s *Socket) onclose(reason string, description error) {
 	socketLog.Debug("close (%s)", reason)
+	s.cancelAuthAttempt()
 	s.connected.Store(false)
 	s.id.Store("")
 	s.EventEmitter.Emit("disconnect", reason, description)
 	s._clearAcks()
+}
+
+func (s *Socket) cancelAuthAttempt() {
+	s.authAttempt.Add(1)
+	s.authMu.Lock()
+	cancel := s.authCancel
+	s.authCancel = nil
+	s.authMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
+func (s *Socket) removeBufferedAck(id uint64) {
+	s.bufferMu.Lock()
+	removed, _ := s.sendBuffer.RangeAndSplice(func(p *Packet, index int) (bool, int, int, []*Packet) {
+		return p.Id != nil && *p.Id == id, index, 1, nil
+	})
+	if len(removed) > 0 {
+		s.sendBufferBytes.Add(-estimateBufferBytes(removed[0].Packet))
+		socketLog.Debug("removing packet with ack id %d from the buffer", id)
+	}
+	s.bufferMu.Unlock()
+}
+
+func cloneAuth(auth map[string]any) map[string]any {
+	if auth == nil {
+		return nil
+	}
+	cloned := make(map[string]any, len(auth))
+	maps.Copy(cloned, auth)
+	return cloned
+}
+
+// BufferStats returns the current packet and byte backlog for this namespace.
+func (s *Socket) BufferStats() BufferStats {
+	return BufferStats{
+		SendPackets:    s.sendBuffer.Len(),
+		SendBytes:      s.sendBufferBytes.Load(),
+		ReceivePackets: s.receiveBuffer.Len(),
+		ReceiveBytes:   s.receiveBufferBytes.Load(),
+		RetryPackets:   s._queue.Len(),
+		RetryBytes:     s.retryQueueBytes.Load(),
+	}
+}
+
+func estimateBufferBytes(value any) int64 {
+	encoded, err := json.Marshal(value)
+	if err == nil {
+		return int64(len(encoded))
+	}
+	return int64(len(fmt.Sprintf("%v", value)))
+}
+
+func bufferLimitExceeded(packets int, bytes, incomingBytes int64, maxPackets int, maxBytes int64) bool {
+	return (maxPackets > 0 && packets+1 > maxPackets) ||
+		(maxBytes > 0 && bytes+incomingBytes > maxBytes)
+}
+
+func (s *Socket) enqueueSendPacket(packet *Packet) (bool, error) {
+	size := estimateBufferBytes(packet.Packet)
+	var droppedAcks []socket.Ack
+
+	s.bufferMu.Lock()
+	overflowed := false
+	for bufferLimitExceeded(s.sendBuffer.Len(), s.sendBufferBytes.Load(), size, s._opts.MaxSendBufferPackets(), s._opts.MaxSendBufferBytes()) {
+		overflowed = true
+		if s._opts.OverflowStrategy() != OverflowDropOldest || s.sendBuffer.Len() == 0 {
+			s.bufferMu.Unlock()
+			accepted, overflowErr := s.handleOverflow("send", size)
+			if packet.Id != nil {
+				if ack, ok := s.acks.LoadAndDelete(*packet.Id); ok {
+					ack(nil, ErrBufferOverflow)
+				}
+			}
+			return accepted, overflowErr
+		}
+		dropped, err := s.sendBuffer.Shift()
+		if err != nil {
+			break
+		}
+		s.sendBufferBytes.Add(-estimateBufferBytes(dropped.Packet))
+		if dropped.Id != nil {
+			if ack, ok := s.acks.LoadAndDelete(*dropped.Id); ok {
+				droppedAcks = append(droppedAcks, ack)
+			}
+		}
+	}
+	s.sendBuffer.Push(packet)
+	s.sendBufferBytes.Add(size)
+	s.bufferMu.Unlock()
+
+	for _, ack := range droppedAcks {
+		ack(nil, ErrBufferOverflow)
+	}
+	if overflowed {
+		s.emitOverflow("send", size)
+	}
+	return true, nil
+}
+
+func (s *Socket) enqueueReceiveEvent(args []any, size int64) {
+	s.bufferMu.Lock()
+	overflowed := false
+	for bufferLimitExceeded(s.receiveBuffer.Len(), s.receiveBufferBytes.Load(), size, s._opts.MaxReceiveBufferPackets(), s._opts.MaxReceiveBufferBytes()) {
+		overflowed = true
+		if s._opts.OverflowStrategy() != OverflowDropOldest || s.receiveBuffer.Len() == 0 {
+			s.bufferMu.Unlock()
+			_, _ = s.handleOverflow("receive", size)
+			return
+		}
+		dropped, err := s.receiveBuffer.Shift()
+		if err != nil {
+			break
+		}
+		s.receiveBufferBytes.Add(-estimateBufferBytes(dropped))
+	}
+	s.receiveBuffer.Push(args)
+	s.receiveBufferBytes.Add(size)
+	s.bufferMu.Unlock()
+	if overflowed {
+		s.emitOverflow("receive", size)
+	}
+}
+
+func (s *Socket) enqueueRetryPacket(packet *QueuedPacket) (bool, error) {
+	var dropped []*QueuedPacket
+	s.bufferMu.Lock()
+	overflowed := false
+	for bufferLimitExceeded(s._queue.Len(), s.retryQueueBytes.Load(), packet.Size, s._opts.MaxRetryQueuePackets(), s._opts.MaxRetryQueueBytes()) {
+		overflowed = true
+		if s._opts.OverflowStrategy() != OverflowDropOldest || s._queue.Len() == 0 {
+			s.bufferMu.Unlock()
+			return s.handleOverflow("retry", packet.Size)
+		}
+		oldest, err := s._queue.Shift()
+		if err != nil {
+			break
+		}
+		s.retryQueueBytes.Add(-oldest.Size)
+		dropped = append(dropped, oldest)
+	}
+	s._queue.Push(packet)
+	s.retryQueueBytes.Add(packet.Size)
+	s.bufferMu.Unlock()
+
+	for _, queued := range dropped {
+		if queued.Ack != nil {
+			queued.Ack(nil, ErrBufferOverflow)
+		}
+	}
+	if overflowed {
+		s.emitOverflow("retry", packet.Size)
+	}
+	return true, nil
+}
+
+func (s *Socket) shiftRetryQueue(expected *QueuedPacket) bool {
+	s.bufferMu.Lock()
+	current, err := s._queue.Get(0)
+	if err != nil || current != expected {
+		s.bufferMu.Unlock()
+		return false
+	}
+	packet, err := s._queue.Shift()
+	if err != nil {
+		s.bufferMu.Unlock()
+		return false
+	}
+	s.retryQueueBytes.Add(-packet.Size)
+	empty := s._queue.Len() == 0
+	s.bufferMu.Unlock()
+	if empty {
+		s.EventEmitter.Emit("drain", "retry", s.BufferStats())
+	}
+	return true
+}
+
+func (s *Socket) handleOverflow(buffer string, incomingBytes int64) (bool, error) {
+	s.emitOverflow(buffer, incomingBytes)
+	switch s._opts.OverflowStrategy() {
+	case OverflowDropNewest:
+		return false, nil
+	case OverflowDisconnect:
+		s.EventEmitter.Emit("slow_consumer", buffer, s.BufferStats())
+		s.Disconnect()
+		return false, ErrBufferOverflow
+	default:
+		return false, ErrBufferOverflow
+	}
+}
+
+func (s *Socket) emitOverflow(buffer string, incomingBytes int64) {
+	s.EventEmitter.Emit("overflow", &OverflowDetails{
+		Buffer:        buffer,
+		Strategy:      s._opts.OverflowStrategy(),
+		IncomingBytes: incomingBytes,
+		Stats:         s.BufferStats(),
+	})
 }
 
 // _clearAcks clears the acknowledgement handlers upon disconnection, since the client will never receive an acknowledgement from the server.
@@ -595,6 +907,7 @@ func (s *Socket) onpacket(packet *parser.Packet) {
 func (s *Socket) onevent(packet *parser.Packet) {
 	args, _ := packet.Data.([]any)
 	socketLog.Debug("emitting event %v", args)
+	bufferSize := estimateBufferBytes(args)
 
 	if nil != packet.Id {
 		socketLog.Debug("attaching ack callback to event")
@@ -604,7 +917,7 @@ func (s *Socket) onevent(packet *parser.Packet) {
 	if s.connected.Load() {
 		s.emitEvent(args)
 	} else {
-		s.receiveBuffer.Push(args)
+		s.enqueueReceiveEvent(args, bufferSize)
 	}
 }
 
@@ -677,20 +990,28 @@ func (s *Socket) onconnect(id string, pid string) {
 
 // emitBuffered emits buffered events (received and emitted).
 func (s *Socket) emitBuffered() {
-	s.receiveBuffer.DoWrite(func(values [][]any) [][]any {
-		for _, args := range values {
-			s.emitEvent(args)
-		}
-		return values[:0]
-	})
+	s.bufferMu.Lock()
+	received := s.receiveBuffer.All()
+	sent := s.sendBuffer.All()
+	s.receiveBuffer.Clear()
+	s.sendBuffer.Clear()
+	s.receiveBufferBytes.Store(0)
+	s.sendBufferBytes.Store(0)
+	s.bufferMu.Unlock()
 
-	s.sendBuffer.DoWrite(func(packets []*Packet) []*Packet {
-		for _, packet := range packets {
-			s.notifyOutgoingListeners(packet)
-			s.packet(packet)
-		}
-		return packets[:0]
-	})
+	for _, args := range received {
+		s.emitEvent(args)
+	}
+	for _, packet := range sent {
+		s.notifyOutgoingListeners(packet)
+		s.packet(packet)
+	}
+	if len(received) > 0 {
+		s.EventEmitter.Emit("drain", "receive", s.BufferStats())
+	}
+	if len(sent) > 0 {
+		s.EventEmitter.Emit("drain", "send", s.BufferStats())
+	}
 }
 
 // ondisconnect is called upon server disconnect.

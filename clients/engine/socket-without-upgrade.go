@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -39,17 +41,17 @@ import (
 // Example usage:
 //
 //	import (
+//		"strings"
+//
 //		"github.com/aqcool/socket.io/clients/engine/v3"
-//		"github.com/aqcool/socket.io/clients/engine/v3/transports"
-//		"github.com/aqcool/socket.io/v3/pkg/types"
 //	)
 //
 //	func main() {
 //		opts := engine.DefaultSocketOptions()
-//		opts.SetTransports(types.NewSet(transports.Polling, transports.WebSocket, transports.WebTransport))
-//		socket := engine.NewSocket("http://localhost:8080", opts)
+//		opts.SetTransportList([]engine.TransportCtor{&engine.PollingBuilder{}})
+//		socket := engine.NewSocketWithoutUpgrade("http://localhost:8080", opts)
 //		socket.On("open", func(...any) {
-//			socket.Send("hello")
+//			socket.Send(strings.NewReader("hello"), nil, nil)
 //		})
 //	}
 //
@@ -66,6 +68,9 @@ type socketWithoutUpgrade struct {
 	transport   atomic.Pointer[Transport]    // Current transport instance
 	readyState  types.Atomic[SocketState]    // Current connection state
 	writeBuffer *types.Slice[*packet.Packet] // Buffer for outgoing packets
+	// Number of packets handed to the current transport write. They stay in
+	// writeBuffer until the transport emits drain, matching engine.io-client.
+	prevBufferLen int
 
 	// Protected fields (read-only after initialization)
 	opts       *SocketOptions       // Connection options
@@ -82,15 +87,14 @@ type socketWithoutUpgrade struct {
 	_offlineEventListener      types.EventListener         // Event listener for offline status
 
 	// Connection configuration (read-only)
-	secure            bool                     // Whether to use secure connection
-	hostname          string                   // Server hostname
-	port              string                   // Server port
-	_transportsByName map[string]TransportCtor // Transport constructors by name
-	_cookieJar        http.CookieJar           // Cookie storage for HTTP requests
+	secure            bool                       // Whether to use secure connection
+	hostname          string                     // Server hostname
+	port              string                     // Server port
+	_transportsByName map[string][]TransportCtor // Ordered transport constructors grouped by name
+	_cookieJar        http.CookieJar             // Cookie storage for HTTP requests
 
 	// Static fields
-	priorWebsocketSuccess atomic.Bool // Previous WebSocket connection success flag
-	protocol              int         // Engine.IO protocol version
+	protocol int // Engine.IO protocol version
 
 	flushMu   sync.Mutex
 	taskQueue *queue.Queue
@@ -156,12 +160,12 @@ func (s *socketWithoutUpgrade) CookieJar() http.CookieJar {
 
 // SetPriorWebsocketSuccess sets the flag indicating previous WebSocket connection success.
 func (s *socketWithoutUpgrade) SetPriorWebsocketSuccess(priorWebsocketSuccess bool) {
-	s.priorWebsocketSuccess.Store(priorWebsocketSuccess)
+	sharedPriorWebsocketSuccess.Store(priorWebsocketSuccess)
 }
 
 // PriorWebsocketSuccess returns whether previous WebSocket connection was successful.
 func (s *socketWithoutUpgrade) PriorWebsocketSuccess() bool {
-	return s.priorWebsocketSuccess.Load()
+	return sharedPriorWebsocketSuccess.Load()
 }
 
 // Protocol returns the Engine.IO protocol version.
@@ -204,10 +208,17 @@ func (s *socketWithoutUpgrade) Construct(uri string, opts SocketOptionsInterface
 		opts = DefaultSocketOptions()
 	}
 	if uri != "" {
-		if parsedURI, err := url.Parse(uri); err == nil {
+		if parsedURI, err := parseSocketURL(uri); err == nil {
 			opts.SetHostname(parsedURI.Hostname())
-			opts.SetSecure(parsedURI.Scheme == "https" || parsedURI.Scheme == "wss")
-			opts.SetPort(parsedURI.Port())
+			secure := parsedURI.Scheme == "https" || parsedURI.Scheme == "wss"
+			opts.SetSecure(secure)
+			if port := parsedURI.Port(); port != "" {
+				opts.SetPort(port)
+			} else if secure {
+				opts.SetPort("443")
+			} else {
+				opts.SetPort("80")
+			}
 			if parsedURI.RawQuery != "" {
 				opts.SetQuery(parsedURI.Query())
 			}
@@ -215,7 +226,7 @@ func (s *socketWithoutUpgrade) Construct(uri string, opts SocketOptionsInterface
 			clientSocketLog.Error("Invalid URL address: %v", err)
 		}
 	} else if opts.GetRawHost() != nil {
-		if parsedURI, err := url.Parse(opts.Host()); err == nil {
+		if parsedURI, err := parseSocketURL(opts.Host()); err == nil {
 			opts.SetHostname(parsedURI.Hostname())
 		}
 	}
@@ -248,12 +259,39 @@ func (s *socketWithoutUpgrade) Construct(uri string, opts SocketOptionsInterface
 	}
 
 	s.transports = types.NewSlice[string]()
-	s._transportsByName = map[string]TransportCtor{}
-	if transports := opts.Transports(); transports != nil {
-		for _, transport := range transports.Keys() {
+	s._transportsByName = map[string][]TransportCtor{}
+	var transportConstructors []TransportCtor
+	if ordered, ok := opts.(interface {
+		GetRawTransportList() types.Optional[[]TransportCtor]
+		TransportList() []TransportCtor
+	}); ok && ordered.GetRawTransportList() != nil {
+		transportConstructors = ordered.TransportList()
+	} else if configured := opts.Transports(); configured != nil {
+		transportConstructors = configured.Keys()
+		// Legacy SetTransports values have no insertion order. Keep their
+		// behavior deterministic and prefer the official built-in order.
+		priority := map[string]int{
+			transports.POLLING:      0,
+			transports.WEBSOCKET:    1,
+			transports.WEBTRANSPORT: 2,
+		}
+		sort.Slice(transportConstructors, func(i, j int) bool {
+			left, leftKnown := priority[transportConstructors[i].Name()]
+			right, rightKnown := priority[transportConstructors[j].Name()]
+			if leftKnown && rightKnown {
+				return left < right
+			}
+			if leftKnown != rightKnown {
+				return leftKnown
+			}
+			return transportConstructors[i].Name() < transportConstructors[j].Name()
+		})
+	}
+	for _, transport := range transportConstructors {
+		if transport != nil {
 			transportName := transport.Name()
 			s.transports.Push(transportName)
-			s._transportsByName[transportName] = transport
+			s._transportsByName[transportName] = append(s._transportsByName[transportName], transport)
 		}
 	}
 
@@ -309,6 +347,28 @@ func (s *socketWithoutUpgrade) Construct(uri string, opts SocketOptionsInterface
 	s._open()
 }
 
+var sharedPriorWebsocketSuccess atomic.Bool
+
+type noTransportsAvailableError struct{}
+
+func (noTransportsAvailableError) Error() string { return "No transports available" }
+
+// parseSocketURL accepts the scheme-less host forms supported by the official
+// client in addition to the URLs understood by net/url. In particular,
+// url.Parse("localhost:3000") treats "localhost" as a scheme and url.Parse
+// does not accept an unbracketed IPv6 literal as a URL host.
+func parseSocketURL(raw string) (*url.URL, error) {
+	if strings.Contains(raw, "://") {
+		return url.Parse(raw)
+	}
+
+	if host := strings.Trim(raw, "[]"); net.ParseIP(host) != nil {
+		return &url.URL{Host: "[" + host + "]"}, nil
+	}
+
+	return url.Parse("http://" + raw)
+}
+
 // CreateTransport initializes a new transport instance with the specified name.
 // It sets up the necessary query parameters and configuration for the transport.
 func (s *socketWithoutUpgrade) CreateTransport(name string) Transport {
@@ -347,7 +407,8 @@ func (s *socketWithoutUpgrade) CreateTransport(name string) Transport {
 
 	clientSocketLog.Debug(`options "%v"`, opts)
 
-	return s._transportsByName[name].New(s._proto_, opts)
+	constructors := s._transportsByName[name]
+	return constructors[0].New(s._proto_, opts)
 }
 
 // _open initializes the connection by selecting and creating the appropriate transport.
@@ -355,12 +416,12 @@ func (s *socketWithoutUpgrade) CreateTransport(name string) Transport {
 func (s *socketWithoutUpgrade) _open() {
 	if s.transports.Len() == 0 {
 		// Emit error on next tick so it can be listened to
-		s.taskQueue.Enqueue(func() { s.Emit("error", errors.New("no transports available")) })
+		time.AfterFunc(time.Millisecond, func() { s.Emit("error", noTransportsAvailableError{}) })
 		return
 	}
 	transportName, err := s.transports.Get(0)
 	if err != nil {
-		s.taskQueue.Enqueue(func() { s.Emit("error", err) })
+		time.AfterFunc(time.Millisecond, func() { s.Emit("error", err) })
 		return
 	}
 	if s.opts.RememberUpgrade() && s.PriorWebsocketSuccess() && s.transports.FindIndex(func(s string) bool {
@@ -456,7 +517,6 @@ func (s *socketWithoutUpgrade) _onPacket(data *packet.Packet) {
 func (s *socketWithoutUpgrade) OnHandshake(data *HandshakeData) {
 	s.Emit("handshake", data)
 	s.id.Store(data.Sid)
-	s.Transport().Query().Set("sid", data.Sid)
 	s._pingInterval.Store(data.PingInterval)
 	s._pingTimeout.Store(data.PingTimeout)
 	s._maxPayload.Store(data.MaxPayload)
@@ -485,7 +545,15 @@ func (s *socketWithoutUpgrade) _resetPingTimeout() {
 // _onDrain handles the drain event from the transport.
 // It manages the write buffer and triggers appropriate events when the buffer is cleared.
 func (s *socketWithoutUpgrade) _onDrain() {
-	if s.writeBuffer.Len() == 0 {
+	s.flushMu.Lock()
+	if s.prevBufferLen > 0 {
+		_, _ = s.writeBuffer.Splice(0, s.prevBufferLen)
+		s.prevBufferLen = 0
+	}
+	empty := s.writeBuffer.Len() == 0
+	s.flushMu.Unlock()
+
+	if empty {
 		s.Emit("drain")
 	} else {
 		s._proto_.Flush()
@@ -498,9 +566,15 @@ func (s *socketWithoutUpgrade) Flush() {
 	s.flushMu.Lock()
 
 	shouldEmitFlush := false
-	if SocketStateClosed != s.ReadyState() && s.Transport().Writable() && !s.Upgrading() {
+	// A transport marks itself writable immediately before emitting drain. In
+	// Go, another goroutine can observe that flag in the tiny window before
+	// _onDrain removes the batch that was just sent. Do not hand the same packet
+	// objects to the transport twice: prevBufferLen is the authoritative
+	// in-flight marker until the drain handler clears it.
+	if SocketStateClosed != s.ReadyState() && s.Transport().Writable() && !s.Upgrading() && s.prevBufferLen == 0 {
 		if packets := s._getWritablePackets(); len(packets) > 0 {
 			clientSocketLog.Debug("flushing %d packets in socket", len(packets))
+			s.prevBufferLen = len(packets)
 			s.Transport().Send(packets)
 			shouldEmitFlush = true
 		}
@@ -516,15 +590,16 @@ func (s *socketWithoutUpgrade) Flush() {
 // _getWritablePackets prepares packets for sending while respecting payload size limits.
 // It handles packet encoding and size calculation for different transport types.
 func (s *socketWithoutUpgrade) _getWritablePackets() (res []*packet.Packet) {
+	packets := s.writeBuffer.All()
 	maxPayload := s._maxPayload.Load()
-	if maxPayload == 0 || s.Transport().Name() != transports.POLLING || s.writeBuffer.Len() <= 1 {
-		return s.writeBuffer.AllAndClear()
+	if maxPayload == 0 || s.Transport().Name() != transports.POLLING || len(packets) <= 1 {
+		return packets
 	}
 
 	payloadSize := int64(1) // first packet type
-	if datas, _ := s.writeBuffer.RangeAndSplice(func(packet *packet.Packet, i int) (bool, int, int, []*packet.Packet) {
-		if packet.Data != nil {
-			switch v := packet.Data.(type) {
+	for i, outgoingPacket := range packets {
+		if outgoingPacket.Data != nil {
+			switch v := outgoingPacket.Data.(type) {
 			case *types.StringBuffer:
 				payloadSize += int64(v.Len())
 			case *strings.Reader:
@@ -534,21 +609,18 @@ func (s *socketWithoutUpgrade) _getWritablePackets() (res []*packet.Packet) {
 			default:
 				snapshot, _ := types.NewBytesBufferReader(v)
 				payloadSize += int64(math.Ceil(float64(snapshot.Len()) * BASE64_OVERHEAD))
-				packet.Data = snapshot
+				outgoingPacket.Data = snapshot
 			}
 			if i > 0 && payloadSize > maxPayload {
 				clientSocketLog.Debug("only send %d out of %d packets", i, payloadSize)
-				return true, 0, i, nil
+				return packets[:i]
 			}
 			payloadSize += 2 // separator + packet type
 		}
-		return false, 0, i, nil
-	}, false); len(datas) > 0 {
-		return datas
 	}
 
 	clientSocketLog.Debug("payload size is %d (max: %d)", payloadSize, maxPayload)
-	return s.writeBuffer.AllAndClear()
+	return packets
 }
 
 // HasPingExpired checks if the connection has timed out due to missed heartbeats.
@@ -654,7 +726,10 @@ func (s *socketWithoutUpgrade) _onError(err error) {
 
 	if s.opts.TryAllTransports() && s.transports.Len() > 1 && s.ReadyState() == SocketStateOpening {
 		clientSocketLog.Debug("trying next transport")
-		_, _ = s.transports.Shift()
+		failedName, _ := s.transports.Shift()
+		if constructors := s._transportsByName[failedName]; len(constructors) > 0 {
+			s._transportsByName[failedName] = constructors[1:]
+		}
 		s._open()
 		return
 	}
@@ -702,7 +777,10 @@ func (s *socketWithoutUpgrade) _onClose(reason string, description error) {
 
 		// clean buffers after, so users can still
 		// grab the buffers on `close` event
+		s.flushMu.Lock()
 		s.writeBuffer.Clear()
+		s.prevBufferLen = 0
+		s.flushMu.Unlock()
 
 		s.taskQueue.TryClose()
 	}

@@ -2,14 +2,22 @@ package engine
 
 import (
 	"crypto/tls"
+	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"testing"
 	"time"
 
-	"github.com/quic-go/quic-go"
 	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/quic-go/quic-go"
 )
+
+type testRoundTripper struct{}
+
+func (*testRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	return &http.Response{StatusCode: http.StatusNoContent, Body: io.NopCloser(http.NoBody)}, nil
+}
 
 func TestSocketOptions(t *testing.T) {
 	opts := DefaultSocketOptions()
@@ -131,6 +139,19 @@ func TestSocketOptions(t *testing.T) {
 		t.Errorf("ExtraHeaders() = %v, want %v", opts.ExtraHeaders().Get("X-Test"), "test")
 	}
 
+	roundTripper := &testRoundTripper{}
+	httpClient := &http.Client{Transport: roundTripper}
+	proxy, _ := url.Parse("http://proxy.example:8080")
+	observer := NetworkObserver(func(NetworkEvent) {})
+	opts.SetRoundTripper(roundTripper)
+	opts.SetHTTPClient(httpClient)
+	opts.SetProxyURL(proxy)
+	opts.SetNetworkObserver(observer)
+	if opts.RoundTripper() != roundTripper || opts.HTTPClient() != httpClient ||
+		opts.ProxyURL() != proxy || opts.NetworkObserver() == nil {
+		t.Fatal("network component options were not preserved")
+	}
+
 	// Test WithCredentials
 	opts.SetWithCredentials(true)
 	if !opts.WithCredentials() {
@@ -184,6 +205,15 @@ func TestSocketOptions(t *testing.T) {
 		if opts.Protocols()[i] != p {
 			t.Errorf("Protocols()[%d] = %v, want %v", i, opts.Protocols()[i], p)
 		}
+	}
+}
+
+func TestNetworkErrorClassification(t *testing.T) {
+	if kind := classifyNetworkError(errors.New("proxy refused"), true); kind != "proxy" {
+		t.Fatalf("kind=%q", kind)
+	}
+	if kind := classifyNetworkError(errors.New("transport failed"), false); kind != "transport" {
+		t.Fatalf("kind=%q", kind)
 	}
 }
 

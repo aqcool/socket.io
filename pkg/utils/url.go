@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"strings"
 )
 
 var (
@@ -23,6 +24,14 @@ type ParsedUrl struct {
 func Url(uri string, path string) (parsedUrl *ParsedUrl, err error) {
 	if uri == "" {
 		return nil, ErrEmptyURI
+	}
+	// Match the official Node client when no browser location is available:
+	// protocol-relative and bare host URLs default to HTTPS. A single-leading-
+	// slash relative path still requires an explicit base URL in Go.
+	if strings.HasPrefix(uri, "//") {
+		uri = "https:" + uri
+	} else if !strings.HasPrefix(uri, "/") && !strings.Contains(uri, "://") {
+		uri = "https://" + uri
 	}
 
 	url, err := url.Parse(uri)

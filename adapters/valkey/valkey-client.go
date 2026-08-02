@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	vk "github.com/valkey-io/valkey-go"
 	"github.com/aqcool/socket.io/v3/pkg/types"
+	vk "github.com/valkey-io/valkey-go"
 )
 
 // ErrValkeyPubSubClosed is returned when receiving from a closed ValkeyPubSub.

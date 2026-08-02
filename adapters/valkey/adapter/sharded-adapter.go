@@ -13,7 +13,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/vmihailenco/msgpack/v5"
 	"github.com/aqcool/socket.io/adapters/adapter/v3"
 	valkey "github.com/aqcool/socket.io/adapters/valkey/v3"
 	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
@@ -21,6 +20,7 @@ import (
 	"github.com/aqcool/socket.io/v3/pkg/slices"
 	"github.com/aqcool/socket.io/v3/pkg/types"
 	"github.com/aqcool/socket.io/v3/pkg/utils"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // ShardedValkeyAdapterBuilder creates sharded Valkey adapters for Socket.IO namespaces.
@@ -32,6 +32,8 @@ type ShardedValkeyAdapterBuilder struct {
 }
 
 // New creates a new sharded Valkey adapter for the given namespace.
+func (sb *ShardedValkeyAdapterBuilder) SupportsConnectionStateRecovery() bool { return false }
+
 func (sb *ShardedValkeyAdapterBuilder) New(nsp socket.Namespace) socket.Adapter {
 	return NewShardedValkeyAdapter(nsp, sb.Valkey, sb.Opts)
 }
@@ -354,6 +356,14 @@ func (s *shardedValkeyAdapter) decodeData(messageType adapter.MessageType, rawDa
 		target = &adapter.FetchSocketsMessage{}
 	case adapter.FETCH_SOCKETS_RESPONSE:
 		target = &adapter.FetchSocketsResponse{}
+	case adapter.COUNT_SOCKETS:
+		target = &adapter.CountSocketsMessage{}
+	case adapter.COUNT_SOCKETS_RESPONSE:
+		target = &adapter.CountSocketsResponse{}
+	case adapter.LIST_ROOMS:
+		target = &adapter.ListRoomsMessage{}
+	case adapter.LIST_ROOMS_RESPONSE:
+		target = &adapter.ListRoomsResponse{}
 	case adapter.SERVER_SIDE_EMIT:
 		target = &adapter.ServerSideEmitMessage{}
 	case adapter.SERVER_SIDE_EMIT_RESPONSE:

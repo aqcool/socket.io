@@ -483,6 +483,28 @@ func TestConn_LargeMessage(t *testing.T) {
 	}
 }
 
+func TestConnLargeWriterDoesNotAppendEmptyFrame(t *testing.T) {
+	conn, stream := newTestConn(true)
+	payload := bytes.Repeat([]byte{0x7f}, 1_000_000)
+	writer, err := conn.NextWriter(BinaryMessage)
+	if err != nil {
+		t.Fatalf("NextWriter error: %v", err)
+	}
+	if _, err := writer.Write(payload); err != nil {
+		t.Fatalf("large writer error: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("large writer close error: %v", err)
+	}
+	written := stream.buf.Bytes()
+	if len(written) != 9+len(payload) {
+		t.Fatalf("wire length = %d, want %d (one extended header plus payload)", len(written), 9+len(payload))
+	}
+	if !bytes.Equal(written[9:], payload) {
+		t.Fatal("large writer payload changed")
+	}
+}
+
 // Helper function to create a test Conn with a mock stream
 func newTestConn(isServer bool) (*Conn, *prepareConn) {
 	nc := &prepareConn{}

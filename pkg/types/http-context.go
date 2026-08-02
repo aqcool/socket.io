@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -44,6 +45,12 @@ type HttpContext struct {
 
 	// Cleanup is invoked exactly once when the context is closed.
 	Cleanup Callable
+	// cleanupMu synchronizes installing Cleanup with context finalization.
+	cleanupMu sync.Mutex
+	// responseMu serializes response commits with request cancellation. Once
+	// cancellation finalizes Done(), net/http may finish the ResponseWriter, so
+	// no response metadata or body may be touched after that point.
+	responseMu sync.Mutex
 
 	ctx      context.Context
 	request  *http.Request
@@ -152,9 +159,40 @@ func (c *HttpContext) Done() <-chan struct{} {
 	return c.done
 }
 
+// SetCleanup installs a cleanup callback. If the context has already been
+// finalized, the callback is invoked immediately. The callback runs exactly
+// once even when installation races with finalization.
+func (c *HttpContext) SetCleanup(cleanup Callable) {
+	c.cleanupMu.Lock()
+	select {
+	case <-c.done:
+		c.cleanupMu.Unlock()
+		if cleanup != nil {
+			cleanup()
+		}
+	default:
+		c.Cleanup = cleanup
+		c.cleanupMu.Unlock()
+	}
+}
+
+// RunCleanup atomically detaches and runs the currently installed cleanup
+// callback. It is safe to race with request finalization.
+func (c *HttpContext) RunCleanup() {
+	c.cleanupMu.Lock()
+	cleanup := c.Cleanup
+	c.Cleanup = nil
+	c.cleanupMu.Unlock()
+	if cleanup != nil {
+		cleanup()
+	}
+}
+
 // Flush finalizes the context without writing a response body.
 func (c *HttpContext) Flush() {
-	c.closeWithError(nil)
+	c.responseMu.Lock()
+	defer c.responseMu.Unlock()
+	c.closeWithErrorLocked(nil)
 }
 
 // ---------------------------------------------------------------------------
@@ -189,6 +227,47 @@ func (c *HttpContext) GetStatusCode() int {
 // Write commits the response. It may be called at most once; subsequent
 // invocations return ErrResponseAlreadyWritten.
 func (c *HttpContext) Write(data []byte) (n int, err error) {
+	c.responseMu.Lock()
+	defer c.responseMu.Unlock()
+	return c.writeLocked(data)
+}
+
+// WriteResponse atomically applies a status and headers and writes a response
+// body. It prevents request cancellation from allowing net/http to finish the
+// underlying ResponseWriter between response configuration and body commit.
+func (c *HttpContext) WriteResponse(status int, headers *ParameterBag, data io.Reader) (n int64, err error) {
+	c.responseMu.Lock()
+	defer c.responseMu.Unlock()
+
+	if status < minStatusCode || status > maxStatusCode {
+		return 0, ErrInvalidStatusCode
+	}
+	if c.written.Load() {
+		return 0, ErrResponseAlreadyWritten
+	}
+	c.statusCode.Store(int32(status))
+	if headers != nil {
+		c.ResponseHeaders().With(headers.All())
+	}
+
+	executed := false
+	c.writeOnce.Do(func() {
+		executed = true
+		c.written.Store(true)
+		c.flushResponseHeaders()
+		c.response.WriteHeader(c.GetStatusCode())
+		if data != nil {
+			n, err = io.Copy(c.response, data)
+		}
+		c.closeWithErrorLocked(nil)
+	})
+	if !executed {
+		return 0, ErrResponseAlreadyWritten
+	}
+	return n, err
+}
+
+func (c *HttpContext) writeLocked(data []byte) (n int, err error) {
 	if c.written.Load() {
 		return 0, ErrResponseAlreadyWritten
 	}
@@ -199,7 +278,7 @@ func (c *HttpContext) Write(data []byte) (n int, err error) {
 		c.written.Store(true)
 
 		n, err = c.performWrite(data)
-		c.closeWithError(nil)
+		c.closeWithErrorLocked(nil)
 	})
 
 	if !executed {
@@ -267,20 +346,45 @@ func (c *HttpContext) contextWatcher() {
 // closeWithError finalizes the context exactly once, running Cleanup and
 // emitting a "close" event asynchronously so it never blocks the caller.
 func (c *HttpContext) closeWithError(err error) {
+	c.responseMu.Lock()
+	defer c.responseMu.Unlock()
+	c.closeWithErrorLocked(err)
+}
+
+func (c *HttpContext) closeWithErrorLocked(err error) {
 	c.closeOnce.Do(func() {
 		// Mark written to make IsDone reflect finalization as well,
 		// even for paths that never wrote a response body.
 		c.written.Store(true)
 
+		// A successfully written/flushed response is normal completion, not a
+		// premature request close. Only preserve and emit close listeners for
+		// request cancellation/errors; Polling relies on this distinction to
+		// keep the Engine.IO session alive after each successful HTTP exchange.
+		var closeEmitter EventEmitter
+		if err != nil {
+			closeEmitter = NewEventEmitter()
+			_ = closeEmitter.On("close", c.Listeners("close")...)
+		}
+
+		c.cleanupMu.Lock()
 		close(c.done)
-		if c.Cleanup != nil {
-			c.Cleanup()
+		cleanup := c.Cleanup
+		c.Cleanup = nil
+		c.cleanupMu.Unlock()
+		if cleanup != nil {
+			cleanup()
 		}
 		// Fire the event asynchronously so listeners can't deadlock us.
 		// Clear the emitter afterwards to release listener references for GC.
-		go func() {
-			c.Emit("close", err)
+		if closeEmitter != nil {
+			go func() {
+				closeEmitter.Emit("close", err)
+				closeEmitter.Clear()
+				c.Clear()
+			}()
+		} else {
 			c.Clear()
-		}()
+		}
 	})
 }

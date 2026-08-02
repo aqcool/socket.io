@@ -1,11 +1,13 @@
 package engine
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
 	"net/url"
 	"sync/atomic"
+	"time"
 
 	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
 	"github.com/aqcool/socket.io/parsers/engine/v3/parser"
@@ -21,7 +23,6 @@ import (
 //
 // Features:
 //   - HTTP/HTTPS support
-//   - Automatic reconnection
 //   - Binary data support (via base64 encoding)
 //   - Cross-domain compatibility
 //   - Timeout handling
@@ -34,7 +35,12 @@ type polling struct {
 	// _polling indicates if a polling request is currently in progress.
 	_polling atomic.Bool
 
+	pollQueue  *queue.Queue
 	writeQueue *queue.Queue
+
+	requestContext context.Context
+	cancelRequests context.CancelFunc
+	closing        atomic.Bool
 }
 
 // Name returns the identifier for the polling transport ("polling").
@@ -62,13 +68,34 @@ func NewPolling(socket Socket, opts SocketOptionsInterface) Polling {
 // Construct initializes the Polling transport with the given socket and options.
 func (p *polling) Construct(socket Socket, opts SocketOptionsInterface) {
 	p.Transport.Construct(socket, opts)
+	p.requestContext, p.cancelRequests = context.WithCancel(context.Background())
+	p.pollQueue = queue.New()
 	p.writeQueue = queue.New()
-	p.client = request.NewHTTPClient(
+	var httpClient http.Client
+	if configured := p.Opts().HTTPClient(); configured != nil {
+		httpClient = *configured
+	}
+	// resty.New() installs its own cookie jar. Supplying an explicit
+	// http.Client is required for withCredentials=false to actually suppress
+	// server cookies; clone the caller's client so its Jar is not mutated.
+	httpClient.Jar = p.Socket().CookieJar()
+	clientOptions := []request.ClientOption{
 		request.WithLogger(NewLog("HTTPClient")),
 		request.WithTimeout(p.Opts().RequestTimeout()),
-		request.WithCookieJar(p.Socket().CookieJar()),
-		request.WithTransport(request.NewTransport(p.Opts().TLSClientConfig(), p.Opts().QUICConfig())),
-	)
+		request.WithHTTPClient(&httpClient),
+	}
+	roundTripper := p.Opts().RoundTripper()
+	if roundTripper == nil && httpClient.Transport == nil {
+		transport := request.NewTransport(p.Opts().TLSClientConfig(), p.Opts().QUICConfig())
+		if proxy := p.Opts().ProxyURL(); proxy != nil {
+			transport.SetProxy(http.ProxyURL(proxy))
+		}
+		roundTripper = transport
+	}
+	if roundTripper != nil {
+		clientOptions = append(clientOptions, request.WithTransport(roundTripper))
+	}
+	p.client = request.NewHTTPClient(clientOptions...)
 }
 
 // DoOpen starts the polling cycle to establish the connection.
@@ -116,7 +143,7 @@ func (p *polling) _poll() {
 	clientPollingLog.Debug("polling")
 	p._polling.Store(true)
 	p.Emit("poll")
-	p.writeQueue.Enqueue(func() { p.doPoll() })
+	p.pollQueue.Enqueue(func() { p.doPoll() })
 }
 
 // _onPacket handles incoming packets and updates the transport state accordingly.
@@ -151,20 +178,27 @@ func (p *polling) OnData(data types.BufferInterface) {
 
 // DoClose gracefully closes the polling transport, sending a close packet if needed.
 func (p *polling) DoClose() {
+	p.closing.Store(true)
+	p.pollQueue.TryClose()
 	cleanup := func(...any) {
 		clientPollingLog.Debug("writing close packet")
 		p.Write([]*packet.Packet{{Type: packet.CLOSE}})
-		// Close the write queue after the close packet has been enqueued.
+		// Keep the request context alive until the close POST has completed.
+		p.writeQueue.Enqueue(func() {
+			p.cancelRequests()
+			_ = p.client.Close()
+		})
 		p.writeQueue.TryClose()
 	}
 	if TransportStateOpen == p.ReadyState() {
 		clientPollingLog.Debug("transport open - closing")
 		cleanup()
 	} else {
-		clientPollingLog.Debug("transport not open - deferring close")
-		_ = p.Once("open", cleanup)
+		clientPollingLog.Debug("transport not open - canceling pending requests")
+		p.cancelRequests()
+		p.writeQueue.TryClose()
+		_ = p.client.Close()
 	}
-	_ = p.client.Close()
 }
 
 // Write encodes and sends packets to the server asynchronously.
@@ -195,7 +229,7 @@ func (p *polling) uri() *url.URL {
 		}
 	}
 	if p.Opts().TimestampRequests() {
-		query.Set(p.Opts().TimestampParam(), request.RandomString())
+		query.Set(p.Opts().TimestampParam(), randomString())
 	}
 	if !p.SupportsBinary() && !query.Has("sid") {
 		query.Set("b64", "1")
@@ -207,12 +241,15 @@ func (p *polling) uri() *url.URL {
 func (p *polling) doPoll() {
 	res, err := p._fetch(nil)
 	if err != nil {
+		if p.closing.Load() && errors.Is(err, context.Canceled) {
+			return
+		}
 		p.OnError("fetch read error", err, nil)
 		return
 	}
 	defer func() { _ = res.Body.Close() }()
 	if !res.Ok() {
-		p.OnError("fetch read error", res.CascadeError, res.Request.Context())
+		p.OnError("fetch read error", pollingResponseError(res), res.Request.Context())
 		return
 	}
 	data, err := types.NewStringBufferReader(res.Body)
@@ -228,19 +265,49 @@ func (p *polling) doPoll() {
 func (p *polling) doWrite(data types.BufferInterface, fn func()) {
 	res, err := p._fetch(data)
 	if err != nil {
+		if p.closing.Load() && errors.Is(err, context.Canceled) {
+			return
+		}
 		p.OnError("fetch write error", err, nil)
 		return
 	}
 	defer func() { _ = res.Body.Close() }()
 	if !res.Ok() {
-		p.OnError("fetch write error", res.CascadeError, res.Request.Context())
+		p.OnError("fetch write error", pollingResponseError(res), res.Request.Context())
 		return
 	}
 	fn()
 }
 
+func pollingResponseError(res *request.Response) error {
+	if res == nil {
+		return errors.New("empty HTTP response")
+	}
+	if res.CascadeError != nil {
+		return res.CascadeError
+	}
+	body, _ := io.ReadAll(io.LimitReader(res.Body, 64*1024))
+	return &HTTPStatusError{
+		StatusCode: res.StatusCode(),
+		Status:     res.Status(),
+		Body:       body,
+	}
+}
+
 // _fetch performs the HTTP request with the given data (GET if data is nil, POST otherwise).
 func (p *polling) _fetch(data io.Reader) (res *request.Response, err error) {
+	startedAt := time.Now()
+	uri := p.uri().String()
+	operation := http.MethodGet
+	if data != nil {
+		operation = http.MethodPost
+	}
+	defer func() {
+		notifyNetwork(p.Opts(), &NetworkEvent{
+			Operation: operation, Transport: p.Name(), URL: uri,
+			Duration: time.Since(startedAt), Success: err == nil, Err: err,
+		})
+	}()
 	headers := http.Header{}
 	for k, vs := range p.Opts().ExtraHeaders() {
 		for _, v := range vs {
@@ -249,12 +316,12 @@ func (p *polling) _fetch(data io.Reader) (res *request.Response, err error) {
 	}
 	if data != nil {
 		headers.Set("Content-Type", "text/plain;charset=UTF-8")
-		res, err = p.client.Post(p.uri().String(), &request.Options{
+		res, err = p.client.Request(p.requestContext, http.MethodPost, uri, &request.Options{
 			Body:    data,
 			Headers: headers,
 		})
 	} else {
-		res, err = p.client.Get(p.uri().String(), &request.Options{
+		res, err = p.client.Request(p.requestContext, http.MethodGet, uri, &request.Options{
 			Headers: headers,
 		})
 	}

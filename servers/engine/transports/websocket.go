@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
-	ws "github.com/gorilla/websocket"
 	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
 	"github.com/aqcool/socket.io/v3/pkg/log"
 	"github.com/aqcool/socket.io/v3/pkg/queue"
 	"github.com/aqcool/socket.io/v3/pkg/slices"
 	"github.com/aqcool/socket.io/v3/pkg/types"
+	ws "github.com/gorilla/websocket"
 )
 
 var wsLog = log.NewLog("engine:ws")
@@ -26,6 +26,8 @@ type websocket struct {
 	socket     *types.WebSocketConn
 	mu         sync.Mutex
 	writeQueue *queue.Queue
+	closeOnce  sync.Once
+	startOnce  sync.Once
 }
 
 // WebSocket transport
@@ -59,11 +61,14 @@ func (w *websocket) Construct(ctx *types.HttpContext) {
 		w.OnClose()
 	})
 
-	// This goroutine is invoked only once.
-	go w.message()
-
 	w.SetWritable(true)
 	w.SetPerMessageDeflate(nil)
+}
+
+func (w *websocket) Start() {
+	w.startOnce.Do(func() {
+		go w.message()
+	})
 }
 
 // Transport name
@@ -101,6 +106,7 @@ func (w *websocket) message() {
 		}
 		mt, message, err := w.socket.NextReader()
 		if err != nil {
+			wsLog.Debug("websocket read failed: %v", err)
 			w._error(err)
 			return
 		}
@@ -168,13 +174,7 @@ func (w *websocket) send(packets []*packet.Packet) {
 				if _, ok := packet.Options.WsPreEncodedFrame.(*types.StringBuffer); ok {
 					mt = ws.TextMessage
 				}
-				pm, err := ws.NewPreparedMessage(mt, packet.Options.WsPreEncodedFrame.Bytes())
-				if err != nil {
-					wsLog.Debug(`Send Error "%s"`, err.Error())
-					w._error(err)
-					return
-				}
-				if err := w.socket.WritePreparedMessage(pm); err != nil {
+				if err := w.socket.WriteMessage(mt, packet.Options.WsPreEncodedFrame.Bytes()); err != nil {
 					wsLog.Debug(`Send Error "%s"`, err.Error())
 					w._error(err)
 					return
@@ -233,14 +233,26 @@ func (w *websocket) write(data types.BufferInterface, compress bool) {
 // sync.Cond forever, leaking once per ungraceful disconnect.
 func (w *websocket) OnClose() {
 	w.writeQueue.TryClose()
+	w.closeConnection()
 	w.Transport.OnClose()
+}
+
+func (w *websocket) closeConnection() {
+	w.closeOnce.Do(func() {
+		if w.socket != nil && w.socket.WebSocketConnection != nil {
+			_ = w.socket.WebSocketConnection.Close()
+		}
+	})
 }
 
 // Closes the transport.
 func (w *websocket) DoClose(fn types.Callable) {
 	wsLog.Debug(`closing`)
 	w.writeQueue.TryClose()
-	defer func() { _ = w.socket.Close() }()
+	defer func() {
+		w.closeConnection()
+		w.Transport.OnClose()
+	}()
 	if fn != nil {
 		fn()
 	}

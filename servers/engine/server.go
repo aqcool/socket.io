@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gorilla/websocket"
-	"github.com/quic-go/webtransport-go"
 	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
 	"github.com/aqcool/socket.io/parsers/engine/v3/parser"
 	"github.com/aqcool/socket.io/servers/engine/v3/config"
@@ -17,6 +15,8 @@ import (
 	"github.com/aqcool/socket.io/v3/pkg/types"
 	"github.com/aqcool/socket.io/v3/pkg/utils"
 	webtrans "github.com/aqcool/socket.io/v3/pkg/webtransport"
+	"github.com/gorilla/websocket"
+	"github.com/quic-go/webtransport-go"
 )
 
 const (
@@ -84,8 +84,16 @@ func (s *server) HandleRequest(ctx *types.HttpContext) {
 
 		if sid := ctx.Query().Peek("sid"); sid != "" {
 			serverLog.Debug("setting new request for existing client")
-			if socket, ok := s.Clients().Load(sid); ok {
-				socket.Transport().OnRequest(ctx)
+			if client, ok := s.Clients().Load(sid); ok {
+				if local, ok := client.(*socket); ok {
+					local.onRequest(ctx)
+				} else {
+					client.Transport().OnRequest(ctx)
+				}
+			} else if handler, ok := s.Proto().(interface {
+				handleRemoteRequest(*types.HttpContext) bool
+			}); ok && handler.handleRemoteRequest(ctx) {
+				serverLog.Debug("request for remote client handled by cluster engine")
 			} else {
 				abortRequest(ctx, UNKNOWN_SID, map[string]any{"sid": sid})
 			}
@@ -100,7 +108,7 @@ func (s *server) HandleRequest(ctx *types.HttpContext) {
 		if err != nil {
 			callback(BAD_REQUEST, map[string]any{"name": "MIDDLEWARE_FAILURE"})
 		} else {
-			callback(s.Verify(ctx, false))
+			callback(s.Proto().Verify(ctx, false))
 		}
 	})
 
@@ -117,8 +125,26 @@ func (s *server) HandleUpgrade(ctx *types.HttpContext) {
 		}
 
 		wsc := &types.WebSocketConn{EventEmitter: types.NewEventEmitter()}
+		handshakeID := ""
+		if ctx.Query().Peek("sid") == "" {
+			var err error
+			if generator, ok := s.BaseServer.(interface {
+				generateId(*types.HttpContext) (string, error)
+			}); ok {
+				handshakeID, err = generator.generateId(ctx)
+			} else {
+				handshakeID = s.GenerateId(ctx)
+			}
+			if err != nil {
+				s.emitAbortUpgrade(ctx, BAD_REQUEST, map[string]any{"name": "ID_GENERATION_ERROR", "error": err})
+				return
+			}
+			addSessionCookie(ctx.ResponseHeaders(), s.Opts().Cookie(), handshakeID)
+			s.Emit("initial_headers", ctx.ResponseHeaders(), ctx)
+		}
+		s.Emit("headers", ctx.ResponseHeaders(), ctx)
 
-		ws := &websocket.Upgrader{
+		upgradeOptions := config.WebSocketUpgradeOptions{
 			ReadBufferSize:    DefaultWSReadBufferSize,
 			WriteBufferSize:   DefaultWSWriteBufferSize,
 			EnableCompression: s.Opts().PerMessageDeflate() != nil,
@@ -129,7 +155,7 @@ func (s *server) HandleUpgrade(ctx *types.HttpContext) {
 		}
 
 		if cors := s.Opts().Cors(); cors != nil && cors.Origin != nil {
-			ws.CheckOrigin = func(r *http.Request) bool {
+			upgradeOptions.CheckOrigin = func(r *http.Request) bool {
 				origin := r.Header.Get("Origin")
 				if origin == "" {
 					return true
@@ -138,14 +164,22 @@ func (s *server) HandleUpgrade(ctx *types.HttpContext) {
 			}
 		}
 
-		// delegate to ws
-		if conn, err := ws.Upgrade(ctx.Response(), ctx.Request(), ctx.ResponseHeaders().All()); err != nil {
+		wsEngine := s.Opts().WebSocketEngine()
+		if wsEngine == nil {
+			wsEngine = &GorillaWebSocketEngine{}
+		}
+		if conn, err := wsEngine.Upgrade(ctx.Response(), ctx.Request(), ctx.ResponseHeaders().All(), upgradeOptions); err != nil {
+			if handler, ok := s.Proto().(interface {
+				forgetRemoteRequest(*types.HttpContext)
+			}); ok {
+				handler.forgetRemoteRequest(ctx)
+			}
 			s.emitAbortRequest(ctx, BAD_REQUEST, map[string]any{"name": "UPGRADE_FAILURE"})
 			serverLog.Debug("websocket error before upgrade: %s", err.Error())
 		} else {
 			conn.SetReadLimit(s.Opts().MaxHttpBufferSize())
-			wsc.Conn = conn
-			s.onWebSocket(ctx, wsc)
+			wsc.WebSocketConnection = conn
+			s.onWebSocket(ctx, wsc, handshakeID)
 		}
 	}
 
@@ -153,13 +187,13 @@ func (s *server) HandleUpgrade(ctx *types.HttpContext) {
 		if err != nil {
 			callback(BAD_REQUEST, map[string]any{"name": "MIDDLEWARE_FAILURE"})
 		} else {
-			callback(s.Verify(ctx, true))
+			callback(s.Proto().Verify(ctx, true))
 		}
 	})
 }
 
 // Called upon a ws.io connection.
-func (s *server) onWebSocket(ctx *types.HttpContext, wsc *types.WebSocketConn) {
+func (s *server) onWebSocket(ctx *types.HttpContext, wsc *types.WebSocketConn, handshakeID string) {
 	onUpgradeError := func(...any) {
 		serverLog.Debug("websocket error before upgrade")
 		// wsc.close() not needed
@@ -181,7 +215,16 @@ func (s *server) onWebSocket(ctx *types.HttpContext, wsc *types.WebSocketConn) {
 	ctx.Websocket = wsc
 
 	if len(id) == 0 {
-		if codeMessage, t := s.Handshake(transportName, ctx); t == nil {
+		var codeMessage *types.CodeMessage
+		var transport transports.Transport
+		if handshaker, ok := s.BaseServer.(interface {
+			handshakeWithID(string, *types.HttpContext, string) (*types.CodeMessage, transports.Transport)
+		}); ok && handshakeID != "" {
+			codeMessage, transport = handshaker.handshakeWithID(transportName, ctx, handshakeID)
+		} else {
+			codeMessage, transport = s.Handshake(transportName, ctx)
+		}
+		if transport == nil {
 			abortUpgrade(ctx, codeMessage, nil)
 		} else {
 			// transport error handling takes over
@@ -193,8 +236,15 @@ func (s *server) onWebSocket(ctx *types.HttpContext, wsc *types.WebSocketConn) {
 	client, ok := s.Clients().Load(id)
 
 	if !ok {
-		serverLog.Debug("upgrade attempt for closed client")
-		_ = wsc.Close()
+		if handler, handlesRemote := s.Proto().(interface {
+			handleRemoteWebSocket(*types.HttpContext, *types.WebSocketConn) bool
+		}); handlesRemote && handler.handleRemoteWebSocket(ctx, wsc) {
+			serverLog.Debug("upgrade for remote client handled by cluster engine")
+			wsc.RemoveListener("error", onUpgradeError)
+		} else {
+			serverLog.Debug("upgrade attempt for closed client")
+			_ = wsc.Close()
+		}
 	} else if client.Upgrading() {
 		serverLog.Debug("transport has already been trying to upgrade")
 		_ = wsc.Close()
@@ -215,18 +265,12 @@ func (s *server) onWebSocket(ctx *types.HttpContext, wsc *types.WebSocketConn) {
 		} else {
 			transport.SetPerMessageDeflate(s.Opts().PerMessageDeflate())
 			client.MaybeUpgrade(transport)
+			startTransport(transport)
 		}
 	}
 }
 
 func (s *server) OnWebTransportSession(ctx *types.HttpContext, wt *webtransport.Server) {
-	if allowRequest := s.Opts().AllowRequest(); allowRequest != nil {
-		if err := allowRequest(ctx); err != nil {
-			s.emitAbortRequest(ctx, FORBIDDEN, map[string]any{"message": err.Error()})
-			return
-		}
-	}
-
 	if cors := s.Opts().Cors(); cors != nil && cors.Origin != nil {
 		wt.CheckOrigin = func(r *http.Request) bool {
 			origin := r.Header.Get("Origin")
@@ -234,6 +278,29 @@ func (s *server) OnWebTransportSession(ctx *types.HttpContext, wt *webtransport.
 				return true
 			}
 			return cors.IsOriginAllowed(origin, cors.Origin)
+		}
+	}
+
+	if len(s.Middlewares()) > 0 {
+		// Engine.IO middlewares require an HTTP request/response lifecycle,
+		// which WebTransport sessions cannot provide. Match the official
+		// server by accepting the protocol session only long enough to close it
+		// and never emitting an Engine.IO connection.
+		serverLog.Debug("closing session since WebTransport is not compatible with middlewares")
+		session, err := wt.Upgrade(ctx.Response(), ctx.Request())
+		if err != nil {
+			serverLog.Debug("upgrading failed: %s", err.Error())
+			s.emitAbortRequest(ctx, BAD_REQUEST, map[string]any{"name": "UPGRADE_FAILURE"})
+			return
+		}
+		_ = session.CloseWithError(0, "")
+		return
+	}
+
+	if allowRequest := s.Opts().AllowRequest(); allowRequest != nil {
+		if err := allowRequest(ctx); err != nil {
+			s.emitAbortRequest(ctx, FORBIDDEN, map[string]any{"message": err.Error()})
+			return
 		}
 	}
 
@@ -248,6 +315,7 @@ func (s *server) OnWebTransportSession(ctx *types.HttpContext, wt *webtransport.
 		serverLog.Debug("the client failed to establish a bidirectional stream in the given period")
 		_ = session.CloseWithError(0, "")
 	}, s.Opts().UpgradeTimeout())
+	defer utils.ClearTimeout(timeout)
 
 	stream, err := session.AcceptStream(ctx.Context())
 	if err != nil {
@@ -294,8 +362,6 @@ func (s *server) OnWebTransportSession(ctx *types.HttpContext, wt *webtransport.
 		_ = c.Close()
 	}
 
-	utils.ClearTimeout(timeout)
-
 	value, _ := parser.Parserv4().DecodePacket(data)
 
 	if v, ok := value.Data.(io.Closer); ok {
@@ -308,7 +374,11 @@ func (s *server) OnWebTransportSession(ctx *types.HttpContext, wt *webtransport.
 		return
 	}
 
+	dataIsEmpty := value.Data == nil
 	if data, ok := value.Data.(types.BufferInterface); ok && data.Len() == 0 {
+		dataIsEmpty = true
+	}
+	if dataIsEmpty {
 		ctx.Query().Set("EIO", "4")
 		if codeMessage, t := s.Handshake(ctx.Request().Proto, ctx); t == nil {
 			abortUpgrade(ctx, codeMessage, nil)
@@ -354,6 +424,7 @@ func (s *server) OnWebTransportSession(ctx *types.HttpContext, wt *webtransport.
 		} else {
 			transport.SetPerMessageDeflate(s.Opts().PerMessageDeflate())
 			client.MaybeUpgrade(transport)
+			startTransport(transport)
 		}
 	}
 }
@@ -372,6 +443,13 @@ func (s *server) Attach(server *types.HttpServer, opts any) {
 	})
 
 	server.HandleFunc(path, s.ServeHTTP)
+	if options != nil && options.GetRawAddTrailingSlash() != nil && !options.AddTrailingSlash() {
+		// Node's path check remains prefix-based when addTrailingSlash is false:
+		// both /engine.io and legacy subpaths such as /engine.io/foo/bar/ are
+		// intercepted. Register the slash-prefixed branch as well because the Go
+		// mux otherwise treats a pattern without a trailing slash as exact-only.
+		server.HandleFunc(path+"/", s.ServeHTTP)
+	}
 }
 
 // Captures upgrade requests for a http.Handler, Need to handle server shutdown disconnecting client connections.

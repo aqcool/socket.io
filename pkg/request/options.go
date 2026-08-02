@@ -23,10 +23,17 @@ type clientOptions struct {
 	Proxy           string
 	TLSClientConfig *tls.Config
 	Transport       http.RoundTripper
+	HTTPClient      *http.Client
 
 	BaseURL string
 	// Cookie Jar
 	Jar http.CookieJar
+}
+
+func WithHTTPClient(client *http.Client) ClientOption {
+	return func(o *clientOptions) {
+		o.HTTPClient = client
+	}
 }
 
 func WithTransport(transport http.RoundTripper) ClientOption {

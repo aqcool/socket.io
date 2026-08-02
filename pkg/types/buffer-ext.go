@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // MaxPayloadSize is the upper bound (128 MiB) for a single encoded payload.
@@ -108,6 +110,29 @@ func (b *BytesBuffer) GoString() string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("%v", b.Bytes())
+}
+
+// MarshalMsgpack encodes a byte buffer as the MessagePack binary type instead
+// of exposing the implementation fields of Buffer.
+func (b *BytesBuffer) MarshalMsgpack() ([]byte, error) {
+	if b == nil || b.Buffer == nil {
+		return msgpack.Marshal([]byte(nil))
+	}
+	return msgpack.Marshal(b.Bytes())
+}
+
+// UnmarshalMsgpack restores a byte buffer encoded with the MessagePack binary
+// type.
+func (b *BytesBuffer) UnmarshalMsgpack(data []byte) error {
+	if b == nil {
+		return errors.New("types.BytesBuffer.UnmarshalMsgpack: nil receiver")
+	}
+	var value []byte
+	if err := msgpack.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	b.Buffer = NewBuffer(value)
+	return nil
 }
 
 func NewBytesBufferReader(r io.Reader) (BufferInterface, error) {

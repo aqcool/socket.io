@@ -78,6 +78,18 @@ func main() {
 }
 ```
 
+跨节点请求默认等待 5 秒，与官方 `@socket.io/mongo-adapter@0.4.0` 一致；可通过 `RequestsTimeout` 调整：
+
+```golang
+opts := mgadapter.DefaultMongoAdapterOptions()
+opts.SetRequestsTimeout(3 * time.Second)
+
+io.SetAdapter(&mgadapter.MongoAdapterBuilder{
+    Mongo: mongoClient,
+    Opts:  opts,
+})
+```
+
 ### 发射器
 
 ```golang
@@ -135,6 +147,29 @@ db.collection("socket.io-adapter-events").createIndex(
 opts := &mgadapter.MongoAdapterOptions{}
 opts.SetAddCreatedAtField(true)
 ```
+
+## 官方 Node Adapter 互操作测试
+
+仓库锁定 `@socket.io/mongo-adapter@0.4.0`、`@socket.io/mongo-emitter@0.2.0`（gitHead `b91b442e8878eae3b4767b70c1c0f8eebf7e4d5f`）与 `socket.io@4.8.3`。在真实 MongoDB 副本集上验证：
+
+- Adapter：Node↔Go 广播、二进制、Room、集群查询、节点 ACK、远程 Join、两方向连接恢复、节点退出和滚动重启。
+- external emitter：官方 12/12 行为（广播、命名空间、Room/Except、Join/Leave、Disconnect、server-side emit）从 Node emitter 到 Go Adapter；并反向验证 Go emitter 到当前官方 Adapter 0.4.0。
+
+官方 mongo-emitter 0.2.0 仓库自身的历史开发依赖是 `@socket.io/mongo-adapter@0.1.0`；本仓库额外使用当前 0.4.0 做反向实测，二者不会混作同一基线。
+
+```bash
+cd testdata/official-interop
+npm ci
+cd ../..
+
+SOCKET_IO_MONGO_OFFICIAL_INTEROP=1 \
+SOCKET_IO_MONGO_TEST_URI='mongodb://localhost:27017/?replicaSet=rs0' \
+go test -race ./adapter -run TestOfficialMongoAdapterBilateralInterop -v
+```
+
+未设置 `SOCKET_IO_MONGO_OFFICIAL_INTEROP=1` 时该真实服务矩阵会跳过；默认 Go 单测不代表已运行官方 Node emitter。
+
+官方 MongoDB Adapter 0.4.0 将消息类型 13 用作 `SESSION`。本实现按 MongoDB 专属协议解释该类型，不会把官方恢复会话误判为通用 Cluster Adapter 的 `ADAPTER_CLOSE`。
 
 ## 许可证
 

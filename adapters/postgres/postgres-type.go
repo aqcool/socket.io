@@ -20,6 +20,13 @@ type (
 		AttachmentId string              `json:"attachmentId,omitempty"  msgpack:"attachmentId,omitempty"`
 	}
 
+	// RecoveryEvent is a persisted cluster event with a monotonically
+	// increasing PostgreSQL offset.
+	RecoveryEvent struct {
+		ID      int64
+		Payload []byte
+	}
+
 	// Parser defines the interface for encoding and decoding data for PostgreSQL communication.
 	// Implementations must be thread-safe as they may be called from multiple goroutines.
 	Parser interface {

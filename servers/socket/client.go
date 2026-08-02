@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
 	"github.com/aqcool/socket.io/servers/engine/v3"
@@ -13,6 +14,11 @@ import (
 )
 
 var client_log = log.NewLog("socket.io:client")
+
+// websocketVolatileTurnDelay emulates the later event-loop write callback of
+// the official Node.js WebSocket transport. It only gates lossy volatile
+// packets; regular packets keep the native Go transport's immediate drain.
+const websocketVolatileTurnDelay = 10 * time.Millisecond
 
 // Client represents a Socket.IO client connection.
 type Client struct {
@@ -25,6 +31,10 @@ type Client struct {
 	sockets        *types.Map[SocketId, *Socket]
 	nsps           *types.Map[string, *Socket]
 	connectTimeout atomic.Pointer[utils.Timer]
+	// volatileBlockedUntil marks the current WebSocket send turn. The Go write
+	// goroutine can drain before a caller performs its next sequential Emit,
+	// whereas the official transport stays non-writable until a later turn.
+	volatileBlockedUntil atomic.Int64
 
 	mu sync.Mutex
 }
@@ -169,9 +179,15 @@ func (c *Client) WriteToEngine(encodedPackets []types.BufferInterface, opts *Wri
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if opts.Volatile && !c.conn.Transport().Writable() {
+	transport := c.conn.Transport()
+	now := time.Now()
+	websocketTurnBlocked := transport.Name() == "websocket" && now.UnixNano() < c.volatileBlockedUntil.Load()
+	if opts.Volatile && (!transport.Writable() || websocketTurnBlocked) {
 		client_log.Debug("volatile packet is discarded since the transport is not currently writable")
 		return
+	}
+	if transport.Name() == "websocket" {
+		c.volatileBlockedUntil.Store(now.Add(websocketVolatileTurnDelay).UnixNano())
 	}
 
 	for _, encodedPacket := range encodedPackets {

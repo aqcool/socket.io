@@ -23,7 +23,28 @@ type (
 		Id       uint64
 		Args     []any
 		Flags    *Flags
+		Size     int64
+		Ack      func([]any, error)
 		Pending  atomic.Bool
 		TryCount atomic.Int64
+	}
+
+	// BufferStats is a snapshot of the current per-namespace client backlog.
+	BufferStats struct {
+		SendPackets    int   `json:"sendPackets"`
+		SendBytes      int64 `json:"sendBytes"`
+		ReceivePackets int   `json:"receivePackets"`
+		ReceiveBytes   int64 `json:"receiveBytes"`
+		RetryPackets   int   `json:"retryPackets"`
+		RetryBytes     int64 `json:"retryBytes"`
+	}
+
+	// OverflowDetails describes a packet rejected or dropped by a bounded
+	// client buffer.
+	OverflowDetails struct {
+		Buffer        string           `json:"buffer"`
+		Strategy      OverflowStrategy `json:"strategy"`
+		IncomingBytes int64            `json:"incomingBytes"`
+		Stats         BufferStats      `json:"stats"`
 	}
 )

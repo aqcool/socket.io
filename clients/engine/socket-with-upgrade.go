@@ -29,13 +29,13 @@ import (
 // Example:
 //
 //	opts := engine.DefaultSocketOptions()
-//	opts.SetTransports(types.NewSet(
-//	    transports.Polling,    // Initial transport
-//	    transports.WebSocket,  // Upgrade target
-//	))
+//	opts.SetTransportList([]engine.TransportCtor{
+//	    &engine.PollingBuilder{},   // Initial transport
+//	    &engine.WebSocketBuilder{}, // Upgrade target
+//	})
 //	socket := engine.NewSocketWithUpgrade("http://localhost:8080", opts)
 //	socket.On("open", func(...any) {
-//	    socket.Send("hello")
+//	    socket.Send(strings.NewReader("hello"), nil, nil)
 //	})
 //
 // See: [SocketWithoutUpgrade]

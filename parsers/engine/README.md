@@ -20,6 +20,11 @@ go get github.com/aqcool/socket.io/parsers/engine/v3
 - 二进制数据支持
 - 支持协议 v3 和 v4
 - UTF-8 编码支持
+- 对齐 `engine.io-parser@5.2.3` 的 WebTransport 长度帧流
+- `maxPayload`、零长度和 JavaScript 安全整数上限校验
+
+官方 38 项运行时测试的准确分母和逐项对应关系见
+[OFFICIAL_TEST_MAPPING.md](OFFICIAL_TEST_MAPPING.md)。
 
 ## 使用方法
 
@@ -29,33 +34,38 @@ go get github.com/aqcool/socket.io/parsers/engine/v3
 package main
 
 import (
-    "bytes"
     "fmt"
+    "io"
+    "strings"
 
     "github.com/aqcool/socket.io/parsers/engine/v3/packet"
-    "github.com/aqcool/socket.io/v3/pkg/types"
+    engineparser "github.com/aqcool/socket.io/parsers/engine/v3/parser"
 )
 
 func main() {
     // Initialize parser
-    parser := packet.Parserv4()
+    codec := engineparser.Parserv4()
 
     // Encode a packet
-    encodedData, err := parser.EncodePacket(&packet.Packet{
+    encodedData, err := codec.EncodePacket(&packet.Packet{
         Type: packet.MESSAGE,
-        Data: bytes.NewBuffer([]byte("Hello World")),
+        Data: strings.NewReader("Hello World"),
     }, true)
     if err != nil {
         panic(err)
     }
 
     // Decode a packet
-    decodedPacket, err := parser.DecodePacket(encodedData)
+    decodedPacket, err := codec.DecodePacket(encodedData)
     if err != nil {
         panic(err)
     }
 
-    fmt.Printf("Decoded message: %s\n", decodedPacket.Data)
+    decodedData, err := io.ReadAll(decodedPacket.Data)
+    if err != nil {
+        panic(err)
+    }
+    fmt.Printf("Decoded message: %s\n", decodedData)
 }
 ```
 
@@ -63,32 +73,59 @@ func main() {
 
 ```go
 func handlePayload() {
-    parser := packet.Parserv4()
+    codec := engineparser.Parserv4()
 
     packets := []*packet.Packet{
         {
             Type: packet.MESSAGE,
-            Data: bytes.NewBuffer([]byte("First message")),
+            Data: strings.NewReader("First message"),
         },
         {
             Type: packet.MESSAGE,
-            Data: bytes.NewBuffer([]byte("Second message")),
+            Data: strings.NewReader("Second message"),
         },
     }
 
     // Encode payload
-    encoded, err := parser.EncodePayload(packets)
+    encoded, err := codec.EncodePayload(packets)
     if err != nil {
         panic(err)
     }
 
     // Decode payload
-    decoded, err := parser.DecodePayload(encoded)
+    decoded, err := codec.DecodePayload(encoded)
     if err != nil {
         panic(err)
     }
 }
 ```
+
+### WebTransport packet stream
+
+官方 WebTransport 流不是用 `0x1e` 拼接的 polling payload，而是给每个包增加
+1、3 或 9 字节的大端长度头。Go 对应接口如下：
+
+```go
+var wire bytes.Buffer
+
+encoder := engineparser.NewPacketStreamEncoder(&wire)
+if err := encoder.Encode(&packet.Packet{
+    Type: packet.MESSAGE,
+    Data: strings.NewReader("hello"),
+}); err != nil {
+    panic(err)
+}
+
+decoder := engineparser.NewPacketStreamDecoder(&wire, 1024*1024)
+decoded, err := decoder.Decode()
+if err != nil {
+    panic(err)
+}
+```
+
+文本数据请使用 `*strings.Reader` 或 `*types.StringBuffer`；其他 `io.Reader`
+按二进制数据处理。`PacketStreamDecoder` 在读取声明的 payload 前校验
+`maxPayload`，避免不受控分配。
 
 ## API 参考
 
@@ -130,6 +167,19 @@ DecodePayload(data types.BufferInterface) ([]*packet.Packet, error)
 
 - `data`：待解码的载荷
 - 返回：解码后的数据包数组及可能发生的错误
+
+### Packet stream 接口
+
+```go
+EncodePacketToBinary(packet *packet.Packet) ([]byte, error)
+EncodePacketFrame(packet *packet.Packet) (header, payload []byte, err error)
+NewPacketStreamEncoder(writer io.Writer) *PacketStreamEncoder
+NewPacketStreamDecoder(reader io.Reader, maxPayload uint64) *PacketStreamDecoder
+```
+
+- `PacketStreamEncoder.Encode`：向连续 WebTransport 流写入一个长度帧。
+- `PacketStreamDecoder.Decode`：从流中读取一个包；流正常结束时返回 `io.EOF`。
+- 协议错误同时返回标准 Engine.IO error packet 和可用 `errors.Is` 判断的 Go 错误。
 
 ## 开发
 

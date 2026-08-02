@@ -8,6 +8,7 @@ require (
 	github.com/aqcool/socket.io/parsers/socket/v3 v3.0.4
 	github.com/aqcool/socket.io/servers/socket/v3 v3.0.4
 	github.com/aqcool/socket.io/v3 v3.0.4
+	github.com/gorilla/websocket v1.5.3
 )
 
 require (
@@ -15,7 +16,6 @@ require (
 	github.com/aqcool/socket.io/servers/engine/v3 v3.0.4 // indirect
 	github.com/dunglas/httpsfv v1.1.0 // indirect
 	github.com/gookit/color v1.6.1 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/klauspost/compress v1.18.6 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.60.0 // indirect

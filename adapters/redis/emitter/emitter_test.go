@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	rds "github.com/redis/go-redis/v9"
 	"github.com/aqcool/socket.io/adapters/redis/v3"
 	"github.com/aqcool/socket.io/v3/pkg/utils"
+	rds "github.com/redis/go-redis/v9"
 )
 
 func TestEmitterOptions(t *testing.T) {

@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	rds "github.com/redis/go-redis/v9"
 	"github.com/aqcool/socket.io/adapters/adapter/v3"
 	"github.com/aqcool/socket.io/adapters/redis/v3"
 	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
@@ -20,6 +19,7 @@ import (
 	"github.com/aqcool/socket.io/v3/pkg/slices"
 	"github.com/aqcool/socket.io/v3/pkg/types"
 	"github.com/aqcool/socket.io/v3/pkg/utils"
+	rds "github.com/redis/go-redis/v9"
 )
 
 // redisLog is the logger for the Redis adapter.
@@ -77,6 +77,8 @@ type (
 
 // New creates a new RedisAdapter for the given namespace.
 // This method implements the socket.AdapterBuilder interface.
+func (rb *RedisAdapterBuilder) SupportsConnectionStateRecovery() bool { return false }
+
 func (rb *RedisAdapterBuilder) New(nsp socket.Namespace) socket.Adapter {
 	return NewRedisAdapter(nsp, rb.Redis, rb.Opts)
 }
@@ -224,13 +226,19 @@ func (r *redisAdapter) handleChannelMessages(sub *rds.PubSub) {
 
 // onMessage handles broadcast messages from Redis pattern subscriptions.
 func (r *redisAdapter) onMessage(_ string, channel string, msg []byte) {
-	if len(channel) <= len(r.channel) || !strings.HasPrefix(channel, r.channel) {
+	// The base channel itself is valid and represents a broadcast without a
+	// room target. Room-specific channels append "<room>#" to this prefix.
+	if len(channel) < len(r.channel) || !strings.HasPrefix(channel, r.channel) {
 		redisLog.Debug("ignore channel: shorter than expected or prefix mismatch")
 		return
 	}
 
-	// Extract room from channel name
-	room := channel[len(r.channel) : len(channel)-1]
+	// Extract the optional room suffix. The base channel (for a global
+	// broadcast) has no suffix, while room channels use "<base><room>#".
+	room := ""
+	if len(channel) > len(r.channel) {
+		room = channel[len(r.channel) : len(channel)-1]
+	}
 	if room != "" && !r.hasRoom(socket.Room(room)) {
 		redisLog.Debug("ignore unknown room %s", room)
 		return
@@ -455,10 +463,14 @@ func (r *redisAdapter) handleServerSideEmitRequest(request *Request) {
 	callback := func(args []any, err error) {
 		called.Do(func() {
 			redisLog.Debug("calling acknowledgement with %v", args)
+			var data any
+			if len(args) > 0 {
+				data = args[0]
+			}
 			response, err := json.Marshal(&Response{
 				Type:      redis.SERVER_SIDE_EMIT,
 				RequestId: request.RequestId,
-				Data:      args,
+				Data:      data,
 			})
 			if err != nil {
 				redisLog.Debug("Error marshaling SERVER_SIDE_EMIT response for RequestId %s: %s", request.RequestId, err.Error())
@@ -496,10 +508,14 @@ func (r *redisAdapter) handleBroadcastRequest(request *Request) {
 		},
 		func(args []any, _ error) {
 			redisLog.Debug("received acknowledgement with value %v", args)
+			var packet any
+			if len(args) > 0 {
+				packet = args[0]
+			}
 			response, err := r.parser.Encode(&Response{
 				Type:      redis.BROADCAST_ACK,
 				RequestId: request.RequestId,
-				Packet:    args,
+				Packet:    packet,
 			})
 			if err != nil {
 				redisLog.Debug("Error marshaling BROADCAST_ACK response for RequestId %s: %s", request.RequestId, err.Error())
@@ -553,7 +569,7 @@ func (r *redisAdapter) onResponse(_ string, msg []byte) {
 		case redis.BROADCAST_CLIENT_COUNT:
 			ackRequest.ClientCountCallback(response.ClientCount)
 		case redis.BROADCAST_ACK:
-			ackRequest.Ack(response.Packet, nil)
+			ackRequest.Ack([]any{response.Packet}, nil)
 		}
 		return
 	}
@@ -667,14 +683,17 @@ func (r *redisAdapter) BroadcastWithAck(packet *parser.Packet, opts *socket.Broa
 			Packet:    packet,
 			Opts:      adapter.EncodeOptions(opts),
 		}); err == nil {
-			if err := r.redisClient.Client.Publish(r.ctx, r.requestChannel, message).Err(); err != nil {
-				r.redisClient.Emit("error", err)
-			}
-
 			r.ackRequests.Store(requestId, &AckRequest{
 				ClientCountCallback: clientCountCallback,
 				Ack:                 ack,
 			})
+
+			// Store the request before publishing. Redis may deliver the message
+			// back to this process before Publish returns.
+			if err := r.redisClient.Client.Publish(r.ctx, r.requestChannel, message).Err(); err != nil {
+				r.ackRequests.Delete(requestId)
+				r.redisClient.Emit("error", err)
+			}
 
 			// Calculate cleanup timeout
 			timeout := adapter.DEFAULT_TIMEOUT

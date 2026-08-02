@@ -15,7 +15,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/vmihailenco/msgpack/v5"
 	"github.com/aqcool/socket.io/adapters/adapter/v3"
 	valkey "github.com/aqcool/socket.io/adapters/valkey/v3"
 	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
@@ -23,6 +22,7 @@ import (
 	"github.com/aqcool/socket.io/v3/pkg/log"
 	"github.com/aqcool/socket.io/v3/pkg/types"
 	"github.com/aqcool/socket.io/v3/pkg/utils"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 var (
@@ -62,7 +62,10 @@ func isEphemeral(message *adapter.ClusterMessage) bool {
 			return data.RequestId != nil
 		}
 	}
-	return message.Type == adapter.SERVER_SIDE_EMIT || message.Type == adapter.FETCH_SOCKETS
+	return message.Type == adapter.SERVER_SIDE_EMIT ||
+		message.Type == adapter.FETCH_SOCKETS ||
+		message.Type == adapter.COUNT_SOCKETS ||
+		message.Type == adapter.LIST_ROOMS
 }
 
 // ValkeyStreamsAdapterBuilder creates Valkey Streams adapters for Socket.IO namespaces.
@@ -115,6 +118,10 @@ func (sb *ValkeyStreamsAdapterBuilder) startPolling(ctx context.Context, streamN
 }
 
 // New creates a new Valkey Streams adapter for the given namespace.
+func (sb *ValkeyStreamsAdapterBuilder) SupportsConnectionStateRecovery() bool { return true }
+
+func (r *valkeyStreamsAdapter) SupportsConnectionStateRecovery() bool { return true }
+
 func (sb *ValkeyStreamsAdapterBuilder) New(nsp socket.Namespace) socket.Adapter {
 	options := DefaultValkeyStreamsAdapterOptions().Assign(sb.Opts)
 
@@ -440,6 +447,14 @@ func (r *valkeyStreamsAdapter) decodeData(messageType adapter.MessageType, rawDa
 		target = &adapter.FetchSocketsMessage{}
 	case adapter.FETCH_SOCKETS_RESPONSE:
 		target = &adapter.FetchSocketsResponse{}
+	case adapter.COUNT_SOCKETS:
+		target = &adapter.CountSocketsMessage{}
+	case adapter.COUNT_SOCKETS_RESPONSE:
+		target = &adapter.CountSocketsResponse{}
+	case adapter.LIST_ROOMS:
+		target = &adapter.ListRoomsMessage{}
+	case adapter.LIST_ROOMS_RESPONSE:
+		target = &adapter.ListRoomsResponse{}
 	case adapter.SERVER_SIDE_EMIT:
 		target = &adapter.ServerSideEmitMessage{}
 	case adapter.SERVER_SIDE_EMIT_RESPONSE:

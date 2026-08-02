@@ -1,0 +1,13 @@
+{
+  "name": "aqcool-engine-io-compatibility-matrix",
+  "private": true,
+  "description": "Official Engine.IO JavaScript client compatibility matrix for the Go server",
+  "scripts": {
+    "test": "node matrix.cjs"
+  },
+  "devDependencies": {
+    "engine.io-client-v3": "npm:engine.io-client@3.5.6",
+    "engine.io-client-v4": "npm:engine.io-client@4.1.4",
+    "engine.io-client-v6": "npm:engine.io-client@6.6.6"
+  }
+}

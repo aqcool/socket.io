@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -49,7 +50,12 @@ var (
 	ErrInvalidPayload                = errors.New("invalid payload")
 	ErrIllegalNamespace              = errors.New("illegal namespace")
 	ErrIllegalID                     = errors.New("illegal id")
-	ErrTooManyAttachments            = errors.New("too many attachments")
+	// ErrInvalidAttachmentCount matches the error exposed by the official
+	// Socket.IO parser when a binary packet does not contain a valid
+	// "<attachments>-" prefix. ErrIllegalAttachments remains reserved for a
+	// placeholder that cannot be reconstructed from the received buffers.
+	ErrInvalidAttachmentCount = errors.New("Illegal attachments") //nolint:staticcheck // Official parser compatibility requires this exact text.
+	ErrTooManyAttachments     = errors.New("too many attachments")
 )
 
 // decoder implements the Decoder interface for Socket.IO packet decoding.
@@ -59,24 +65,48 @@ type decoder struct {
 	// reconstructor manages binary packet reconstruction state.
 	reconstructor atomic.Pointer[binaryReconstructor]
 
-	opts DecoderOptionsInterface
+	opts *DecoderOptions
 }
 
 // NewDecoder creates a new Decoder instance.
-// An optional DecoderOptions can be provided to configure the decoder.
-func NewDecoder(opts ...DecoderOptionsInterface) Decoder {
+// The optional constructor argument can be either DecoderOptionsInterface or
+// JSONReviver, matching the object and legacy function forms accepted by the
+// official parser.
+func NewDecoder(opts ...any) Decoder {
 	options := DefaultDecoderOptions()
 	options.SetMaxAttachments(DefaultMaxAttachments)
 	options.SetMaxNamespaceLength(DefaultMaxNamespaceLength)
 	options.SetMaxPacketIDLength(DefaultMaxPacketIDLength)
 
-	if len(opts) > 0 && opts[0] != nil {
-		options.Assign(opts[0])
+	if len(opts) > 0 {
+		switch option := opts[0].(type) {
+		case nil:
+		case DecoderOptionsInterface:
+			if !isNilDecoderOption(option) {
+				options.Assign(option)
+			}
+		case JSONReviver:
+			options.SetReviver(option)
+		case func(string, any) any:
+			options.SetReviver(JSONReviver(option))
+		default:
+			panic(fmt.Sprintf("parser: unsupported decoder option %T", option))
+		}
 	}
 
 	return &decoder{
 		EventEmitter: types.NewEventEmitter(),
 		opts:         options,
+	}
+}
+
+func isNilDecoderOption(option DecoderOptionsInterface) bool {
+	value := reflect.ValueOf(option)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
 	}
 }
 
@@ -114,7 +144,7 @@ func (d *decoder) handleStringData(buffer types.BufferInterface) error {
 // handleBinaryData processes binary packet data for reconstruction.
 func (d *decoder) handleBinaryData(data any) error {
 	if !IsBinary(data) {
-		return fmt.Errorf("unknown type: %T", data)
+		return fmt.Errorf("Unknown type: %v", data) //nolint:staticcheck // Official parser compatibility requires this exact text.
 	}
 
 	reconstructor := d.reconstructor.Load()
@@ -129,7 +159,7 @@ func (d *decoder) handleBinaryData(data any) error {
 
 	packet, err := reconstructor.takeBinaryData(buffer)
 	if err != nil {
-		return fmt.Errorf("decode error: %w", err)
+		return err
 	}
 
 	if packet != nil {
@@ -175,11 +205,12 @@ func (d *decoder) decodeAsString(buffer types.BufferInterface) error {
 	}
 
 	if packet.Type == BINARY_EVENT || packet.Type == BINARY_ACK {
-		d.reconstructor.Store(newBinaryReconstructor(packet))
-		// If no attachments expected, emit immediately
-		if packet.Attachments != nil && *packet.Attachments == 0 {
-			d.Emit("decoded", packet)
+		if packet.Type == BINARY_EVENT {
+			packet.Type = EVENT
+		} else {
+			packet.Type = ACK
 		}
+		d.reconstructor.Store(newBinaryReconstructor(packet))
 	} else {
 		// Non-binary packet, emit immediately
 		d.Emit("decoded", packet)
@@ -245,17 +276,21 @@ func (d *decoder) parseAttachments(buffer types.BufferInterface, packet *Packet)
 
 	attachmentStr, err := buffer.ReadString('-')
 	if err != nil {
-		return ErrIllegalAttachments
+		return ErrInvalidAttachmentCount
 	}
 
 	strLen := len(attachmentStr)
 	if strLen < 2 { // Must be at least "X-" where X is a digit
-		return ErrIllegalAttachments
+		return ErrInvalidAttachmentCount
 	}
 
 	attachmentCount, err := strconv.ParseUint(attachmentStr[:strLen-1], 10, 64)
 	if err != nil {
-		return ErrIllegalAttachments
+		return ErrInvalidAttachmentCount
+	}
+
+	if attachmentCount == 0 {
+		return ErrInvalidAttachmentCount
 	}
 
 	if attachmentCount > d.opts.MaxAttachments() {
@@ -359,8 +394,20 @@ func (d *decoder) parsePayload(buffer types.BufferInterface, packet *Packet) err
 	}
 
 	var payload any
-	if err := json.NewDecoder(buffer).Decode(&payload); err != nil {
+	jsonDecoder := json.NewDecoder(buffer)
+	if err := jsonDecoder.Decode(&payload); err != nil {
 		return ErrInvalidPayload
+	}
+	if err := jsonDecoder.Decode(&struct{}{}); err != io.EOF {
+		return ErrInvalidPayload
+	}
+
+	if reviver := d.opts.Reviver(); reviver != nil {
+		var valid bool
+		payload, valid = applyJSONReviver(payload, reviver)
+		if !valid {
+			return ErrInvalidPayload
+		}
 	}
 
 	if err := d.validatePayload(packet.Type, payload); err != nil {
@@ -369,6 +416,36 @@ func (d *decoder) parsePayload(buffer types.BufferInterface, packet *Packet) err
 
 	packet.Data = payload
 	return nil
+}
+
+// applyJSONReviver applies reviver in the same post-order traversal used by
+// JSON.parse(). A panic from user code is treated as a parse failure, as the
+// official parser catches exceptions thrown by its reviver.
+func applyJSONReviver(payload any, reviver JSONReviver) (result any, valid bool) {
+	valid = true
+	defer func() {
+		if recover() != nil {
+			result = nil
+			valid = false
+		}
+	}()
+
+	return reviveJSONValue("", payload, reviver), true
+}
+
+func reviveJSONValue(key string, value any, reviver JSONReviver) any {
+	switch typedValue := value.(type) {
+	case []any:
+		for index, item := range typedValue {
+			typedValue[index] = reviveJSONValue(strconv.Itoa(index), item, reviver)
+		}
+	case map[string]any:
+		for property, item := range typedValue {
+			typedValue[property] = reviveJSONValue(property, item, reviver)
+		}
+	}
+
+	return reviver(key, value)
 }
 
 // validatePayload checks if the payload is valid for the given packet type.
@@ -381,7 +458,7 @@ func (d *decoder) validatePayload(packetType PacketType, payload any) error {
 
 // Destroy releases the decoder's resources and stops any ongoing reconstruction.
 func (d *decoder) Destroy() {
-	if reconstructor := d.reconstructor.Load(); reconstructor != nil {
+	if reconstructor := d.reconstructor.Swap(nil); reconstructor != nil {
 		reconstructor.finishedReconstruction()
 	}
 }

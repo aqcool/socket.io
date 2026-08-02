@@ -5,8 +5,8 @@ package redis
 import (
 	"context"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/redis/go-redis/v9"
 )
 
 // RedisClient wraps a Redis UniversalClient and provides context management

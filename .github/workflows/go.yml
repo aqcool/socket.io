@@ -30,7 +30,16 @@ jobs:
           - "parsers/socket"
           - "servers/engine"
           - "servers/socket"
+          - "instrumentation"
+          - "observability"
+          - "reliability"
+          - "sticky"
+          - "typed"
           - "adapters/adapter"
+          - "adapters/amqp"
+          - "adapters/broker"
+          - "adapters/kafka"
+          - "adapters/nats"
           - "adapters/mongo"
           - "adapters/postgres"
           - "adapters/redis"
@@ -50,7 +59,7 @@ jobs:
           cache-dependency-path: "**/go.sum"
 
       - name: Run make deps
-        run: make deps
+        run: make deps MODULE="${{ matrix.module }}"
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
@@ -75,6 +84,49 @@ jobs:
           go-version-file: "go.mod"
           cache-dependency-path: "**/go.sum"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            servers/engine/testdata/compatibility/package-lock.json
+            servers/socket/testdata/compatibility/package-lock.json
+            instrumentation/testdata/official-admin-ui/package-lock.json
+            clients/socket/testdata/official-4.8.3/package-lock.json
+            adapters/redis/testdata/interop/package-lock.json
+            adapters/mongo/testdata/official-interop/package-lock.json
+            adapters/postgres/testdata/official-interop/package-lock.json
+            adapters/unix/testdata/cluster-official/package-lock.json
+
+      - name: Install official Engine.IO compatibility clients
+        working-directory: servers/engine/testdata/compatibility
+        run: npm ci
+
+      - name: Install official Socket.IO compatibility clients
+        working-directory: servers/socket/testdata/compatibility
+        run: npm ci
+
+      - name: Install official Admin UI interoperability client
+        working-directory: instrumentation/testdata/official-admin-ui
+        run: npm ci
+
+      - name: Install official Redis Adapter interoperability fixtures
+        working-directory: adapters/redis/testdata/interop
+        run: npm ci
+
+      - name: Install official MongoDB Adapter interoperability fixtures
+        working-directory: adapters/mongo/testdata/official-interop
+        run: npm ci
+
+      - name: Install official PostgreSQL Adapter interoperability fixtures
+        working-directory: adapters/postgres/testdata/official-interop
+        run: npm ci
+
+      - name: Install official cluster deployment fixtures
+        working-directory: adapters/unix/testdata/cluster-official
+        run: npm ci
+
       - name: Start Redis with Password and No-Save
         run: |
           docker run -d -p 6379:6379 --name ci-redis redis:alpine \
@@ -91,6 +143,93 @@ jobs:
             sleep 3;
           done
 
+      - name: Start Redis fault proxy
+        run: |
+          docker run -d --name ci-toxiproxy \
+            --add-host host.docker.internal:host-gateway \
+            -p 8474:8474 -p 6380:6380 \
+            ghcr.io/shopify/toxiproxy:2.12.0
+          for i in {1..20}; do
+            if curl --fail --silent http://localhost:8474/version > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent --show-error \
+            -X POST http://localhost:8474/proxies \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"redis","listen":"0.0.0.0:6380","upstream":"host.docker.internal:6379"}'
+
+      - name: Start RabbitMQ
+        run: |
+          docker run -d -p 5672:5672 --name ci-rabbitmq rabbitmq:4-alpine
+
+      - name: Wait for RabbitMQ to be ready
+        run: |
+          for i in {1..30}; do
+            if docker exec ci-rabbitmq rabbitmq-diagnostics -q ping; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Start PostgreSQL
+        run: |
+          docker run -d -p 5432:5432 --name ci-postgres \
+            -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=socketio postgres:17-alpine
+
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          for i in {1..20}; do
+            if docker exec ci-postgres pg_isready -U postgres -d socketio; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Start MongoDB replica set
+        run: |
+          docker run -d -p 27017:27017 --name ci-mongo mongo:8 \
+            --replSet rs0 --bind_ip_all
+
+      - name: Initialize MongoDB replica set
+        run: |
+          for i in {1..30}; do
+            if docker exec ci-mongo mongosh --quiet --eval "db.adminCommand('ping').ok" | grep -q 1; then
+              break
+            fi
+            sleep 2
+          done
+          docker exec ci-mongo mongosh --quiet --eval \
+            "rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]})"
+          for i in {1..30}; do
+            if docker exec ci-mongo mongosh --quiet --eval "db.hello().isWritablePrimary" | grep -q true; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+
       - name: Test
+        env:
+          TEST_TIMEOUT: "10m"
+          ENGINE_IO_COMPAT_TEST: "1"
+          SOCKET_IO_COMPAT_TEST: "1"
+          SOCKET_IO_ADMIN_UI_OFFICIAL_INTEROP: "1"
+          SOCKET_IO_CLIENT_OFFICIAL_INTEROP: "1"
+          SOCKET_IO_REDIS_INTEROP_TEST: "1"
+          SOCKET_IO_REDIS_TEST_ADDR: "localhost:6380"
+          SOCKET_IO_REDIS_TEST_PASSWORD: "root"
+          SOCKET_IO_REDIS_TOXIPROXY_API: "http://localhost:8474"
+          SOCKET_IO_REDIS_TOXIPROXY_NAME: "redis"
+          SOCKET_IO_REDIS_RESTART_CONTAINER: "ci-redis"
+          SOCKET_IO_AMQP_TEST_URI: "amqp://guest:guest@localhost:5672/"
+          SOCKET_IO_MONGO_TEST_URI: "mongodb://localhost:27017/?replicaSet=rs0"
+          SOCKET_IO_MONGO_OFFICIAL_INTEROP: "1"
+          SOCKET_IO_POSTGRES_TEST_URI: "postgres://postgres:postgres@localhost:5432/socketio?sslmode=disable"
+          SOCKET_IO_POSTGRES_OFFICIAL_INTEROP: "1"
+          SOCKET_IO_CLUSTER_OFFICIAL_INTEROP: "1"
         run: |
           make test

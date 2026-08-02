@@ -1,0 +1,19 @@
+{
+  "name": "aqcool-socket-io-redis-interop",
+  "private": true,
+  "description": "Cross-implementation tests for the Go and official Node.js Redis adapters",
+  "scripts": {
+    "test": "node interop.cjs"
+  },
+  "devDependencies": {
+    "@socket.io/redis-adapter": "8.3.0",
+    "@socket.io/redis-adapter-previous": "npm:@socket.io/redis-adapter@8.2.1",
+    "@socket.io/redis-emitter": "5.1.0",
+    "@socket.io/redis-streams-adapter": "0.3.1",
+    "@socket.io/redis-streams-adapter-previous": "npm:@socket.io/redis-streams-adapter@0.3.0",
+    "@socket.io/redis-streams-emitter": "0.1.1",
+    "redis": "5.8.2",
+    "socket.io": "4.8.3",
+    "socket.io-client": "4.8.3"
+  }
+}

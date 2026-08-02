@@ -1,0 +1,10 @@
+{
+  "name": "socket-io-go-cluster-engine-official-interop",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "@socket.io/cluster-engine": "0.1.0",
+    "ioredis": "5.4.1",
+    "redis": "4.6.15"
+  }
+}

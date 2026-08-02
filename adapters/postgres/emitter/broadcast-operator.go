@@ -167,6 +167,11 @@ func (b *BroadcastOperator) Emit(ev string, args ...any) error {
 // publish() method behavior exactly.
 func (b *BroadcastOperator) publish(message *adapter.ClusterMessage) error {
 	channel := b.broadcastOptions.BroadcastChannel
+	// Current @socket.io/postgres-adapter releases route messages by the
+	// top-level namespace. Older emitter-era adapters inferred it from the
+	// LISTEN channel, so retaining the channel and adding nsp is compatible
+	// with both protocol generations.
+	message.Nsp = b.broadcastOptions.Nsp
 
 	// Check binary data first — binary always goes to attachment table
 	if b.messageHasBinary(message) {

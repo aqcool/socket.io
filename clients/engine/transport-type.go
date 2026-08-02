@@ -106,7 +106,6 @@ type (
 	//   - Maximum compatibility across browsers and networks
 	//   - Works through most proxies and firewalls
 	//   - Fallback transport when WebSocket is not available
-	//   - Automatic reconnection handling
 	Polling interface {
 		Transport
 	}
@@ -120,7 +119,6 @@ type (
 	//   - Lower latency than polling
 	//   - Binary data support
 	//   - Built-in heartbeat mechanism
-	//   - Automatic reconnection
 	WebSocket interface {
 		Transport
 	}

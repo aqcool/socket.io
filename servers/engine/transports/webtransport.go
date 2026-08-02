@@ -14,6 +14,7 @@ import (
 	"github.com/aqcool/socket.io/v3/pkg/slices"
 	"github.com/aqcool/socket.io/v3/pkg/types"
 	"github.com/aqcool/socket.io/v3/pkg/webtransport"
+	wt "github.com/quic-go/webtransport-go"
 )
 
 var (
@@ -28,6 +29,8 @@ type webTransport struct {
 	session    *types.WebTransportConn
 	mu         sync.Mutex
 	writeQueue *queue.Queue
+	closeOnce  sync.Once
+	startOnce  sync.Once
 }
 
 // WebTransport transport
@@ -61,11 +64,14 @@ func (w *webTransport) Construct(ctx *types.HttpContext) {
 		w.OnClose()
 	})
 
-	// This goroutine is invoked only once.
-	go w.message()
-
 	w.SetWritable(true)
 	w.SetPerMessageDeflate(nil)
+}
+
+func (w *webTransport) Start() {
+	w.startOnce.Do(func() {
+		go w.message()
+	})
 }
 
 // Transport name
@@ -79,7 +85,8 @@ func (w *webTransport) HandlesUpgrades() bool {
 }
 
 func (w *webTransport) _error(err error) {
-	if webtransport.IsUnexpectedCloseError(err) || errors.Is(err, net.ErrClosed) {
+	var sessionError *wt.SessionError
+	if webtransport.IsUnexpectedCloseError(err) || errors.Is(err, net.ErrClosed) || errors.As(err, &sessionError) {
 		w.session.Emit("close")
 	} else {
 		w.session.Emit("error", err)
@@ -224,14 +231,26 @@ func (w *webTransport) write(data types.BufferInterface, _ bool) {
 // disconnects.
 func (w *webTransport) OnClose() {
 	w.writeQueue.TryClose()
+	w.closeConnection()
 	w.Transport.OnClose()
+}
+
+func (w *webTransport) closeConnection() {
+	w.closeOnce.Do(func() {
+		if w.session != nil && w.session.Conn != nil {
+			_ = w.session.Conn.CloseWithError(0, "")
+		}
+	})
 }
 
 // Closes the transport.
 func (w *webTransport) DoClose(fn types.Callable) {
 	wtLog.Debug(`closing WebTransport session`)
 	w.writeQueue.TryClose()
-	defer func() { _ = w.session.CloseWithError(0, "") }()
+	defer func() {
+		w.closeConnection()
+		w.Transport.OnClose()
+	}()
 	if fn != nil {
 		fn()
 	}

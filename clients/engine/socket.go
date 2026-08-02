@@ -4,8 +4,8 @@
 // and WebTransport.
 //
 // The package supports automatic transport upgrade, binary data transmission,
-// and reconnection handling. It is designed to be the foundation for higher-level
-// protocols like Socket.IO.
+// heartbeat handling, and graceful close. Reconnection belongs to the higher-level
+// Socket.IO Manager, not the Engine.IO socket itself.
 package engine
 
 import "github.com/aqcool/socket.io/v3/pkg/types"
@@ -23,17 +23,20 @@ import "github.com/aqcool/socket.io/v3/pkg/types"
 // Example usage:
 //
 //	import (
+//		"strings"
+//
 //		"github.com/aqcool/socket.io/clients/engine/v3"
-//		"github.com/aqcool/socket.io/clients/engine/v3/transports"
-//		"github.com/aqcool/socket.io/v3/pkg/types"
 //	)
 //
 //	func main() {
 //		opts := engine.DefaultSocketOptions()
-//		opts.SetTransports(types.NewSet(transports.Polling, transports.WebSocket))
+//		opts.SetTransportList([]engine.TransportCtor{
+//			&engine.PollingBuilder{},
+//			&engine.WebSocketBuilder{},
+//		})
 //		socket := engine.NewSocket("http://localhost:8080", opts)
 //		socket.On("open", func(...any) {
-//			socket.Send("hello")
+//			socket.Send(strings.NewReader("hello"), nil, nil)
 //		})
 //	}
 //
@@ -87,7 +90,12 @@ func (s *socket) Construct(uri string, opts SocketOptionsInterface) {
 	}
 
 	if opts.Transports() == nil {
-		opts.SetTransports(types.NewSet[TransportCtor](&PollingBuilder{}, &WebSocketBuilder{}, &WebTransportBuilder{}))
+		defaults := []TransportCtor{&PollingBuilder{}, &WebSocketBuilder{}, &WebTransportBuilder{}}
+		if ordered, ok := opts.(interface{ SetTransportList([]TransportCtor) }); ok {
+			ordered.SetTransportList(defaults)
+		} else {
+			opts.SetTransports(types.NewSet(defaults...))
+		}
 	}
 
 	s.SocketWithUpgrade.Construct(uri, opts)

@@ -1,22 +1,23 @@
 package engine
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	ws "github.com/gorilla/websocket"
 	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
 	"github.com/aqcool/socket.io/parsers/engine/v3/parser"
 	"github.com/aqcool/socket.io/servers/engine/v3/transports"
 	"github.com/aqcool/socket.io/v3/pkg/queue"
-	"github.com/aqcool/socket.io/v3/pkg/request"
 	"github.com/aqcool/socket.io/v3/pkg/slices"
 	"github.com/aqcool/socket.io/v3/pkg/types"
+	ws "github.com/gorilla/websocket"
 )
 
 // WebSocket implements the WebSocket transport for Engine.IO.
@@ -28,7 +29,6 @@ import (
 //   - Full-duplex communication
 //   - Binary data support
 //   - Message compression (optional)
-//   - Automatic reconnection
 //   - Custom protocols support
 type websocket struct {
 	Transport
@@ -36,7 +36,7 @@ type websocket struct {
 	// dialer is the WebSocket dialer used to establish connections.
 	// It handles connection establishment with custom options like
 	// proxy settings, TLS configuration, and protocol selection.
-	dialer *ws.Dialer
+	dialer WebSocketDialer
 
 	// socket is the active WebSocket connection instance.
 	// It provides the actual communication channel with the server.
@@ -46,7 +46,10 @@ type websocket struct {
 	// This ensures thread-safe operations on the connection.
 	mu sync.Mutex
 
-	writeQueue *queue.Queue
+	writeQueue  *queue.Queue
+	dialContext context.Context
+	cancelDial  context.CancelFunc
+	closing     atomic.Bool
 }
 
 // Name returns the identifier for the WebSocket transport.
@@ -100,13 +103,21 @@ func (w *websocket) Construct(socket Socket, opts SocketOptionsInterface) {
 	w.Transport.Construct(socket, opts)
 
 	w.writeQueue = queue.New()
+	w.dialContext, w.cancelDial = context.WithCancel(context.Background())
 
-	w.dialer = &ws.Dialer{
+	dialer := &ws.Dialer{
 		Proxy:             http.ProxyFromEnvironment,
 		TLSClientConfig:   w.Opts().TLSClientConfig(),
 		Subprotocols:      w.Opts().Protocols(),
 		EnableCompression: w.Opts().PerMessageDeflate() != nil,
 		Jar:               w.Socket().CookieJar(),
+	}
+	if proxy := w.Opts().ProxyURL(); proxy != nil {
+		dialer.Proxy = http.ProxyURL(proxy)
+	}
+	w.dialer = dialer.DialContext
+	if custom := w.Opts().WebSocketDialer(); custom != nil {
+		w.dialer = custom
 	}
 }
 
@@ -114,25 +125,60 @@ func (w *websocket) Construct(socket Socket, opts SocketOptionsInterface) {
 // This method establishes the WebSocket connection and sets up event listeners.
 // It handles the initial handshake and connection setup process.
 func (w *websocket) DoOpen() {
+	// Dialing must not block the constructor. Besides matching browser/Node
+	// transports, this guarantees callers can attach open/error listeners after
+	// NewSocket returns without racing a fast local server.
+	go w.open()
+}
+
+func (w *websocket) open() {
 	headers := http.Header{}
 	for k, vs := range w.Opts().ExtraHeaders() {
 		for _, v := range vs {
 			headers.Add(k, v)
 		}
 	}
-	socket, _, err := w.dialer.Dial(w.uri().String(), headers)
+	uri := w.uri().String()
+	startedAt := time.Now()
+	socket, response, err := w.dialer(w.dialContext, uri, headers)
+	notifyNetwork(w.Opts(), &NetworkEvent{
+		Operation: "dial", Transport: w.Name(), URL: uri,
+		Duration: time.Since(startedAt), Success: err == nil, Err: err,
+	})
 	if err != nil {
-		w.Emit("error", err)
+		if w.closing.Load() && errors.Is(err, context.Canceled) {
+			return
+		}
+		var requestContext context.Context
+		if response != nil && response.Request != nil {
+			requestContext = response.Request.Context()
+		}
+		// Preserve the transport's asynchronous event contract even when a
+		// custom dialer fails immediately in its goroutine. The short next-tick
+		// delay gives NewSocket's caller a deterministic listener-registration
+		// window, just like the official client.
+		time.AfterFunc(time.Millisecond, func() {
+			if !w.closing.Load() {
+				w.OnError("websocket error", err, requestContext)
+			}
+		})
 		return
 	}
-	w.socket = &types.WebSocketConn{EventEmitter: types.NewEventEmitter(), Conn: socket}
+	connection := &types.WebSocketConn{EventEmitter: types.NewEventEmitter(), WebSocketConnection: socket}
+	w.mu.Lock()
+	w.socket = connection
+	w.mu.Unlock()
+	if w.closing.Load() {
+		_ = connection.Close()
+		return
+	}
 
 	w.addEventListeners()
 }
 
 func (w *websocket) _error(err error) {
 	if ws.IsUnexpectedCloseError(err) || errors.Is(err, net.ErrClosed) {
-		w.socket.Emit("close")
+		w.socket.Emit("close", err)
 	} else {
 		w.socket.Emit("error", err)
 	}
@@ -195,8 +241,8 @@ func (w *websocket) addEventListeners() {
 	_ = w.socket.On("error", func(errs ...any) {
 		w.OnError("websocket error", slices.TryGetAny[error](errs, 0), nil)
 	})
-	_ = w.socket.Once("close", func(...any) {
-		w.OnClose(NewTransportError("websocket connection closed", nil, nil).Err())
+	_ = w.socket.Once("close", func(details ...any) {
+		w.OnClose(NewTransportError("websocket connection closed", slices.TryGetAny[error](details, 0), nil).Err())
 	})
 
 	// This goroutine is invoked only once.
@@ -247,13 +293,7 @@ func (w *websocket) write(packets []*packet.Packet) {
 				if _, ok := packet.Options.WsPreEncodedFrame.(*types.StringBuffer); ok {
 					mt = ws.TextMessage
 				}
-				pm, err := ws.NewPreparedMessage(mt, packet.Options.WsPreEncodedFrame.Bytes())
-				if err != nil {
-					clientWebsocketLog.Debug(`Send Error "%s"`, err.Error())
-					writeErr = err
-					break
-				}
-				if err := w.socket.WritePreparedMessage(pm); err != nil {
+				if err := w.socket.WriteMessage(mt, packet.Options.WsPreEncodedFrame.Bytes()); err != nil {
 					clientWebsocketLog.Debug(`Send Error "%s"`, err.Error())
 					writeErr = err
 					break
@@ -332,9 +372,16 @@ func (w *websocket) doWrite(data types.BufferInterface, compress bool, writeErr 
 // DoClose gracefully closes the WebSocket connection.
 // This method ensures proper cleanup of the WebSocket connection.
 func (w *websocket) DoClose() {
+	w.closing.Store(true)
+	if w.cancelDial != nil {
+		w.cancelDial()
+	}
 	w.writeQueue.TryClose()
-	if w.socket != nil {
-		_ = w.socket.Close()
+	w.mu.Lock()
+	connection := w.socket
+	w.mu.Unlock()
+	if connection != nil {
+		_ = connection.Close()
 	}
 }
 
@@ -357,7 +404,7 @@ func (w *websocket) uri() *url.URL {
 	}
 
 	if w.Opts().TimestampRequests() {
-		query.Set(w.Opts().TimestampParam(), request.RandomString())
+		query.Set(w.Opts().TimestampParam(), randomString())
 	}
 
 	if !w.SupportsBinary() {

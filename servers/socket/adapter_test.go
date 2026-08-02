@@ -178,6 +178,40 @@ func TestAdapterRoomEvents(t *testing.T) {
 	}
 }
 
+func TestAdapterCountSocketsWithoutFetchingDetails(t *testing.T) {
+	server := NewServer(nil, nil)
+	adapter := server.Sockets().Adapter()
+	adapter.AddAll("socket-1", types.NewSet(Room("room-a")))
+	adapter.AddAll("socket-2", types.NewSet(Room("room-a"), Room("excluded")))
+	adapter.AddAll("socket-3", types.NewSet(Room("room-b")))
+
+	assertCount := func(opts *BroadcastOptions, expected uint64) {
+		t.Helper()
+		adapter.CountSockets(opts)(func(actual uint64, err error) {
+			if err != nil {
+				t.Fatal(err)
+			}
+			if actual != expected {
+				t.Fatalf("count = %d, want %d", actual, expected)
+			}
+		})
+	}
+	assertCount(nil, 3)
+	assertCount(&BroadcastOptions{
+		Rooms:  types.NewSet(Room("room-a"), Room("room-b")),
+		Except: types.NewSet(Room("excluded")),
+	}, 2)
+
+	adapter.ListRooms(nil)(func(rooms map[Room]uint64, err error) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		if rooms["room-a"] != 2 || rooms["room-b"] != 1 || rooms["excluded"] != 1 {
+			t.Fatalf("unexpected room counts: %v", rooms)
+		}
+	})
+}
+
 func TestAdapterAddAllIdempotent(t *testing.T) {
 	adapter := newTestAdapter()
 

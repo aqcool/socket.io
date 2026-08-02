@@ -63,6 +63,33 @@ func TestUrl(t *testing.T) {
 		}
 	})
 
+	t.Run("bare host defaults to https", func(t *testing.T) {
+		p, err := Url("localhost:3000", "/socket.io")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.Scheme != "https" || p.Hostname != "localhost" || p.Port != "3000" ||
+			p.Id != "https://localhost:3000/socket.io" {
+			t.Fatalf("unexpected bare host parse: %+v", p)
+		}
+	})
+
+	t.Run("protocol relative defaults to https", func(t *testing.T) {
+		p, err := Url("//localhost:3000", "/socket.io")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.Scheme != "https" || p.Hostname != "localhost" || p.Port != "3000" {
+			t.Fatalf("unexpected protocol-relative parse: %+v", p)
+		}
+	})
+
+	t.Run("relative path still requires a base", func(t *testing.T) {
+		if _, err := Url("/namespace", "/socket.io"); err == nil {
+			t.Fatal("relative path unexpectedly parsed without a base URL")
+		}
+	})
+
 	t.Run("empty path gets default", func(t *testing.T) {
 		p, err := Url("http://example.com", "/socket.io")
 		if err != nil {

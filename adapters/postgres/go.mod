@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/aqcool/socket.io/adapters/adapter/v3 v3.0.4
 	github.com/aqcool/socket.io/parsers/socket/v3 v3.0.4
+	github.com/aqcool/socket.io/reliability/v3 v3.0.4
 	github.com/aqcool/socket.io/servers/socket/v3 v3.0.4
 	github.com/aqcool/socket.io/v3 v3.0.4
 	github.com/jackc/pgx/v5 v5.10.0
@@ -13,6 +14,8 @@ require (
 
 require (
 	github.com/andybalholm/brotli v1.2.1 // indirect
+	github.com/aqcool/socket.io/clients/engine/v3 v3.0.4 // indirect
+	github.com/aqcool/socket.io/clients/socket/v3 v3.0.4 // indirect
 	github.com/aqcool/socket.io/parsers/engine/v3 v3.0.4 // indirect
 	github.com/aqcool/socket.io/servers/engine/v3 v3.0.4 // indirect
 	github.com/dunglas/httpsfv v1.1.0 // indirect
@@ -32,12 +35,16 @@ require (
 	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
+	resty.dev/v3 v3.0.0-rc.1 // indirect
 )
 
 replace (
 	github.com/aqcool/socket.io/adapters/adapter/v3 => ../../adapters/adapter
+	github.com/aqcool/socket.io/clients/engine/v3 => ../../clients/engine
+	github.com/aqcool/socket.io/clients/socket/v3 => ../../clients/socket
 	github.com/aqcool/socket.io/parsers/engine/v3 => ../../parsers/engine
 	github.com/aqcool/socket.io/parsers/socket/v3 => ../../parsers/socket
+	github.com/aqcool/socket.io/reliability/v3 => ../../reliability
 	github.com/aqcool/socket.io/servers/engine/v3 => ../../servers/engine
 	github.com/aqcool/socket.io/servers/socket/v3 => ../../servers/socket
 	github.com/aqcool/socket.io/v3 => ../../

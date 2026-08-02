@@ -5,13 +5,15 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
+	"time"
 
+	"github.com/aqcool/socket.io/v3/pkg/types"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/aqcool/socket.io/v3/pkg/types"
 )
 
 // PostgresClient wraps a pgxpool.Pool and provides context management
@@ -38,6 +40,7 @@ type PostgresClient struct {
 	// It is lazily acquired from the pool.
 	listenerConn *pgx.Conn
 	listenerMu   sync.Mutex
+	listenerOpMu sync.Mutex
 }
 
 // NewPostgresClient creates a new PostgresClient with the given context and connection pool.
@@ -93,6 +96,9 @@ func (c *PostgresClient) getListenerConn() (*pgx.Conn, error) {
 //   - ctx: The context for the LISTEN operation.
 //   - channels: One or more channel names to listen on.
 func (c *PostgresClient) Listen(ctx context.Context, channels ...string) error {
+	c.listenerOpMu.Lock()
+	defer c.listenerOpMu.Unlock()
+
 	conn, err := c.getListenerConn()
 	if err != nil {
 		return err
@@ -113,6 +119,9 @@ func (c *PostgresClient) Listen(ctx context.Context, channels ...string) error {
 //   - ctx: The context for the UNLISTEN operation.
 //   - channels: One or more channel names to unlisten from.
 func (c *PostgresClient) Unlisten(ctx context.Context, channels ...string) error {
+	c.listenerOpMu.Lock()
+	defer c.listenerOpMu.Unlock()
+
 	c.listenerMu.Lock()
 	conn := c.listenerConn
 	c.listenerMu.Unlock()
@@ -140,7 +149,18 @@ func (c *PostgresClient) WaitForNotification(ctx context.Context) (*pgconn.Notif
 		return nil, err
 	}
 
-	return conn.WaitForNotification(ctx)
+	for {
+		c.listenerOpMu.Lock()
+		waitCtx, cancel := context.WithTimeout(ctx, 250*time.Millisecond)
+		notification, waitErr := conn.WaitForNotification(waitCtx)
+		cancel()
+		c.listenerOpMu.Unlock()
+
+		if errors.Is(waitErr, context.DeadlineExceeded) && ctx.Err() == nil {
+			continue
+		}
+		return notification, waitErr
+	}
 }
 
 // Notify sends a NOTIFY on the specified channel with the given payload.
@@ -212,8 +232,96 @@ func (c *PostgresClient) CleanupAttachments(ctx context.Context, tableName strin
 	return err
 }
 
+// EnsureRecoveryTables creates the durable event log and session store used
+// for connection state recovery.
+func (c *PostgresClient) EnsureRecoveryTables(ctx context.Context, eventTable, sessionTable string) error {
+	eventIdentifier := pgx.Identifier{eventTable}.Sanitize()
+	sessionIdentifier := pgx.Identifier{sessionTable}.Sanitize()
+	queries := []string{
+		fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (id bigserial PRIMARY KEY, namespace text NOT NULL, payload bytea NOT NULL, expires_at timestamptz NOT NULL)", eventIdentifier),
+		fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s ON %s (namespace, id)", pgx.Identifier{eventTable + "_namespace_id_idx"}.Sanitize(), eventIdentifier),
+		fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s ON %s (expires_at)", pgx.Identifier{eventTable + "_expires_at_idx"}.Sanitize(), eventIdentifier),
+		fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (namespace text NOT NULL, pid text NOT NULL, payload bytea NOT NULL, expires_at timestamptz NOT NULL, PRIMARY KEY (namespace, pid))", sessionIdentifier),
+		fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s ON %s (expires_at)", pgx.Identifier{sessionTable + "_expires_at_idx"}.Sanitize(), sessionIdentifier),
+	}
+	for _, query := range queries {
+		if _, err := c.Pool.Exec(ctx, query); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *PostgresClient) InsertRecoveryEvent(ctx context.Context, tableName, namespace string, payload []byte, expiresAt time.Time) (int64, error) {
+	var id int64
+	query := fmt.Sprintf("INSERT INTO %s (namespace, payload, expires_at) VALUES ($1, $2, $3) RETURNING id", pgx.Identifier{tableName}.Sanitize())
+	err := c.Pool.QueryRow(ctx, query, namespace, payload, expiresAt).Scan(&id)
+	return id, err
+}
+
+func (c *PostgresClient) DeleteRecoveryEvent(ctx context.Context, tableName string, id int64) error {
+	query := fmt.Sprintf("DELETE FROM %s WHERE id = $1", pgx.Identifier{tableName}.Sanitize())
+	_, err := c.Pool.Exec(ctx, query, id)
+	return err
+}
+
+func (c *PostgresClient) RecoveryOffsetExists(ctx context.Context, tableName, namespace string, id int64) (bool, error) {
+	var exists bool
+	query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM %s WHERE id = $1 AND namespace = $2 AND expires_at > now())", pgx.Identifier{tableName}.Sanitize())
+	err := c.Pool.QueryRow(ctx, query, id, namespace).Scan(&exists)
+	return exists, err
+}
+
+func (c *PostgresClient) RecoveryEventsAfter(ctx context.Context, tableName, namespace string, id int64) ([]RecoveryEvent, error) {
+	query := fmt.Sprintf("SELECT id, payload FROM %s WHERE namespace = $1 AND id > $2 AND expires_at > now() ORDER BY id", pgx.Identifier{tableName}.Sanitize())
+	rows, err := c.Pool.Query(ctx, query, namespace, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	events := make([]RecoveryEvent, 0)
+	for rows.Next() {
+		var event RecoveryEvent
+		if err := rows.Scan(&event.ID, &event.Payload); err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+	return events, rows.Err()
+}
+
+func (c *PostgresClient) UpsertRecoverySession(ctx context.Context, tableName, namespace, pid string, payload []byte, expiresAt time.Time) error {
+	query := fmt.Sprintf(
+		"INSERT INTO %s (namespace, pid, payload, expires_at) VALUES ($1, $2, $3, $4) ON CONFLICT (namespace, pid) DO UPDATE SET payload = EXCLUDED.payload, expires_at = EXCLUDED.expires_at",
+		pgx.Identifier{tableName}.Sanitize(),
+	)
+	_, err := c.Pool.Exec(ctx, query, namespace, pid, payload, expiresAt)
+	return err
+}
+
+func (c *PostgresClient) DeleteRecoverySession(ctx context.Context, tableName, namespace, pid string) ([]byte, error) {
+	var payload []byte
+	query := fmt.Sprintf("DELETE FROM %s WHERE namespace = $1 AND pid = $2 AND expires_at > now() RETURNING payload", pgx.Identifier{tableName}.Sanitize())
+	err := c.Pool.QueryRow(ctx, query, namespace, pid).Scan(&payload)
+	return payload, err
+}
+
+func (c *PostgresClient) CleanupRecovery(ctx context.Context, eventTable, sessionTable string) error {
+	for _, tableName := range []string{eventTable, sessionTable} {
+		query := fmt.Sprintf("DELETE FROM %s WHERE expires_at <= now()", pgx.Identifier{tableName}.Sanitize())
+		if _, err := c.Pool.Exec(ctx, query); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Close releases the listener connection if it was acquired.
 func (c *PostgresClient) Close() {
+	c.listenerOpMu.Lock()
+	defer c.listenerOpMu.Unlock()
+
 	c.listenerMu.Lock()
 	defer c.listenerMu.Unlock()
 

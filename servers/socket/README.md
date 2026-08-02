@@ -10,7 +10,8 @@ Socket.IO 是面向 Go 的实时双向事件通信库。本模块提供 Socket.I
 ## 特性
 
 - **协议支持**
-  - Socket.IO v4+ 协议
+  - Socket.IO 协议 v4/v5
+  - 官方 JavaScript 客户端 v2、v3 和 v4；v2 需要启用 `AllowEIO3`
   - 二进制数据传输
   - 多路复用（命名空间）
   - 房间支持
@@ -158,6 +159,7 @@ make test
 
 - [GoDoc 文档](https://pkg.go.dev/github.com/aqcool/socket.io/servers/socket/v3)
 - [Socket.IO 协议](https://github.com/socketio/socket.io-protocol)
+- [客户端兼容矩阵](../../docs/COMPATIBILITY.md)
 
 ## 参与贡献
 

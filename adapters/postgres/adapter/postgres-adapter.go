@@ -5,10 +5,11 @@ package adapter
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
-	"github.com/vmihailenco/msgpack/v5"
 	"github.com/aqcool/socket.io/adapters/adapter/v3"
 	"github.com/aqcool/socket.io/adapters/postgres/v3"
 	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
@@ -16,6 +17,8 @@ import (
 	"github.com/aqcool/socket.io/v3/pkg/log"
 	"github.com/aqcool/socket.io/v3/pkg/types"
 	"github.com/aqcool/socket.io/v3/pkg/utils"
+	"github.com/jackc/pgx/v5"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // postgresLog is the logger for the PostgreSQL adapter.
@@ -32,6 +35,8 @@ type postgresAdapter struct {
 	channel        string
 	cleanupFunc    types.Callable // Cleanup callback for resource management
 }
+
+func (a *postgresAdapter) SupportsConnectionStateRecovery() bool { return true }
 
 // MakePostgresAdapter creates a new uninitialized postgresAdapter.
 // Call Construct() to complete initialization before use.
@@ -107,32 +112,160 @@ func hasBinary(message *ClusterResponse) bool {
 // If the message contains binary data, or the JSON payload exceeds the configured threshold,
 // the full message is msgpack-encoded and stored in the attachment table. Only a reference
 // header is sent via NOTIFY. This matches the Node.js adapter protocol exactly.
-// Returns an empty offset since PostgreSQL NOTIFY does not support ordered offsets.
 func (a *postgresAdapter) DoPublish(message *ClusterMessage) (adapter.Offset, error) {
 	postgresLog.Debug("publishing message of type %d", message.Type)
 
+	var recoveryEventID int64
+	if a.isRecoverableBroadcast(message) {
+		payload, err := utils.MsgPack().Encode(message)
+		if err != nil {
+			return "", fmt.Errorf("encode recovery event: %w", err)
+		}
+		recoveryEventID, err = a.postgresClient.InsertRecoveryEvent(
+			a.postgresClient.Context,
+			recoveryEventTable(a.opts),
+			a.channel,
+			payload,
+			time.Now().Add(a.maxDisconnectionDuration()),
+		)
+		if err != nil {
+			return "", fmt.Errorf("persist recovery event: %w", err)
+		}
+		message.Offset = adapter.Offset(strconv.FormatInt(recoveryEventID, 10))
+	}
+
+	var offset adapter.Offset
+	var err error
 	// Binary data always goes to attachment table (Node.js never sends binary via NOTIFY)
 	if hasBinary(message) {
-		return a.publishWithAttachment(message)
+		offset, err = a.publishWithAttachment(message)
+	} else {
+		// Encode as JSON for NOTIFY
+		var payload []byte
+		payload, err = json.Marshal(message)
+		if err == nil {
+			if len(payload) > a.opts.PayloadThreshold() {
+				offset, err = a.publishWithAttachment(message)
+			} else {
+				err = a.postgresClient.Notify(a.postgresClient.Context, a.channel, string(payload))
+				offset = message.Offset
+			}
+		}
 	}
-
-	// Encode as JSON for NOTIFY
-	payload, err := json.Marshal(message)
 	if err != nil {
-		return "", fmt.Errorf("failed to encode message: %w", err)
-	}
-
-	// If JSON payload exceeds threshold, use attachment table
-	if len(payload) > a.opts.PayloadThreshold() {
-		return a.publishWithAttachment(message)
-	}
-
-	err = a.postgresClient.Notify(a.postgresClient.Context, a.channel, string(payload))
-	if err != nil {
+		if recoveryEventID != 0 {
+			_ = a.postgresClient.DeleteRecoveryEvent(a.postgresClient.Context, recoveryEventTable(a.opts), recoveryEventID)
+		}
 		return "", err
 	}
+	return offset, nil
+}
 
-	return "", nil
+func (a *postgresAdapter) isRecoverableBroadcast(message *ClusterMessage) bool {
+	if a.Nsp().Server().Opts().ConnectionStateRecovery() == nil || message.Type != adapter.BROADCAST {
+		return false
+	}
+	data, ok := message.Data.(*BroadcastMessage)
+	if !ok || data.Packet == nil {
+		return false
+	}
+	return data.Packet.Type == parser.EVENT &&
+		data.Packet.Id == nil &&
+		(data.Opts == nil || data.Opts.Flags == nil || !data.Opts.Flags.Volatile)
+}
+
+func (a *postgresAdapter) maxDisconnectionDuration() time.Duration {
+	recovery := a.Nsp().Server().Opts().ConnectionStateRecovery()
+	if recovery == nil {
+		return 0
+	}
+	return time.Duration(recovery.MaxDisconnectionDuration()) * time.Millisecond
+}
+
+// PersistSession stores a disconnected session until the configured recovery
+// window expires.
+func (a *postgresAdapter) PersistSession(session *socket.SessionToPersist) {
+	payload, err := utils.MsgPack().Encode(session)
+	if err != nil {
+		a.postgresClient.Emit("error", fmt.Errorf("encode recovery session: %w", err))
+		return
+	}
+	err = a.postgresClient.UpsertRecoverySession(
+		a.postgresClient.Context,
+		recoverySessionTable(a.opts),
+		a.channel,
+		string(session.Pid),
+		payload,
+		time.Now().Add(a.maxDisconnectionDuration()),
+	)
+	if err != nil {
+		a.postgresClient.Emit("error", fmt.Errorf("persist recovery session: %w", err))
+	}
+}
+
+// RestoreSession atomically consumes the session and replays matching events
+// after the client's last bigserial offset.
+func (a *postgresAdapter) RestoreSession(pid socket.PrivateSessionId, offset string) (*socket.Session, error) {
+	offsetID, err := strconv.ParseInt(offset, 10, 64)
+	if err != nil || offsetID <= 0 {
+		return nil, fmt.Errorf("invalid recovery offset %q", offset)
+	}
+	exists, err := a.postgresClient.RecoveryOffsetExists(
+		a.postgresClient.Context,
+		recoveryEventTable(a.opts),
+		a.channel,
+		offsetID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("verify recovery offset: %w", err)
+	}
+	if !exists {
+		return nil, nil
+	}
+
+	payload, err := a.postgresClient.DeleteRecoverySession(
+		a.postgresClient.Context,
+		recoverySessionTable(a.opts),
+		a.channel,
+		string(pid),
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("restore recovery session: %w", err)
+	}
+
+	session := &socket.Session{}
+	if decodeErr := utils.MsgPack().Decode(payload, &session.SessionToPersist); decodeErr != nil {
+		return nil, fmt.Errorf("decode recovery session: %w", decodeErr)
+	}
+
+	events, err := a.postgresClient.RecoveryEventsAfter(
+		a.postgresClient.Context,
+		recoveryEventTable(a.opts),
+		a.channel,
+		offsetID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query missed packets: %w", err)
+	}
+	for _, event := range events {
+		message, err := a.decodeMsgpack(event.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("decode missed packet: %w", err)
+		}
+		broadcast, ok := message.Data.(*BroadcastMessage)
+		if !ok || broadcast.Packet == nil {
+			continue
+		}
+		if socket.ShouldIncludePacket(session.Rooms, adapter.DecodeOptions(broadcast.Opts)) {
+			packetData := append(utils.TryCast[[]any](broadcast.Packet.Data), strconv.FormatInt(event.ID, 10))
+			session.MissedPackets = append(session.MissedPackets, packetData)
+		}
+	}
+
+	return session, nil
 }
 
 // DoPublishResponse publishes a response message to the cluster.
@@ -172,7 +305,7 @@ func (a *postgresAdapter) publishWithAttachment(message *ClusterMessage) (adapte
 	}
 
 	err = a.postgresClient.Notify(a.postgresClient.Context, a.channel, string(notification))
-	return "", err
+	return message.Offset, err
 }
 
 // OnNotification processes a raw notification payload received from PostgreSQL LISTEN/NOTIFY.
@@ -220,8 +353,16 @@ func (a *postgresAdapter) OnNotification(payload string) {
 		if message.Uid == a.Uid() {
 			return
 		}
+		// @socket.io/postgres-emitter@0.1.1 (the version shipped with the
+		// Socket.IO 4.8.3 monorepo) routes namespaces through the PostgreSQL
+		// notification channel and omits the top-level nsp field. The adapter
+		// instance already represents exactly that channel, so restore the
+		// namespace before passing the message to ClusterAdapter.
+		if message.Nsp == "" {
+			message.Nsp = a.Nsp().Name()
+		}
 
-		a.OnMessage(message, "")
+		a.OnMessage(message, message.Offset)
 		return
 	}
 
@@ -236,8 +377,11 @@ func (a *postgresAdapter) OnNotification(payload string) {
 	if message.Uid == a.Uid() {
 		return
 	}
+	if message.Nsp == "" {
+		message.Nsp = a.Nsp().Name()
+	}
 
-	a.OnMessage(message, "")
+	a.OnMessage(message, message.Offset)
 }
 
 // decode converts a JSON NOTIFY payload into a typed ClusterResponse.
@@ -245,10 +389,11 @@ func (a *postgresAdapter) OnNotification(payload string) {
 func (a *postgresAdapter) decode(payload []byte) (*ClusterResponse, error) {
 	// Parse the outer structure with Data as raw JSON
 	var raw struct {
-		Uid  string              `json:"uid"`
-		Nsp  string              `json:"nsp"`
-		Type adapter.MessageType `json:"type"`
-		Data json.RawMessage     `json:"data,omitempty"`
+		Uid    string              `json:"uid"`
+		Nsp    string              `json:"nsp"`
+		Type   adapter.MessageType `json:"type"`
+		Data   json.RawMessage     `json:"data,omitempty"`
+		Offset adapter.Offset      `json:"offset,omitempty"`
 	}
 
 	if err := json.Unmarshal(payload, &raw); err != nil {
@@ -256,9 +401,10 @@ func (a *postgresAdapter) decode(payload []byte) (*ClusterResponse, error) {
 	}
 
 	message := &adapter.ClusterMessage{
-		Uid:  adapter.ServerId(raw.Uid),
-		Nsp:  raw.Nsp,
-		Type: raw.Type,
+		Uid:    adapter.ServerId(raw.Uid),
+		Nsp:    raw.Nsp,
+		Type:   raw.Type,
+		Offset: raw.Offset,
 	}
 
 	// Return early if no data
@@ -281,10 +427,11 @@ func (a *postgresAdapter) decode(payload []byte) (*ClusterResponse, error) {
 func (a *postgresAdapter) decodeMsgpack(payload []byte) (*ClusterResponse, error) {
 	// Two-pass decode: first get outer fields with Data as raw msgpack
 	var raw struct {
-		Uid  string              `msgpack:"uid,omitempty"`
-		Nsp  string              `msgpack:"nsp,omitempty"`
-		Type adapter.MessageType `msgpack:"type,omitempty"`
-		Data msgpack.RawMessage  `msgpack:"data,omitempty"`
+		Uid    string              `msgpack:"uid,omitempty"`
+		Nsp    string              `msgpack:"nsp,omitempty"`
+		Type   adapter.MessageType `msgpack:"type,omitempty"`
+		Data   msgpack.RawMessage  `msgpack:"data,omitempty"`
+		Offset adapter.Offset      `msgpack:"offset,omitempty"`
 	}
 
 	if err := utils.MsgPack().Decode(payload, &raw); err != nil {
@@ -292,9 +439,10 @@ func (a *postgresAdapter) decodeMsgpack(payload []byte) (*ClusterResponse, error
 	}
 
 	message := &adapter.ClusterMessage{
-		Uid:  adapter.ServerId(raw.Uid),
-		Nsp:  raw.Nsp,
-		Type: raw.Type,
+		Uid:    adapter.ServerId(raw.Uid),
+		Nsp:    raw.Nsp,
+		Type:   raw.Type,
+		Offset: raw.Offset,
 	}
 
 	if len(raw.Data) == 0 {
@@ -354,6 +502,14 @@ func allocateTarget(messageType adapter.MessageType) any {
 		return &FetchSocketsMessage{}
 	case adapter.FETCH_SOCKETS_RESPONSE:
 		return &FetchSocketsResponse{}
+	case adapter.COUNT_SOCKETS:
+		return &adapter.CountSocketsMessage{}
+	case adapter.COUNT_SOCKETS_RESPONSE:
+		return &adapter.CountSocketsResponse{}
+	case adapter.LIST_ROOMS:
+		return &adapter.ListRoomsMessage{}
+	case adapter.LIST_ROOMS_RESPONSE:
+		return &adapter.ListRoomsResponse{}
 	case adapter.SERVER_SIDE_EMIT:
 		return &ServerSideEmitMessage{}
 	case adapter.SERVER_SIDE_EMIT_RESPONSE:

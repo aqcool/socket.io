@@ -77,6 +77,8 @@ type MongoAdapterBuilder struct {
 
 // New creates a new MongoAdapter for the given namespace.
 // This method implements the socket.AdapterBuilder interface.
+func (mb *MongoAdapterBuilder) SupportsConnectionStateRecovery() bool { return true }
+
 func (mb *MongoAdapterBuilder) New(nsp socket.Namespace) socket.Adapter {
 	options := DefaultMongoAdapterOptions()
 	options.Assign(mb.Opts)
@@ -88,7 +90,9 @@ func (mb *MongoAdapterBuilder) New(nsp socket.Namespace) socket.Adapter {
 	if options.GetRawHeartbeatTimeout() == nil {
 		options.SetHeartbeatTimeout(DefaultHeartbeatTimeout)
 	}
-
+	if options.GetRawRequestsTimeout() == nil {
+		options.SetRequestsTimeout(DefaultRequestsTimeout)
+	}
 	adapterInstance := NewMongoAdapter(nsp, mb.Mongo, options)
 
 	mb.namespaceToAdapters.Store(nsp.Name(), adapterInstance)

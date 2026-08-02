@@ -1,9 +1,11 @@
 package socket
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,6 +29,7 @@ type (
 	Ack = func([]any, error)
 
 	SocketMiddleware = func([]any, func(error))
+	JoinMiddleware   = func(*Socket, []Room) error
 
 	// Handshake represents the initial connection information exchanged
 	// between the client and server during the handshake process.
@@ -119,6 +122,15 @@ type (
 		//		fmt.Println(socket.Connected()) // true
 		//	})
 		connected atomic.Bool
+		// closeMu serializes competing transport, namespace and server shutdown
+		// paths so the disconnect lifecycle is emitted exactly once.
+		closeMu sync.Mutex
+		// connectReady prevents a fast client from dispatching its first event while
+		// Namespace connection handlers are still being installed. Node.js gets
+		// this ordering from its single-threaded event loop; Go needs an explicit
+		// barrier between the CONNECT packet and concurrent transport readers.
+		connectReady     chan struct{}
+		connectReadyOnce sync.Once
 
 		// The session ID, which must not be shared (unlike [id]).
 		pid PrivateSessionId
@@ -128,6 +140,7 @@ type (
 		adapter               Adapter
 		acks                  *types.Map[uint64, Ack]
 		fns                   *types.Slice[SocketMiddleware]
+		joinFns               *types.Slice[JoinMiddleware]
 		flags                 atomic.Pointer[BroadcastFlags]
 		_anyListeners         *types.Slice[types.EventListener]
 		_anyOutgoingListeners *types.Slice[types.EventListener]
@@ -144,15 +157,23 @@ type (
 )
 
 func MakeSocket() *Socket {
+	s := makeSocket()
+	s.markConnectReady()
+	return s
+}
+
+func makeSocket() *Socket {
 	s := &Socket{
 		StrictEventEmitter: NewStrictEventEmitter(),
 
 		// Initialize default value
 		acks:                  &types.Map[uint64, Ack]{},
 		fns:                   types.NewSlice[SocketMiddleware](),
+		joinFns:               types.NewSlice[JoinMiddleware](),
 		_anyListeners:         types.NewSlice[types.EventListener](),
 		_anyOutgoingListeners: types.NewSlice[types.EventListener](),
 		taskQueue:             queue.New(),
+		connectReady:          make(chan struct{}),
 	}
 	s.flags.Store(&BroadcastFlags{})
 	s.canJoin.Store(true)
@@ -161,11 +182,17 @@ func MakeSocket() *Socket {
 }
 
 func NewSocket(nsp Namespace, client *Client, auth map[string]any, previousSession *Session) *Socket {
-	s := MakeSocket()
+	s := makeSocket()
 
 	s.Construct(nsp, client, auth, previousSession)
 
 	return s
+}
+
+func (s *Socket) markConnectReady() {
+	s.connectReadyOnce.Do(func() {
+		close(s.connectReady)
+	})
 }
 
 // An unique identifier for the session.
@@ -267,21 +294,51 @@ func (s *Socket) Construct(nsp Namespace, client *Client, auth map[string]any, p
 
 // Builds the `handshake` BC object
 func (s *Socket) buildHandshake(auth map[string]any) *Handshake {
-	return &Handshake{
-		Headers: utils.MapValues(s.Request().Headers().All(), func(value []string) any {
-			return value
-		}),
-		Time:    time.Now().Format(time.RFC3339),
-		Address: s.Conn().RemoteAddress(),
-		Xdomain: s.Request().Headers().Peek("Origin") != "",
-		Secure:  s.Request().Secure(),
-		Issued:  time.Now().UnixMilli(),
-		Url:     s.Request().Request().RequestURI,
-		Query: utils.MapValues(s.Request().Query().All(), func(value []string) any {
-			return value
-		}),
-		Auth: auth,
+	return buildHandshake(s.Request(), s.Conn().RemoteAddress(), auth)
+}
+
+func buildHandshake(request *types.HttpContext, address string, auth map[string]any) *Handshake {
+	issued := time.Now()
+	handshake := &Handshake{
+		Headers: types.IncomingHttpHeaders{},
+		Time:    issued.Format(time.RFC3339),
+		Address: address,
+		Issued:  issued.UnixMilli(),
+		Query:   types.ParsedUrlQuery{},
+		Auth:    auth,
 	}
+	if request == nil {
+		// A WebTransport-only connection does not have an Engine.IO HTTP
+		// request by the time the Socket.IO namespace is created. WebTransport
+		// always runs over secure HTTP/3, matching the official fallback.
+		handshake.Secure = true
+		return handshake
+	}
+
+	handshake.Headers = compactHandshakeValues(request.Headers().All(), true)
+	handshake.Xdomain = request.Headers().Peek("Origin") != ""
+	handshake.Secure = request.Secure()
+	handshake.Url = request.Request().RequestURI
+	handshake.Query = compactHandshakeValues(request.Query().All(), false)
+	return handshake
+}
+
+func compactHandshakeValues(values map[string][]string, lowerKeys bool) map[string]any {
+	result := make(map[string]any, len(values))
+	for key, items := range values {
+		if lowerKeys {
+			key = strings.ToLower(key)
+		}
+		switch len(items) {
+		case 0:
+			result[key] = ""
+		case 1:
+			result[key] = items[0]
+		default:
+			result[key] = append([]string(nil), items...)
+		}
+	}
+	return result
 }
 
 // Emits to this client.
@@ -315,7 +372,7 @@ func (s *Socket) Emit(ev string, args ...any) error {
 		id := s.nsp.Ids()
 		socketLog.Debug("emitting packet with ack id %d", id)
 		packet.Data = data[:data_len-1]
-		s.registerAckCallback(id, fn, flags.Timeout)
+		s.registerAckCallback(id, ev, telemetryTraceMetadata(data), fn, flags.Timeout)
 		packet.Id = &id
 	}
 
@@ -364,20 +421,60 @@ func (s *Socket) EmitWithAck(ev string, args ...any) func(Ack) {
 	}
 }
 
-func (s *Socket) registerAckCallback(id uint64, ack Ack, timeout *time.Duration) {
+func (s *Socket) registerAckCallback(
+	id uint64,
+	eventName string,
+	traceMetadata map[string]string,
+	ack Ack,
+	timeout *time.Duration,
+) {
+	startedAt := time.Now()
 	if timeout == nil {
-		s.acks.Store(id, ack)
+		s.acks.Store(id, func(args []any, err error) {
+			s.emitTelemetry(&TelemetryEvent{
+				Kind:          TelemetryAckCompleted,
+				Event:         eventName,
+				Duration:      time.Since(startedAt),
+				Success:       err == nil,
+				TraceMetadata: traceMetadata,
+			})
+			ack(args, err)
+		})
 		return
 	}
-	timer := utils.SetTimeout(func() {
-		socketLog.Debug("event with ack id %d has timed out after %d ms", id, *timeout/time.Millisecond)
-		s.acks.Delete(id)
-		ack(nil, errors.New("operation has timed out"))
-	}, *timeout)
+	// Store the callback before starting the timer. With a zero timeout, the
+	// previous order allowed the timer to run first, observe no callback and
+	// leave a subsequently stored ACK pending forever. The one-slot channel
+	// also lets an extremely fast ACK wait until its timer is available without
+	// racing on the timer pointer.
+	timerReady := make(chan *utils.Timer, 1)
 	s.acks.Store(id, func(args []any, _ error) {
+		timer := <-timerReady
 		utils.ClearTimeout(timer)
+		s.emitTelemetry(&TelemetryEvent{
+			Kind:          TelemetryAckCompleted,
+			Event:         eventName,
+			Duration:      time.Since(startedAt),
+			Success:       true,
+			TraceMetadata: traceMetadata,
+		})
 		ack(args, nil)
 	})
+	timer := utils.SetTimeout(func() {
+		if _, loaded := s.acks.LoadAndDelete(id); !loaded {
+			return
+		}
+		socketLog.Debug("event with ack id %d has timed out after %d ms", id, *timeout/time.Millisecond)
+		s.emitTelemetry(&TelemetryEvent{
+			Kind:          TelemetryAckTimeout,
+			Event:         eventName,
+			Duration:      time.Since(startedAt),
+			Success:       false,
+			TraceMetadata: traceMetadata,
+		})
+		ack(nil, errors.New("operation has timed out"))
+	}, *timeout)
+	timerReady <- timer
 }
 
 // To targets a room when broadcasting. Returns a new BroadcastOperator for chaining.
@@ -434,13 +531,32 @@ func (s *Socket) packet(packet *parser.Packet, opts *BroadcastFlags) {
 
 // Join adds the socket to one or more rooms.
 func (s *Socket) Join(rooms ...Room) {
+	_ = s.TryJoin(rooms...)
+}
+
+// TryJoin adds rooms and returns a validation error from join middleware.
+func (s *Socket) TryJoin(rooms ...Room) error {
 	s.joinMu.RLock()
 	defer s.joinMu.RUnlock()
 	if !s.canJoin.Load() {
-		return
+		return errors.New("socket.io: socket is closing")
+	}
+	for _, middleware := range s.joinFns.All() {
+		if err := middleware(s, rooms); err != nil {
+			return err
+		}
 	}
 	socketLog.Debug("join room %s", rooms)
 	s.adapter.AddAll(s.id, types.NewSet(rooms...))
+	return nil
+}
+
+// UseJoinMiddleware validates future room joins before they reach the Adapter.
+func (s *Socket) UseJoinMiddleware(middleware JoinMiddleware) *Socket {
+	if middleware != nil {
+		s.joinFns.Push(middleware)
+	}
+	return s
 }
 
 // Leave removes the socket from a room.
@@ -484,6 +600,12 @@ func (s *Socket) _onconnect() {
 
 // Called with each packet. Called by `Client`.
 func (s *Socket) _onpacket(packet *parser.Packet) {
+	// A client can answer the namespace CONNECT packet on another goroutine
+	// before Namespace._doConnect() has finished firing the user connection
+	// callbacks. Wait for that setup to complete so the first event is never
+	// observed without its handlers.
+	<-s.connectReady
+
 	socketLog.Debug("got packet %v", packet)
 	switch packet.Type {
 	case parser.EVENT:
@@ -503,26 +625,28 @@ func (s *Socket) _onpacket(packet *parser.Packet) {
 //
 // Param:  packet - packet struct
 func (s *Socket) onevent(packet *parser.Packet) {
+	startedAt := time.Now()
 	args, ok := packet.Data.([]any)
 	if !ok {
 		socketLog.Debug("invalid event packet data format")
 		return
 	}
 	socketLog.Debug("emitting event %v", args)
+	eventName := slices.TryGetAny[string](args, 0)
 	if nil != packet.Id {
 		socketLog.Debug("attaching ack callback to event")
-		args = append(args, s.ack(*packet.Id))
+		args = append(args, s.ack(*packet.Id, eventName, startedAt))
 	}
 	for _, listener := range s._anyListeners.All() {
 		listener(args...)
 	}
-	s.dispatch(args)
+	s.dispatch(args, startedAt)
 }
 
 // Produces an ack callback to emit with an event.
 //
 // Param: id - packet id
-func (s *Socket) ack(id uint64) Ack {
+func (s *Socket) ack(id uint64, eventName string, startedAt time.Time) Ack {
 	sent := &sync.Once{}
 	return func(args []any, _ error) {
 		// prevent double callbacks
@@ -537,6 +661,12 @@ func (s *Socket) ack(id uint64) Ack {
 				Type: parser.ACK,
 				Data: args,
 			}, nil)
+			s.emitTelemetry(&TelemetryEvent{
+				Kind:     TelemetryAckCompleted,
+				Event:    eventName,
+				Duration: time.Since(startedAt),
+				Success:  true,
+			})
 		})
 	}
 }
@@ -544,10 +674,9 @@ func (s *Socket) ack(id uint64) Ack {
 // Called upon ack packet.
 func (s *Socket) onack(packet *parser.Packet) {
 	if packet.Id != nil {
-		if ack, ok := s.acks.Load(*packet.Id); ok {
+		if ack, ok := s.acks.LoadAndDelete(*packet.Id); ok {
 			socketLog.Debug("calling ack %d with %v", *packet.Id, packet.Data)
 			ack(utils.TryCast[[]any](packet.Data), nil)
-			s.acks.Delete(*packet.Id)
 		} else {
 			socketLog.Debug("bad ack %d", *packet.Id)
 		}
@@ -576,6 +705,17 @@ func (s *Socket) _onerror(err any) {
 // Param: reason
 // Param: description
 func (s *Socket) _onclose(args ...any) {
+	s.closeMu.Lock()
+	defer s.closeMu.Unlock()
+	s.oncloseLocked(args...)
+}
+
+// oncloseLocked completes the disconnect lifecycle while closeMu is held.
+// Keeping packet emission and state transition in one critical section is
+// required for server namespace disconnects: the peer may close the transport
+// immediately after receiving DISCONNECT, and that transport callback must not
+// persist the session under a different, recoverable reason.
+func (s *Socket) oncloseLocked(args ...any) {
 	if !s.Connected() {
 		return
 	}
@@ -594,6 +734,11 @@ func (s *Socket) _onclose(args ...any) {
 	s._cleanup()
 	s.client._remove(s)
 	s.connected.Store(false)
+	s.emitTelemetry(&TelemetryEvent{
+		Kind:    TelemetryDisconnection,
+		Reason:  slices.TryGetAny[string](args, 0),
+		Success: true,
+	})
 	s.EmitReserved("disconnect", args...)
 }
 
@@ -648,10 +793,15 @@ func (s *Socket) Disconnect(status bool) *Socket {
 	if status {
 		s.client._disconnect()
 	} else {
+		s.closeMu.Lock()
+		defer s.closeMu.Unlock()
+		if !s.Connected() {
+			return s
+		}
 		s.packet(&parser.Packet{
 			Type: parser.DISCONNECT,
 		}, nil)
-		s._onclose("server namespace disconnect")
+		s.oncloseLocked("server namespace disconnect")
 	}
 	return s
 }
@@ -726,7 +876,7 @@ func (s *Socket) Timeout(timeout time.Duration) *Socket {
 }
 
 // Dispatch incoming event to socket listeners.
-func (s *Socket) dispatch(event []any) {
+func (s *Socket) dispatch(event []any, startedAt time.Time) {
 	socketLog.Debug("dispatching an event %v", event)
 	s.run(event, func(err error) {
 		s.Enqueue(func() {
@@ -739,6 +889,14 @@ func (s *Socket) dispatch(event []any) {
 			} else {
 				socketLog.Debug("ignore packet received after disconnection")
 			}
+			s.emitTelemetry(&TelemetryEvent{
+				Kind:          TelemetryEventReceived,
+				Event:         slices.TryGetAny[string](event, 0),
+				Bytes:         telemetryBytes(event),
+				Duration:      time.Since(startedAt),
+				Success:       err == nil,
+				TraceMetadata: telemetryTraceMetadata(event),
+			})
 		})
 	})
 }
@@ -885,6 +1043,15 @@ func (s *Socket) ListenersAnyOutgoing() []types.EventListener {
 
 // Notify the listeners for each packet sent (emit or broadcast)
 func (s *Socket) notifyOutgoingListeners(packet *parser.Packet) {
+	if args, ok := packet.Data.([]any); ok {
+		s.emitTelemetry(&TelemetryEvent{
+			Kind:          TelemetryEventSent,
+			Event:         slices.TryGetAny[string](args, 0),
+			Bytes:         telemetryBytes(args),
+			Success:       true,
+			TraceMetadata: telemetryTraceMetadata(args),
+		})
+	}
 	for _, listener := range s._anyOutgoingListeners.All() {
 		if args, ok := packet.Data.([]any); ok {
 			listener(args...)
@@ -892,6 +1059,60 @@ func (s *Socket) notifyOutgoingListeners(packet *parser.Packet) {
 			listener(packet.Data)
 		}
 	}
+}
+
+func telemetryBytes(value any) int {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return 0
+	}
+	return len(encoded)
+}
+
+func telemetryTraceMetadata(args []any) map[string]string {
+	for _, arg := range args {
+		values, ok := arg.(map[string]any)
+		if !ok {
+			continue
+		}
+		metadata := make(map[string]string, 2)
+		for _, key := range []string{"traceparent", "tracestate"} {
+			if value, ok := values[key].(string); ok && value != "" {
+				metadata[key] = value
+			}
+		}
+		if len(metadata) > 0 {
+			return metadata
+		}
+	}
+	return nil
+}
+
+func telemetryHandshakeTrace(handshake *Handshake) map[string]string {
+	if handshake == nil {
+		return nil
+	}
+	metadata := make(map[string]string, 2)
+	for headerName, headerValue := range handshake.Headers {
+		for _, key := range []string{"traceparent", "tracestate"} {
+			if !strings.EqualFold(headerName, key) {
+				continue
+			}
+			switch value := headerValue.(type) {
+			case string:
+				metadata[key] = value
+			case []string:
+				if len(value) > 0 {
+					metadata[key] = value[0]
+				}
+			case []any:
+				if len(value) > 0 {
+					metadata[key], _ = value[0].(string)
+				}
+			}
+		}
+	}
+	return metadata
 }
 func (s *Socket) NotifyOutgoingListeners() func(*parser.Packet) {
 	return s.notifyOutgoingListeners

@@ -715,6 +715,15 @@ func (w *messageWriter) Close() error {
 	if w.err != nil {
 		return w.err
 	}
+	// The WebTransport framing used by Engine.IO treats every length-prefixed
+	// frame as a complete message (continuation reassembly is intentionally not
+	// implemented by messageReader). The large-write fast path has already
+	// written the whole payload in one frame, so do not append a spurious empty
+	// binary frame when io.Copy closes the writer.
+	if w.frameType == continuationFrame && w.pos == maxFrameHeaderSize {
+		_ = w.endMessage(errWriteClosed)
+		return nil
+	}
 	return w.flushFrame(true, nil)
 }
 

@@ -156,11 +156,35 @@ CREATE TABLE IF NOT EXISTS socket_io_attachments (
 
 ## 测试
 
-运行测试套件：
+运行普通测试套件：
 
 ```bash
 make test
 ```
+
+官方互操作矩阵锁定 `@socket.io/postgres-adapter@0.5.0` 与 `socket.io@4.8.3`，覆盖 Node↔Go JSON 通知、二进制及 20 KB MessagePack attachment、Room、集群查询、节点 ACK、远程 Join、节点退出和滚动重启。
+
+external emitter 另锁定 `@socket.io/postgres-emitter@0.1.1`（gitHead `ac3df9a747a73d92bd49d62b666ca175a9f9b2f1`），覆盖其官方 12/12 行为。需要注意官方 Socket.IO 4.8.3 的 emitter 测试历史基线实际是 `@socket.io/postgres-adapter@0.1.1`，而不是当前的 0.5.0：
+
+- 官方 emitter 0.1.1 → Go Adapter：12/12 真实互操作；Go Adapter 会从已订阅频道回填旧 emitter 省略的顶层 `nsp`。
+- Go emitter → 当前官方 Adapter 0.5.0：真实反向互操作；Go emitter 同时发送当前协议要求的顶层 `nsp`。
+- Node 侧 emitter 行为基线和当前 Adapter 反向验证使用不同进程及连接池，结果不会混写成同一版本。
+
+运行真实 PostgreSQL 矩阵：
+
+```bash
+cd testdata/official-interop
+npm ci
+cd ../..
+
+SOCKET_IO_POSTGRES_OFFICIAL_INTEROP=1 \
+SOCKET_IO_POSTGRES_TEST_URI='postgres://postgres:postgres@localhost:5432/socketio?sslmode=disable' \
+go test -race ./adapter -run TestOfficialPostgresAdapterBilateralInterop -v
+```
+
+未设置 `SOCKET_IO_POSTGRES_OFFICIAL_INTEROP=1` 时该矩阵会跳过；默认 Go 单测不等同于官方 Node emitter 互操作。
+
+官方 PostgreSQL Adapter 0.5.0 明确不支持连接状态恢复；Go 实现的恢复属于扩展能力，由真实 PostgreSQL 上的 Go↔Go 集成测试覆盖。
 
 ## 参与贡献
 

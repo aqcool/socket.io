@@ -30,6 +30,16 @@ func (*SessionAwareAdapterBuilder) New(nsp Namespace) Adapter {
 	return NewSessionAwareAdapter(nsp)
 }
 
+func (*SessionAwareAdapterBuilder) SupportsConnectionStateRecovery() bool {
+	return true
+}
+
+func (*SessionAwareAdapterBuilder) Capabilities() AdapterCapabilities {
+	capabilities := (&AdapterBuilder{}).Capabilities()
+	capabilities.ConnectionStateRecovery = true
+	return capabilities
+}
+
 func MakeSessionAwareAdapter() SessionAwareAdapter {
 	s := &sessionAwareAdapter{
 		Adapter: MakeAdapter(),
@@ -49,6 +59,14 @@ func NewSessionAwareAdapter(nsp Namespace) SessionAwareAdapter {
 	s.Construct(nsp)
 
 	return s
+}
+
+func (s *sessionAwareAdapter) SupportsConnectionStateRecovery() bool {
+	return true
+}
+
+func (s *sessionAwareAdapter) Capabilities() AdapterCapabilities {
+	return (&SessionAwareAdapterBuilder{}).Capabilities()
 }
 
 func (s *sessionAwareAdapter) Construct(nsp Namespace) {
@@ -123,7 +141,7 @@ func (s *sessionAwareAdapter) RestoreSession(pid PrivateSessionId, offset string
 		if err != nil {
 			break
 		}
-		if shouldIncludePacket(session.Rooms, packet.Opts) {
+		if ShouldIncludePacket(session.Rooms, packet.Opts) {
 			missedPackets = append(missedPackets, packet.Data)
 			missedNum++
 		}
@@ -158,17 +176,34 @@ func (s *sessionAwareAdapter) Broadcast(packet *parser.Packet, opts *BroadcastOp
 	s.Adapter.Broadcast(packet, opts)
 }
 
-func shouldIncludePacket(sessionRooms *types.Set[Room], opts *BroadcastOptions) bool {
-	included := opts.Rooms.Len() == 0
+// ShouldIncludePacket reports whether a persisted broadcast matches a
+// recovered session's rooms.
+func ShouldIncludePacket(sessionRooms *types.Set[Room], opts *BroadcastOptions) bool {
+	if opts == nil {
+		return true
+	}
+	rooms := opts.Rooms
+	if rooms == nil {
+		rooms = types.NewSet[Room]()
+	}
+	except := opts.Except
+	if except == nil {
+		except = types.NewSet[Room]()
+	}
+	if sessionRooms == nil {
+		sessionRooms = types.NewSet[Room]()
+	}
+
+	included := rooms.Len() == 0
 	notExcluded := true
 	for _, room := range sessionRooms.Keys() {
 		if included && !notExcluded {
 			break
 		}
-		if !included && opts.Rooms.Has(room) {
+		if !included && rooms.Has(room) {
 			included = true
 		}
-		if notExcluded && opts.Except.Has(room) {
+		if notExcluded && except.Has(room) {
 			notExcluded = false
 		}
 	}

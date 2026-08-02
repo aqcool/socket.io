@@ -1,11 +1,50 @@
 package socket
 
 import (
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
 	"github.com/aqcool/socket.io/v3/pkg/types"
 )
+
+type allSocketsDetails struct {
+	id SocketId
+}
+
+func (d *allSocketsDetails) Id() SocketId            { return d.id }
+func (d *allSocketsDetails) Handshake() *Handshake   { return nil }
+func (d *allSocketsDetails) Rooms() *types.Set[Room] { return types.NewSet[Room]() }
+func (d *allSocketsDetails) Data() any               { return nil }
+
+type allSocketsAdapter struct {
+	Adapter
+	details []SocketDetails
+	err     error
+}
+
+type broadcastAckAdapter struct {
+	Adapter
+}
+
+func (a *broadcastAckAdapter) BroadcastWithAck(
+	_ *parser.Packet,
+	_ *BroadcastOptions,
+	clientCount func(uint64),
+	ack Ack,
+) {
+	clientCount(1)
+	ack([]any{"first", "ignored"}, nil)
+}
+
+func (a *broadcastAckAdapter) ServerCount() int64 { return 1 }
+
+func (a *allSocketsAdapter) FetchSockets(*BroadcastOptions) func(func([]SocketDetails, error)) {
+	return func(callback func([]SocketDetails, error)) {
+		callback(a.details, a.err)
+	}
+}
 
 func TestBroadcastOperatorTo(t *testing.T) {
 	op := MakeBroadcastOperator()
@@ -174,6 +213,71 @@ func TestBroadcastOperatorEmitReservedEvent(t *testing.T) {
 		if err == nil {
 			t.Errorf("Expected error when emitting reserved event %q", ev)
 		}
+	}
+}
+
+func TestBroadcastOperatorAllSockets(t *testing.T) {
+	adapter := &allSocketsAdapter{
+		Adapter: MakeAdapter(),
+		details: []SocketDetails{
+			&allSocketsDetails{id: "socket-1"},
+			&allSocketsDetails{id: "socket-2"},
+		},
+	}
+	op := NewBroadcastOperator(adapter, nil, nil, nil)
+
+	op.AllSockets()(func(ids *types.Set[SocketId], err error) {
+		if err != nil {
+			t.Fatalf("AllSockets returned an unexpected error: %v", err)
+		}
+		if ids.Len() != 2 || !ids.Has("socket-1") || !ids.Has("socket-2") {
+			t.Fatalf("AllSockets returned unexpected IDs: %v", ids.Keys())
+		}
+	})
+}
+
+func TestBroadcastOperatorAllSocketsPropagatesFetchError(t *testing.T) {
+	expected := errors.New("fetch failed")
+	op := NewBroadcastOperator(&allSocketsAdapter{Adapter: MakeAdapter(), err: expected}, nil, nil, nil)
+
+	op.AllSockets()(func(ids *types.Set[SocketId], err error) {
+		if ids != nil {
+			t.Fatalf("expected no IDs on error, got %v", ids.Keys())
+		}
+		if !errors.Is(err, expected) {
+			t.Fatalf("expected %v, got %v", expected, err)
+		}
+	})
+}
+
+func TestBroadcastOperatorAckUsesFirstClientResponseArgument(t *testing.T) {
+	op := NewBroadcastOperator(&broadcastAckAdapter{Adapter: MakeAdapter()}, nil, nil, nil)
+	called := false
+	op.Timeout(time.Second).EmitWithAck("event")(func(responses []any, err error) {
+		called = true
+		if err != nil {
+			t.Fatalf("unexpected broadcast ACK error: %v", err)
+		}
+		if len(responses) != 1 || responses[0] != "first" {
+			t.Fatalf("expected one response per client, got %#v", responses)
+		}
+	})
+	if !called {
+		t.Fatal("broadcast ACK callback was not called")
+	}
+}
+
+func TestBroadcastOperatorAckWithoutTimeoutWaitsForResponse(t *testing.T) {
+	op := NewBroadcastOperator(&broadcastAckAdapter{Adapter: MakeAdapter()}, nil, nil, nil)
+	called := false
+	op.EmitWithAck("event")(func(responses []any, err error) {
+		called = true
+		if err != nil || len(responses) != 1 || responses[0] != "first" {
+			t.Fatalf("broadcast ACK without timeout = %#v, %v", responses, err)
+		}
+	})
+	if !called {
+		t.Fatal("broadcast ACK without timeout did not wait for the response")
 	}
 }
 

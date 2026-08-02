@@ -56,6 +56,8 @@ type UnixAdapterBuilder struct {
 
 // New creates a new UnixAdapter for the given namespace.
 // This method implements the socket.AdapterBuilder interface.
+func (ub *UnixAdapterBuilder) SupportsConnectionStateRecovery() bool { return false }
+
 func (ub *UnixAdapterBuilder) New(nsp socket.Namespace) socket.Adapter {
 	options := DefaultUnixAdapterOptions()
 	options.Assign(ub.Opts)

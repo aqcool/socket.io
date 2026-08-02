@@ -9,6 +9,26 @@ import (
 )
 
 type (
+	// AdapterCapabilities declares optional and distributed behavior without
+	// requiring callers to infer support from concrete Adapter types.
+	AdapterCapabilities struct {
+		Broadcast               bool `json:"broadcast"`
+		RoomBroadcast           bool `json:"roomBroadcast"`
+		BroadcastAck            bool `json:"broadcastAck"`
+		FetchSockets            bool `json:"fetchSockets"`
+		SocketManagement        bool `json:"socketManagement"`
+		ServerSideEmit          bool `json:"serverSideEmit"`
+		NodeDiscovery           bool `json:"nodeDiscovery"`
+		OrderedDelivery         bool `json:"orderedDelivery"`
+		DuplicateSuppression    bool `json:"duplicateSuppression"`
+		ConnectionStateRecovery bool `json:"connectionStateRecovery"`
+		ExternalEmitter         bool `json:"externalEmitter"`
+	}
+
+	AdapterCapabilityProvider interface {
+		Capabilities() AdapterCapabilities
+	}
+
 	// A public ID, sent by the server at the beginning of the Socket.IO session and which can be used for private messaging
 	SocketId string
 
@@ -23,19 +43,19 @@ type (
 	WriteOptions struct {
 		packet.Options
 
-		Volatile   bool `json:"volatile" msgpack:"volatile"`
-		PreEncoded bool `json:"preEncoded" msgpack:"preEncoded"`
+		Volatile   bool `json:"volatile" msgpack:"volatile" bson:"volatile"`
+		PreEncoded bool `json:"preEncoded" msgpack:"preEncoded" bson:"preEncoded"`
 	}
 
 	BroadcastFlags struct {
 		WriteOptions
 
-		Local     bool           `json:"local" msgpack:"local"`
-		Broadcast bool           `json:"broadcast" msgpack:"broadcast"`
-		Binary    bool           `json:"binary" msgpack:"binary"`
-		Timeout   *time.Duration `json:"timeout,omitempty" msgpack:"timeout,omitempty"`
+		Local     bool           `json:"local" msgpack:"local" bson:"local"`
+		Broadcast bool           `json:"broadcast" msgpack:"broadcast" bson:"broadcast"`
+		Binary    bool           `json:"binary" msgpack:"binary" bson:"binary"`
+		Timeout   *time.Duration `json:"timeout,omitempty" msgpack:"timeout,omitempty" bson:"timeout,omitempty"`
 
-		ExpectSingleResponse bool `json:"expectSingleResponse" msgpack:"expectSingleResponse"`
+		ExpectSingleResponse bool `json:"expectSingleResponse" msgpack:"expectSingleResponse" bson:"expectSingleResponse"`
 	}
 
 	BroadcastOptions struct {
@@ -73,6 +93,10 @@ type (
 	Adapter interface {
 		types.EventEmitter
 
+		// SupportsConnectionStateRecovery reports whether sessions and missed
+		// packets can be restored by this adapter.
+		SupportsConnectionStateRecovery() bool
+
 		// #prototype
 
 		Prototype(Adapter)
@@ -93,6 +117,14 @@ type (
 
 		// Returns the number of Socket.IO servers in the cluster
 		ServerCount() int64
+
+		// CountSockets returns the number of matching sockets without
+		// serializing complete socket details.
+		CountSockets(*BroadcastOptions) func(func(uint64, error))
+
+		// ListRooms returns matching room names and their socket counts without
+		// serializing complete socket details.
+		ListRooms(*BroadcastOptions) func(func(map[Room]uint64, error))
 
 		// Adds a socket to a list of room.
 		AddAll(SocketId, *types.Set[Room])
@@ -157,5 +189,19 @@ type (
 
 	AdapterConstructor interface {
 		New(Namespace) Adapter
+		SupportsConnectionStateRecovery() bool
 	}
 )
+
+// CapabilitiesOf returns a standardized declaration, with a conservative
+// legacy fallback for third-party adapters and builders.
+func CapabilitiesOf(value any) AdapterCapabilities {
+	if provider, ok := value.(AdapterCapabilityProvider); ok {
+		return provider.Capabilities()
+	}
+	recovery := false
+	if legacy, ok := value.(interface{ SupportsConnectionStateRecovery() bool }); ok {
+		recovery = legacy.SupportsConnectionStateRecovery()
+	}
+	return AdapterCapabilities{ConnectionStateRecovery: recovery}
+}

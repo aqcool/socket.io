@@ -10,15 +10,19 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/aqcool/socket.io/v3/pkg/log"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
-	"github.com/aqcool/socket.io/v3/pkg/log"
 )
 
 var (
 	serverLog = log.NewLog("engine:server")
 	http3Log  = slog.New(log.NewPrefixSimpleHandler(log.Output, "engine:server"))
+
+	// ErrServerNotRunning matches net/http's lifecycle semantics when Close is
+	// requested before any listener has been started (or after it was closed).
+	ErrServerNotRunning = errors.New("http server is not running")
 )
 
 type HttpServer struct {
@@ -70,10 +74,18 @@ func (s *HttpServer) webtransportServer(addr string, handler http.Handler) *webt
 }
 
 func (s *HttpServer) Close(fn func(error)) (err error) {
+	servers := s.servers.AllAndClear()
+	if len(servers) == 0 {
+		if fn != nil {
+			fn(ErrServerNotRunning)
+		}
+		return ErrServerNotRunning
+	}
+
 	s.Emit("close")
 
 	var closingErr, serverErr error
-	s.servers.Range(func(server any, _ int) bool {
+	for _, server := range servers {
 		switch srv := server.(type) {
 		case *http.Server:
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -89,8 +101,7 @@ func (s *HttpServer) Close(fn func(error)) (err error) {
 		if serverErr != nil && closingErr == nil {
 			closingErr = serverErr
 		}
-		return true
-	})
+	}
 
 	if closingErr != nil {
 		err = fmt.Errorf("error occurred while closing servers: %v", closingErr)

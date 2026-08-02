@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	wt "github.com/quic-go/webtransport-go"
 	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
 	"github.com/aqcool/socket.io/parsers/engine/v3/parser"
 	"github.com/aqcool/socket.io/servers/engine/v3/transports"
@@ -21,6 +20,7 @@ import (
 	"github.com/aqcool/socket.io/v3/pkg/slices"
 	"github.com/aqcool/socket.io/v3/pkg/types"
 	"github.com/aqcool/socket.io/v3/pkg/webtransport"
+	wt "github.com/quic-go/webtransport-go"
 )
 
 // webTransport implements the WebTransport transport for Engine.IO.
@@ -34,7 +34,7 @@ type webTransport struct {
 	Transport
 
 	// dialer is the WebTransport dialer used to establish connections
-	dialer *wt.Dialer
+	dialer WebTransportDialer
 
 	// session is the WebTransport connection instance
 	session *types.WebTransportConn
@@ -84,9 +84,13 @@ func (w *webTransport) Construct(socket Socket, opts SocketOptionsInterface) {
 
 	w.writeQueue = queue.New()
 
-	w.dialer = &wt.Dialer{
+	dialer := &wt.Dialer{
 		TLSClientConfig: w.Opts().TLSClientConfig(),
 		QUICConfig:      w.Opts().QUICConfig(),
+	}
+	w.dialer = dialer.Dial
+	if custom := w.Opts().WebTransportDialer(); custom != nil {
+		w.dialer = custom
 	}
 }
 
@@ -112,19 +116,32 @@ func (w *webTransport) DoOpen() {
 			}
 		}
 	}
-	response, session, err := w.dialer.Dial(context.Background(), uri.String(), headers)
+	startedAt := time.Now()
+	response, session, err := w.dialer(context.Background(), uri.String(), headers)
+	notifyNetwork(w.Opts(), &NetworkEvent{
+		Operation: "dial", Transport: w.Name(), URL: uri.String(),
+		Duration: time.Since(startedAt), Success: err == nil, Err: err,
+	})
 	if err != nil {
-		w.Emit("error", err)
+		var requestContext context.Context
+		if response != nil && response.Request != nil {
+			requestContext = response.Request.Context()
+		}
+		time.AfterFunc(time.Millisecond, func() {
+			w.OnError("webtransport error", err, requestContext)
+		})
 		return
 	}
-	if w.Socket().CookieJar() != nil {
+	if w.Socket().CookieJar() != nil && response != nil {
 		w.Socket().CookieJar().SetCookies(uri, response.Cookies())
 	}
 
 	stream, err := session.OpenStreamSync(context.Background())
 	if err != nil {
 		clientWebtransportLog.Debug("session is closed")
-		w.Emit("error", err)
+		time.AfterFunc(time.Millisecond, func() {
+			w.OnError("webtransport error", err, session.Context())
+		})
 		return
 	}
 
@@ -134,8 +151,9 @@ func (w *webTransport) DoOpen() {
 }
 
 func (w *webTransport) _error(err error) {
-	if webtransport.IsUnexpectedCloseError(err) || errors.Is(err, net.ErrClosed) {
-		w.session.Emit("close")
+	var sessionError *wt.SessionError
+	if webtransport.IsUnexpectedCloseError(err) || errors.Is(err, net.ErrClosed) || errors.As(err, &sessionError) {
+		w.session.Emit("close", err)
 	} else {
 		w.session.Emit("error", err)
 	}
@@ -215,9 +233,9 @@ func (w *webTransport) addEventListeners() {
 	_ = w.session.On("error", func(errs ...any) {
 		w.OnError("webtransport error", slices.TryGetAny[error](errs, 0), w.session.Session().Context())
 	})
-	_ = w.session.Once("close", func(...any) {
+	_ = w.session.Once("close", func(details ...any) {
 		clientWebtransportLog.Debug(`transport closed gracefully`)
-		w.OnClose(NewTransportError("webtransport connection closed", nil, w.session.Session().Context()).Err())
+		w.OnClose(NewTransportError("webtransport connection closed", slices.TryGetAny[error](details, 0), w.session.Session().Context()).Err())
 	})
 
 	// This goroutine is invoked only once.
@@ -356,7 +374,7 @@ func (w *webTransport) uri() *url.URL {
 	}
 
 	if w.Opts().TimestampRequests() {
-		query.Set(w.Opts().TimestampParam(), request.RandomString())
+		query.Set(w.Opts().TimestampParam(), randomString())
 	}
 
 	if !w.SupportsBinary() {

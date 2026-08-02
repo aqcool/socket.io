@@ -6,7 +6,6 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
 	"github.com/aqcool/socket.io/v3/pkg/types"
@@ -232,7 +231,10 @@ func (p *parserv3) encodeOneBinaryPacket(pkt *packet.Packet) (types.BufferInterf
 		return nil, ErrPacketNil
 	}
 
-	buf, err := p.EncodePacket(pkt, true, true)
+	// Go string readers already expose UTF-8 bytes. The utf8encode flag exists
+	// for callers that pass JavaScript-style byte strings, but applying it here
+	// would encode every non-ASCII byte twice.
+	buf, err := p.EncodePacket(pkt, true, false)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +242,10 @@ func (p *parserv3) encodeOneBinaryPacket(pkt *packet.Packet) (types.BufferInterf
 	binaryPacket := types.NewBytesBuffer(nil)
 
 	if _, ok := buf.(*types.StringBuffer); ok {
-		encodingLength := strconv.FormatInt(int64(utils.Utf16Count(buf.Bytes())), 10) // JS length
+		// engine.io-parser v3 first UTF-8 encodes JavaScript strings and then
+		// stores the resulting byte length. Go strings are already UTF-8, so
+		// using the byte length produces the same framing without re-encoding.
+		encodingLength := strconv.Itoa(buf.Len())
 		if err := binaryPacket.WriteByte(0x00); err != nil {
 			return nil, err
 		}
@@ -252,7 +257,7 @@ func (p *parserv3) encodeOneBinaryPacket(pkt *packet.Packet) (types.BufferInterf
 		if err := binaryPacket.WriteByte(0xFF); err != nil {
 			return nil, err
 		}
-		if _, err := buf.WriteTo(utils.NewUtf8Encoder(binaryPacket)); err != nil {
+		if _, err := buf.WriteTo(binaryPacket); err != nil {
 			return nil, err
 		}
 		return binaryPacket, nil
@@ -394,34 +399,12 @@ func (p *parserv3) decodeBinaryPayload(bufferTail types.BufferInterface) ([]*pac
 		}
 
 		if isString {
-			data := types.NewStringBuffer(nil)
-			runeBuf := make([]byte, 0, 4)
-
-			for k := 0; k < packetLen; {
-				runeBuf = runeBuf[:0]
-				// read utf8 rune bytes
-				for len(runeBuf) < 4 {
-					r, _, err := bufferTail.ReadRune()
-					if err != nil {
-						if err == io.EOF && len(runeBuf) > 0 {
-							break
-						}
-						return packets, err
-					}
-					runeBuf = append(runeBuf, byte(r))
-					if utf8.FullRune(runeBuf) {
-						break
-					}
-				}
-				r, runeLen := utf8.DecodeRune(runeBuf)
-				k += utils.Utf16Len(r)
-				if _, err := data.Write(utils.Utf8decodeBytes(runeBuf[:runeLen])); err != nil {
-					return packets, err
-				}
+			rawData := bufferTail.Next(packetLen)
+			if len(rawData) != packetLen {
+				return packets, io.ErrUnexpectedEOF
 			}
-
-			if data.Len() > 0 {
-				pkt, err := p.DecodePacket(data, false)
+			if len(rawData) > 0 {
+				pkt, err := p.DecodePacket(types.NewStringBuffer(rawData), false)
 				if err != nil {
 					return packets, err
 				}

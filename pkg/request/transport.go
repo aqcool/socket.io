@@ -11,9 +11,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/aqcool/socket.io/v3/pkg/types"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
 )
 
 // Maximum number of retry attempts for alternative services
@@ -52,6 +52,11 @@ func NewTransport(tlsClientConfig *tls.Config, quicConfig *quic.Config) *Transpo
 		},
 		altSvcCache: types.Map[string, []*altSvc]{},
 	}
+}
+
+// SetProxy configures the proxy selector for HTTP/1.1 and HTTP/2 requests.
+func (t *Transport) SetProxy(proxy func(*http.Request) (*url.URL, error)) {
+	t.standardTransport.Proxy = proxy
 }
 
 // RoundTrip implements the http.RoundTripper interface. It attempts to send the request

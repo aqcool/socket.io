@@ -5,7 +5,9 @@ go 1.26.0
 require (
 	github.com/aqcool/socket.io/adapters/adapter/v3 v3.0.4
 	github.com/aqcool/socket.io/parsers/socket/v3 v3.0.4
+	github.com/aqcool/socket.io/servers/engine/v3 v3.0.4
 	github.com/aqcool/socket.io/servers/socket/v3 v3.0.4
+	github.com/aqcool/socket.io/sticky/v3 v3.0.4
 	github.com/aqcool/socket.io/v3 v3.0.4
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 )
@@ -13,7 +15,6 @@ require (
 require (
 	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/aqcool/socket.io/parsers/engine/v3 v3.0.4 // indirect
-	github.com/aqcool/socket.io/servers/engine/v3 v3.0.4 // indirect
 	github.com/dunglas/httpsfv v1.1.0 // indirect
 	github.com/gookit/color v1.6.1 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
@@ -35,5 +36,6 @@ replace (
 	github.com/aqcool/socket.io/parsers/socket/v3 => ../../parsers/socket
 	github.com/aqcool/socket.io/servers/engine/v3 => ../../servers/engine
 	github.com/aqcool/socket.io/servers/socket/v3 => ../../servers/socket
+	github.com/aqcool/socket.io/sticky/v3 => ../../sticky
 	github.com/aqcool/socket.io/v3 => ../../
 )

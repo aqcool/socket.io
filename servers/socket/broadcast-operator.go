@@ -131,36 +131,45 @@ func (b *BroadcastOperator) Emit(ev string, args ...any) error {
 	}
 
 	packet.Data = data[:data_len-1]
+	// Allocate the acknowledgement ID before the timeout goroutine and before
+	// cluster adapters publish the packet. Besides matching the official
+	// ownership model, this keeps packet immutable while it is being encoded or
+	// inspected by concurrent transports.
+	var packetID uint64
+	hasPacketID := false
+	if namespace := b.adapter.Nsp(); namespace != nil {
+		packetID = namespace.Ids()
+		packet.Id = &packetID
+		hasPacketID = true
+	}
 
 	var timedOut atomic.Bool
 	responses := types.NewSlice[any]()
-	var timeout time.Duration
 	var ackOnce sync.Once
 
-	if time := b.flags.Timeout; time != nil {
-		timeout = *time
-	}
+	var timer *utils.Timer
+	if timeout := b.flags.Timeout; timeout != nil {
+		timer = utils.SetTimeout(func() {
+			timedOut.Store(true)
 
-	timer := utils.SetTimeout(func() {
-		timedOut.Store(true)
+			broadcast_log.Debug("operation has timed out")
 
-		broadcast_log.Debug("operation has timed out")
-
-		if packetId := packet.Id; packetId != nil {
-			b.adapter.Nsp().Sockets().Range(func(_ SocketId, socket *Socket) bool {
-				socket.Acks().Delete(*packetId)
-				return true
-			})
-		}
-
-		ackOnce.Do(func() {
-			if b.flags.ExpectSingleResponse {
-				ack(nil, errors.New("operation has timed out"))
-			} else {
-				ack(responses.All(), errors.New("operation has timed out"))
+			if namespace := b.adapter.Nsp(); hasPacketID && namespace != nil {
+				namespace.Sockets().Range(func(_ SocketId, socket *Socket) bool {
+					socket.Acks().Delete(packetID)
+					return true
+				})
 			}
-		})
-	}, timeout)
+
+			ackOnce.Do(func() {
+				if b.flags.ExpectSingleResponse {
+					ack(nil, errors.New("operation has timed out"))
+				} else {
+					ack(responses.All(), errors.New("operation has timed out"))
+				}
+			})
+		}, *timeout)
+	}
 
 	var expectedServerCount atomic.Int64
 	expectedServerCount.Store(-1)
@@ -204,7 +213,11 @@ func (b *BroadcastOperator) Emit(ev string, args ...any) error {
 		checkCompleteness()
 	}, func(clientResponse []any, _ error) {
 		// each client sends an acknowledgement
-		responses.Push(clientResponse...)
+		if len(clientResponse) > 0 {
+			responses.Push(clientResponse[0])
+		} else {
+			responses.Push(nil)
+		}
 		checkCompleteness()
 	})
 	expectedServerCount.Store(b.adapter.ServerCount())
@@ -216,6 +229,27 @@ func (b *BroadcastOperator) Emit(ev string, args ...any) error {
 func (b *BroadcastOperator) EmitWithAck(ev string, args ...any) func(Ack) {
 	return func(ack Ack) {
 		_ = b.Emit(ev, append(args, ack)...)
+	}
+}
+
+// AllSockets returns the IDs of the matching socket instances.
+//
+// Deprecated: use FetchSockets when socket metadata or remote operations are
+// needed. This method is kept for API compatibility with Socket.IO 4.x.
+func (b *BroadcastOperator) AllSockets() func(func(*types.Set[SocketId], error)) {
+	return func(callback func(*types.Set[SocketId], error)) {
+		b.FetchSockets()(func(sockets []*RemoteSocket, err error) {
+			if err != nil {
+				callback(nil, err)
+				return
+			}
+
+			ids := types.NewSet[SocketId]()
+			for _, socket := range sockets {
+				ids.Add(socket.Id())
+			}
+			callback(ids, nil)
+		})
 	}
 }
 
@@ -238,6 +272,25 @@ func (b *BroadcastOperator) FetchSockets() func(func([]*RemoteSocket, error)) {
 			callback(remoteSockets, err)
 		})
 	}
+}
+
+// CountSockets returns the number of matching sockets without fetching their
+// handshake, rooms, and data.
+func (b *BroadcastOperator) CountSockets() func(func(uint64, error)) {
+	return b.adapter.CountSockets(&BroadcastOptions{
+		Rooms:  b.rooms,
+		Except: b.exceptRooms,
+		Flags:  b.flags,
+	})
+}
+
+// ListRooms returns matching room names and their socket counts.
+func (b *BroadcastOperator) ListRooms() func(func(map[Room]uint64, error)) {
+	return b.adapter.ListRooms(&BroadcastOptions{
+		Rooms:  b.rooms,
+		Except: b.exceptRooms,
+		Flags:  b.flags,
+	})
 }
 
 // SocketsJoin makes the matching socket instances join the specified rooms.

@@ -13,6 +13,14 @@ type MockBuffer struct {
 	data []byte
 }
 
+type binaryEnvelope struct {
+	Data any
+}
+
+type cyclicEnvelope struct {
+	Next *cyclicEnvelope
+}
+
 func (mb *MockBuffer) Read(p []byte) (n int, err error) {
 	return copy(p, mb.data), nil
 }
@@ -45,6 +53,8 @@ func TestIsBinary(t *testing.T) {
 }
 
 func TestHasBinary(t *testing.T) {
+	cyclic := &cyclicEnvelope{}
+	cyclic.Next = cyclic
 	tests := []struct {
 		name string
 		data any
@@ -57,6 +67,9 @@ func TestHasBinary(t *testing.T) {
 		{"map[string]any with binary", map[string]any{"key": []byte("binary data")}, true},
 		{"nested structure with binary", map[string]any{"key": []any{"string", []byte("binary data")}}, true},
 		{"io.Reader in map", map[string]any{"key": io.Reader(&MockBuffer{})}, true},
+		{"binary in struct pointer", &binaryEnvelope{Data: types.NewBytesBuffer([]byte{1, 2, 3})}, true},
+		{"struct pointer without binary", &binaryEnvelope{Data: "text"}, false},
+		{"cyclic structure", cyclic, false},
 	}
 
 	for _, tt := range tests {

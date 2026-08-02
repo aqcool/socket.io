@@ -86,11 +86,11 @@ github.com/aqcool/socket.io/
 <details>
 <summary>协议兼容性更新</summary>
 
-Socket.IO v3 对齐 Socket.IO v4+ 协议，因此所有客户端连接都会受到兼容性变化的影响。
+Socket.IO Go v3 默认对齐 Socket.IO 协议 v5 和 Engine.IO v4，因此所有客户端连接都会受到兼容性变化的影响。
 
 **影响概率：非常高**
 
-客户端 Socket.IO 库必须升级到 4.x 或更高版本。使用旧版本（v2.x 或 v3.x）的客户端无法连接 v3 服务端。
+官方 Socket.IO JavaScript v3.x 和 v4.x 客户端可按默认配置连接。若仍需兼容使用 Engine.IO 3 的 v2.x 客户端，请显式启用 `AllowEIO3(true)`；详细范围见[客户端兼容矩阵](COMPATIBILITY.md)。
 
 ```bash
 # Update your frontend dependency

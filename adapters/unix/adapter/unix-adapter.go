@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/vmihailenco/msgpack/v5"
 	"github.com/aqcool/socket.io/adapters/adapter/v3"
 	"github.com/aqcool/socket.io/adapters/unix/v3"
 	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
@@ -17,6 +16,7 @@ import (
 	"github.com/aqcool/socket.io/v3/pkg/log"
 	"github.com/aqcool/socket.io/v3/pkg/types"
 	"github.com/aqcool/socket.io/v3/pkg/utils"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // unixLog is the logger for the Unix Domain Socket adapter.
@@ -334,6 +334,14 @@ func allocateTarget(messageType adapter.MessageType) any {
 		return &adapter.FetchSocketsMessage{}
 	case adapter.FETCH_SOCKETS_RESPONSE:
 		return &adapter.FetchSocketsResponse{}
+	case adapter.COUNT_SOCKETS:
+		return &adapter.CountSocketsMessage{}
+	case adapter.COUNT_SOCKETS_RESPONSE:
+		return &adapter.CountSocketsResponse{}
+	case adapter.LIST_ROOMS:
+		return &adapter.ListRoomsMessage{}
+	case adapter.LIST_ROOMS_RESPONSE:
+		return &adapter.ListRoomsResponse{}
 	case adapter.SERVER_SIDE_EMIT:
 		return &adapter.ServerSideEmitMessage{}
 	case adapter.SERVER_SIDE_EMIT_RESPONSE:

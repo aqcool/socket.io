@@ -182,7 +182,7 @@ func TestRemoveListener(t *testing.T) {
 		t.Fatal("Should return 'false' when removes nothing")
 	}
 
-	if e.Len() != 3 {
+	if e.Len() != 2 {
 		t.Fatal("Length of all listeners must be 2")
 	}
 
@@ -191,6 +191,41 @@ func TestRemoveListener(t *testing.T) {
 	}
 
 	e.Emit("my_event")
+}
+
+func TestConcurrentLastRemovalDoesNotDropNewListener(t *testing.T) {
+	for iteration := range 1_000 {
+		emitter := NewEventEmitter()
+		oldListener := func(...any) {}
+		var called atomic.Int64
+		newListener := func(...any) { called.Add(1) }
+		if err := emitter.On("event", oldListener); err != nil {
+			t.Fatal(err)
+		}
+
+		start := make(chan struct{})
+		var wait sync.WaitGroup
+		wait.Add(2)
+		go func() {
+			defer wait.Done()
+			<-start
+			emitter.RemoveListener("event", oldListener)
+		}()
+		go func() {
+			defer wait.Done()
+			<-start
+			if err := emitter.On("event", newListener); err != nil {
+				t.Errorf("adding concurrent listener: %v", err)
+			}
+		}()
+		close(start)
+		wait.Wait()
+
+		emitter.Emit("event")
+		if called.Load() != 1 {
+			t.Fatalf("iteration %d lost concurrent listener", iteration)
+		}
+	}
 }
 
 func BenchmarkConcurrentEmit(b *testing.B) {

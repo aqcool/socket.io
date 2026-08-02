@@ -1,0 +1,53 @@
+name: Socket.IO Cluster Soak
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: Soak duration (Go duration syntax)
+        required: false
+        default: 3h
+      clients:
+        description: Number of official Socket.IO clients
+        required: false
+        default: "72"
+  schedule:
+    - cron: "17 18 * * 6"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: socket-io-cluster-soak
+  cancel-in-progress: false
+
+jobs:
+  soak:
+    name: 3-hour cluster, partition and leak acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 230
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: "**/go.sum"
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: adapters/unix/testdata/cluster-official/package-lock.json
+      - name: Install locked official clients
+        working-directory: adapters/unix/testdata/cluster-official
+        run: npm ci
+      - name: Run sustained cluster acceptance
+        working-directory: adapters/unix
+        env:
+          SOCKET_IO_CLUSTER_SOAK: "1"
+          SOCKET_IO_SOAK_DURATION: ${{ inputs.duration || '3h' }}
+          SOCKET_IO_SOAK_PARTITION_DURATION: "20m"
+          SOCKET_IO_SOAK_CLIENTS: ${{ inputs.clients || '72' }}
+        run: go test -mod=mod ./adapter -run '^TestOfficialClusterSoakAndResourceLeaks$' -v -count=1 -timeout=3h30m

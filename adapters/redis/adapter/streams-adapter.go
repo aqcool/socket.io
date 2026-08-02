@@ -17,8 +17,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	rds "github.com/redis/go-redis/v9"
-	"github.com/vmihailenco/msgpack/v5"
 	"github.com/aqcool/socket.io/adapters/adapter/v3"
 	"github.com/aqcool/socket.io/adapters/redis/v3"
 	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
@@ -26,6 +24,8 @@ import (
 	"github.com/aqcool/socket.io/v3/pkg/log"
 	"github.com/aqcool/socket.io/v3/pkg/types"
 	"github.com/aqcool/socket.io/v3/pkg/utils"
+	rds "github.com/redis/go-redis/v9"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 var (
@@ -74,7 +74,10 @@ func isEphemeral(message *adapter.ClusterMessage) bool {
 			return data.RequestId != nil
 		}
 	}
-	return message.Type == adapter.SERVER_SIDE_EMIT || message.Type == adapter.FETCH_SOCKETS
+	return message.Type == adapter.SERVER_SIDE_EMIT ||
+		message.Type == adapter.FETCH_SOCKETS ||
+		message.Type == adapter.COUNT_SOCKETS ||
+		message.Type == adapter.LIST_ROOMS
 }
 
 // RedisStreamsAdapterBuilder creates Redis Streams adapters for Socket.IO namespaces.
@@ -141,6 +144,10 @@ func (sb *RedisStreamsAdapterBuilder) startPolling(ctx context.Context, client r
 
 // New creates a new Redis Streams adapter for the given namespace.
 // This method implements the socket.AdapterBuilder interface.
+func (sb *RedisStreamsAdapterBuilder) SupportsConnectionStateRecovery() bool { return true }
+
+func (r *redisStreamsAdapter) SupportsConnectionStateRecovery() bool { return true }
+
 func (sb *RedisStreamsAdapterBuilder) New(nsp socket.Namespace) socket.Adapter {
 	options := DefaultRedisStreamsAdapterOptions().Assign(sb.Opts)
 
@@ -298,13 +305,13 @@ func (r *redisStreamsAdapter) handlePubSubMessages() {
 			continue
 		}
 
-		var message adapter.ClusterMessage
-		if err := utils.MsgPack().Decode([]byte(msg.Payload), &message); err != nil {
+		message, err := adapter.DecodeClusterMessage([]byte(msg.Payload))
+		if err != nil {
 			redisStreamsLog.Debug("invalid PUB/SUB message format: %s", err.Error())
 			continue
 		}
 
-		r.OnMessage(&message, "")
+		r.OnMessage(message, "")
 	}
 }
 
@@ -509,6 +516,14 @@ func (r *redisStreamsAdapter) decodeData(messageType adapter.MessageType, rawDat
 		target = &adapter.FetchSocketsMessage{}
 	case adapter.FETCH_SOCKETS_RESPONSE:
 		target = &adapter.FetchSocketsResponse{}
+	case adapter.COUNT_SOCKETS:
+		target = &adapter.CountSocketsMessage{}
+	case adapter.COUNT_SOCKETS_RESPONSE:
+		target = &adapter.CountSocketsResponse{}
+	case adapter.LIST_ROOMS:
+		target = &adapter.ListRoomsMessage{}
+	case adapter.LIST_ROOMS_RESPONSE:
+		target = &adapter.ListRoomsResponse{}
 	case adapter.SERVER_SIDE_EMIT:
 		target = &adapter.ServerSideEmitMessage{}
 	case adapter.SERVER_SIDE_EMIT_RESPONSE:

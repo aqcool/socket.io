@@ -82,6 +82,8 @@ type PostgresAdapterBuilder struct {
 
 // New creates a new PostgresAdapter for the given namespace.
 // This method implements the socket.AdapterBuilder interface.
+func (pb *PostgresAdapterBuilder) SupportsConnectionStateRecovery() bool { return true }
+
 func (pb *PostgresAdapterBuilder) New(nsp socket.Namespace) socket.Adapter {
 	options := DefaultPostgresAdapterOptions()
 	options.Assign(pb.Opts)
@@ -119,13 +121,19 @@ func (pb *PostgresAdapterBuilder) New(nsp socket.Namespace) socket.Adapter {
 		if err := pb.Postgres.EnsureTable(pb.Postgres.Context, options.TableName()); err != nil {
 			pb.Postgres.Emit("error", err)
 		}
+		recoveryEnabled := nsp.Server().Opts().ConnectionStateRecovery() != nil
+		if recoveryEnabled {
+			if err := pb.Postgres.EnsureRecoveryTables(pb.Postgres.Context, recoveryEventTable(options), recoverySessionTable(options)); err != nil {
+				pb.Postgres.Emit("error", err)
+			}
+		}
 
 		// Listen on the channel for this namespace
 		if err := pb.Postgres.Listen(pb.Postgres.Context, channel); err != nil {
 			pb.Postgres.Emit("error", err)
 		}
 
-		go pb.startListening(options)
+		go pb.startListening(options, recoveryEnabled)
 	} else {
 		// Listen on additional channel for new namespace
 		if err := pb.Postgres.Listen(pb.Postgres.Context, channel); err != nil {
@@ -144,13 +152,13 @@ func (pb *PostgresAdapterBuilder) New(nsp socket.Namespace) socket.Adapter {
 
 // startListening continuously waits for PostgreSQL notifications and dispatches them
 // to the appropriate namespace adapter.
-func (pb *PostgresAdapterBuilder) startListening(options *PostgresAdapterOptions) {
+func (pb *PostgresAdapterBuilder) startListening(options *PostgresAdapterOptions, recoveryEnabled bool) {
 	// Start cleanup timer for old attachments
 	cleanupInterval := options.CleanupInterval()
 	tableName := options.TableName()
 
 	if cleanupInterval > 0 {
-		go pb.cleanupLoop(cleanupInterval, tableName)
+		go pb.cleanupLoop(cleanupInterval, tableName, recoveryEnabled)
 	}
 
 	for {
@@ -191,7 +199,7 @@ func (pb *PostgresAdapterBuilder) dispatchNotification(channel, payload string, 
 }
 
 // cleanupLoop periodically cleans up old attachments from the storage table.
-func (pb *PostgresAdapterBuilder) cleanupLoop(intervalMs int64, tableName string) {
+func (pb *PostgresAdapterBuilder) cleanupLoop(intervalMs int64, tableName string, recoveryEnabled bool) {
 	ticker := time.NewTicker(time.Duration(intervalMs) * time.Millisecond)
 	defer ticker.Stop()
 
@@ -203,6 +211,27 @@ func (pb *PostgresAdapterBuilder) cleanupLoop(intervalMs int64, tableName string
 			if err := pb.Postgres.CleanupAttachments(pb.Postgres.Context, tableName, intervalMs); err != nil {
 				pb.Postgres.Emit("error", err)
 			}
+			if recoveryEnabled {
+				if err := pb.Postgres.CleanupRecovery(pb.Postgres.Context, recoveryEventTableName(tableName), recoverySessionTableName(tableName)); err != nil {
+					pb.Postgres.Emit("error", err)
+				}
+			}
 		}
 	}
+}
+
+func recoveryEventTable(options *PostgresAdapterOptions) string {
+	return recoveryEventTableName(options.TableName())
+}
+
+func recoverySessionTable(options *PostgresAdapterOptions) string {
+	return recoverySessionTableName(options.TableName())
+}
+
+func recoveryEventTableName(tableName string) string {
+	return tableName + "_recovery_events"
+}
+
+func recoverySessionTableName(tableName string) string {
+	return tableName + "_recovery_sessions"
 }

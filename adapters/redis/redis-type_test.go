@@ -1,13 +1,69 @@
 package redis
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"testing"
 
 	"github.com/aqcool/socket.io/adapters/adapter/v3"
 	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
 	"github.com/aqcool/socket.io/servers/socket/v3"
+	"github.com/aqcool/socket.io/v3/pkg/utils"
 )
+
+func TestRedisPacketDecodesOfficialNotepackPayload(t *testing.T) {
+	// Generated with notepack.io, the default parser of
+	// @socket.io/redis-adapter@8.3.0.
+	payload, err := hex.DecodeString("93a66e6f6465303183a47479706502a36e7370a12fa46461746192a966726f6d2d6e6f6465ae6e6f64652d62726f61646361737483a5726f6f6d7390a665786365707490a5666c61677380")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var packet RedisPacket
+	if err := utils.MsgPack().Decode(payload, &packet); err != nil {
+		t.Fatalf("decode official Redis adapter payload: %v", err)
+	}
+	if packet.Uid != "node01" || packet.Packet == nil || packet.Packet.Nsp != "/" {
+		t.Fatalf("unexpected decoded packet: %#v", packet)
+	}
+}
+
+func TestRedisResponseUsesOfficialClientCountField(t *testing.T) {
+	payload, err := json.Marshal(&RedisResponse{ClientCount: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(payload) != `{"clientCount":2}` {
+		t.Fatalf("unexpected Redis response JSON: %s", payload)
+	}
+}
+
+func TestRedisResponseKeepsOfficialZeroClientCount(t *testing.T) {
+	payload, err := json.Marshal(&RedisResponse{
+		Type:      BROADCAST_CLIENT_COUNT,
+		RequestId: "empty-room",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(payload) != `{"type":8,"requestId":"empty-room","clientCount":0}` {
+		t.Fatalf("zero client count was omitted from Redis response JSON: %s", payload)
+	}
+}
+
+func TestRedisResponseKeepsOfficialEmptyCollections(t *testing.T) {
+	payload, err := json.Marshal(&RedisResponse{
+		RequestId: "empty-result",
+		Rooms:     []socket.Room{},
+		Sockets:   []*adapter.SocketResponse{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(payload) != `{"requestId":"empty-result","rooms":[],"sockets":[]}` {
+		t.Fatalf("empty Redis response collections were omitted: %s", payload)
+	}
+}
 
 func TestRedisPacket_MarshalJSON(t *testing.T) {
 	t.Run("nil packet", func(t *testing.T) {

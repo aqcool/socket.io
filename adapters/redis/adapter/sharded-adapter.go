@@ -15,8 +15,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	rds "github.com/redis/go-redis/v9"
-	"github.com/vmihailenco/msgpack/v5"
 	"github.com/aqcool/socket.io/adapters/adapter/v3"
 	"github.com/aqcool/socket.io/adapters/redis/v3"
 	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
@@ -24,6 +22,8 @@ import (
 	"github.com/aqcool/socket.io/v3/pkg/slices"
 	"github.com/aqcool/socket.io/v3/pkg/types"
 	"github.com/aqcool/socket.io/v3/pkg/utils"
+	rds "github.com/redis/go-redis/v9"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // ShardedRedisAdapterBuilder creates sharded Redis adapters for Socket.IO namespaces.
@@ -36,6 +36,8 @@ type ShardedRedisAdapterBuilder struct {
 
 // New creates a new sharded Redis adapter for the given namespace.
 // It implements the socket.AdapterBuilder interface.
+func (sb *ShardedRedisAdapterBuilder) SupportsConnectionStateRecovery() bool { return false }
+
 func (sb *ShardedRedisAdapterBuilder) New(nsp socket.Namespace) socket.Adapter {
 	return NewShardedRedisAdapter(nsp, sb.Redis, sb.Opts)
 }
@@ -482,6 +484,15 @@ func (s *shardedRedisAdapter) decodeClusterMessage(rawMessage []byte) (*adapter.
 		return nil, fmt.Errorf("failed to decode data: %w", err)
 	}
 
+	// @socket.io/redis-adapter <= 8.2.1 did not include the namespace in
+	// sharded Pub/Sub cluster messages. The Redis channel itself is scoped to
+	// this adapter's namespace, so treating an omitted namespace as the local
+	// namespace is both unambiguous and required during a rolling upgrade to
+	// the 8.3.x wire format.
+	if nsp == "" {
+		nsp = s.Nsp().Name()
+	}
+
 	return &adapter.ClusterResponse{
 		Uid:  uid,
 		Nsp:  nsp,
@@ -506,6 +517,14 @@ func (s *shardedRedisAdapter) decodeData(messageType adapter.MessageType, rawDat
 		target = &adapter.FetchSocketsMessage{}
 	case adapter.FETCH_SOCKETS_RESPONSE:
 		target = &adapter.FetchSocketsResponse{}
+	case adapter.COUNT_SOCKETS:
+		target = &adapter.CountSocketsMessage{}
+	case adapter.COUNT_SOCKETS_RESPONSE:
+		target = &adapter.CountSocketsResponse{}
+	case adapter.LIST_ROOMS:
+		target = &adapter.ListRoomsMessage{}
+	case adapter.LIST_ROOMS_RESPONSE:
+		target = &adapter.ListRoomsResponse{}
 	case adapter.SERVER_SIDE_EMIT:
 		target = &adapter.ServerSideEmitMessage{}
 	case adapter.SERVER_SIDE_EMIT_RESPONSE:
@@ -559,14 +578,9 @@ func (s *shardedRedisAdapter) isDynamicMode() bool {
 // In DynamicSubscriptionMode, only public rooms (non-socket-ID rooms) use a separate channel.
 // In DynamicPrivateSubscriptionMode, all rooms do.
 func (s *shardedRedisAdapter) shouldUseASeparateNamespace(room socket.Room) bool {
-	_, isPrivateRoom := s.Sids().Load(socket.SocketId(room))
-
-	switch s.opts.SubscriptionMode() {
-	case redis.DynamicSubscriptionMode:
-		return !isPrivateRoom
-	case redis.DynamicPrivateSubscriptionMode:
-		return true
-	default:
-		return false
-	}
+	// Use the same 20-character Socket.IO ID heuristic as computeChannel() and
+	// the official Node.js adapter. Go currently emits 24-character socket IDs;
+	// treating those rooms as private only on the subscription side would make
+	// publishers select a dynamic channel that no Go adapter listens to.
+	return redis.ShouldUseDynamicChannel(s.opts.SubscriptionMode(), room)
 }

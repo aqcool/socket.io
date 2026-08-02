@@ -2,6 +2,7 @@ package types
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestHttpContext(t *testing.T) {
@@ -211,4 +213,96 @@ func TestHttpContext(t *testing.T) {
 			t.Errorf("expected nil for 200, got %v", err)
 		}
 	})
+}
+
+func TestHttpContextWriteResponseIsAtomicWithCancellation(t *testing.T) {
+	t.Run("response wins", func(t *testing.T) {
+		requestContext, cancel := context.WithCancel(context.Background())
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(requestContext)
+		ctx := NewHttpContext(recorder, request)
+		headers := NewParameterBag(map[string][]string{"X-Test": {"yes"}})
+
+		n, err := ctx.WriteResponse(http.StatusCreated, headers, bytes.NewBufferString("body"))
+		cancel()
+		if err != nil || n != 4 {
+			t.Fatalf("WriteResponse result = %d/%v", n, err)
+		}
+		if recorder.Code != http.StatusCreated || recorder.Header().Get("X-Test") != "yes" || recorder.Body.String() != "body" {
+			t.Fatalf("response = %d/%q/%q", recorder.Code, recorder.Header().Get("X-Test"), recorder.Body.String())
+		}
+	})
+
+	t.Run("cancellation wins", func(t *testing.T) {
+		requestContext, cancel := context.WithCancel(context.Background())
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(requestContext)
+		ctx := NewHttpContext(recorder, request)
+		cancel()
+		select {
+		case <-ctx.Done():
+		case <-time.After(time.Second):
+			t.Fatal("canceled context was not finalized")
+		}
+
+		_, err := ctx.WriteResponse(
+			http.StatusCreated,
+			NewParameterBag(map[string][]string{"X-Test": {"unexpected"}}),
+			bytes.NewBufferString("unexpected"),
+		)
+		if !errors.Is(err, ErrResponseAlreadyWritten) {
+			t.Fatalf("WriteResponse error = %v, want ErrResponseAlreadyWritten", err)
+		}
+		if recorder.Header().Get("X-Test") != "" || recorder.Body.Len() != 0 {
+			t.Fatalf("response was touched after cancellation: headers %v, body %q", recorder.Header(), recorder.Body.String())
+		}
+	})
+}
+
+func TestHttpContextCleanupConcurrentFinalization(t *testing.T) {
+	for range 100 {
+		ctx := NewHttpContext(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+		var (
+			cleanupCalls atomic.Int32
+			wg           sync.WaitGroup
+		)
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			ctx.SetCleanup(func() {
+				cleanupCalls.Add(1)
+			})
+		}()
+		go func() {
+			defer wg.Done()
+			ctx.Flush()
+		}()
+		wg.Wait()
+		<-ctx.Done()
+		if calls := cleanupCalls.Load(); calls != 1 {
+			t.Fatalf("cleanup calls = %d, want 1", calls)
+		}
+	}
+}
+
+func TestHttpContextCancellationEmitsCloseBeforeCleanupRemoval(t *testing.T) {
+	requestContext, cancel := context.WithCancel(context.Background())
+	request := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(requestContext)
+	ctx := NewHttpContext(httptest.NewRecorder(), request)
+	closed := make(chan error, 1)
+	listener := EventListener(func(args ...any) {
+		closed <- args[0].(error)
+	})
+	_ = ctx.Once("close", listener)
+	ctx.SetCleanup(func() { ctx.RemoveListener("close", listener) })
+	cancel()
+
+	select {
+	case err := <-closed:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("close error = %v, want context.Canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("request cancellation did not emit close")
+	}
 }

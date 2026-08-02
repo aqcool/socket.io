@@ -53,9 +53,9 @@ type (
 		RequestId   string                    `json:"requestId,omitempty" msgpack:"requestId,omitempty"`
 		Rooms       []socket.Room             `json:"rooms,omitempty" msgpack:"rooms,omitempty"`
 		Sockets     []*adapter.SocketResponse `json:"sockets,omitempty" msgpack:"sockets,omitempty"`
-		Data        []any                     `json:"data,omitempty" msgpack:"data,omitempty"`
-		ClientCount uint64                    `json:"clientcount,omitempty" msgpack:"clientcount,omitempty"`
-		Packet      []any                     `json:"packet,omitempty" msgpack:"packet,omitempty"`
+		Data        any                       `json:"data,omitempty" msgpack:"data,omitempty"`
+		ClientCount uint64                    `json:"clientCount,omitempty" msgpack:"clientCount,omitempty"`
+		Packet      any                       `json:"packet,omitempty" msgpack:"packet,omitempty"`
 	}
 
 	// Parser defines the interface for encoding and decoding data for Redis communication.
@@ -68,6 +68,48 @@ type (
 		Decode([]byte, any) error
 	}
 )
+
+// MarshalJSON keeps clientCount on the wire for BROADCAST_CLIENT_COUNT even
+// when its value is zero. The official Node.js adapter uses the presence of
+// this field to complete an acknowledgement request targeting an empty room;
+// a regular `omitempty` tag would turn the count into undefined and make the
+// requester time out.
+func (r *RedisResponse) MarshalJSON() ([]byte, error) {
+	if r == nil {
+		return json.Marshal(nil)
+	}
+	var clientCount *uint64
+	if r.Type == BROADCAST_CLIENT_COUNT || r.ClientCount != 0 {
+		value := r.ClientCount
+		clientCount = &value
+	}
+	var rooms *[]socket.Room
+	if r.Rooms != nil {
+		rooms = &r.Rooms
+	}
+	var sockets *[]*adapter.SocketResponse
+	if r.Sockets != nil {
+		sockets = &r.Sockets
+	}
+
+	return json.Marshal(struct {
+		Type        adapter.MessageType        `json:"type,omitempty"`
+		RequestId   string                     `json:"requestId,omitempty"`
+		Rooms       *[]socket.Room             `json:"rooms,omitempty"`
+		Sockets     *[]*adapter.SocketResponse `json:"sockets,omitempty"`
+		Data        any                        `json:"data,omitempty"`
+		ClientCount *uint64                    `json:"clientCount,omitempty"`
+		Packet      any                        `json:"packet,omitempty"`
+	}{
+		Type:        r.Type,
+		RequestId:   r.RequestId,
+		Rooms:       rooms,
+		Sockets:     sockets,
+		Data:        r.Data,
+		ClientCount: clientCount,
+		Packet:      r.Packet,
+	})
+}
 
 // MarshalJSON implements the json.Marshaler interface for RedisPacket.
 // It serializes the RedisPacket as a JSON array in the format [Uid, Packet, Opts].

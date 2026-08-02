@@ -12,6 +12,21 @@ import (
 
 type (
 	AllowRequest func(*types.HttpContext) error
+	// IdGenerator creates an Engine.IO session ID. Returning an error rejects
+	// the handshake with the official ID_GENERATION_ERROR context.
+	IdGenerator func(*types.HttpContext) (string, error)
+
+	WebSocketUpgradeOptions struct {
+		ReadBufferSize    int
+		WriteBufferSize   int
+		EnableCompression bool
+		CheckOrigin       func(*http.Request) bool
+		Error             func(http.ResponseWriter, *http.Request, int, error)
+	}
+
+	WebSocketEngine interface {
+		Upgrade(http.ResponseWriter, *http.Request, http.Header, WebSocketUpgradeOptions) (types.WebSocketConnection, error)
+	}
 
 	ServerOptionsInterface interface {
 		SetPingTimeout(time.Duration)
@@ -49,6 +64,10 @@ type (
 		SetHttpCompression(*types.HttpCompression)
 		GetRawHttpCompression() types.Optional[*types.HttpCompression]
 		HttpCompression() *types.HttpCompression
+
+		SetWebSocketEngine(WebSocketEngine)
+		GetRawWebSocketEngine() types.Optional[WebSocketEngine]
+		WebSocketEngine() WebSocketEngine
 
 		SetInitialPacket(io.Reader)
 		GetRawInitialPacket() types.Optional[io.Reader]
@@ -100,11 +119,7 @@ type (
 		// parameters of the http compression for the polling transports (see zlib api docs). Set to false to disable.
 		httpCompression types.Optional[*types.HttpCompression]
 
-		// TODO: Implement pluggable WebSocket engine support.
-		// The default engine will be gorilla/websocket. Future engines to support include
-		// coder/websocket, gobwas/ws, coder/websocket, etc.
-		// Field type: types.Optional[WsEngine]
-		// wsEngine types.Optional[WsEngine]
+		webSocketEngine types.Optional[WebSocketEngine]
 
 		// an optional packet which will be concatenated to the handshake packet emitted by Engine.IO.
 		initialPacket types.Optional[io.Reader]
@@ -112,6 +127,14 @@ type (
 		// configuration of the cookie that contains the client sid to send as part of handshake response headers. This cookie
 		// might be used for sticky-session. Defaults to not sending any cookie.
 		cookie types.Optional[*http.Cookie]
+		// Explicit overrides are separate because http.Cookie cannot distinguish
+		// an omitted Path/HttpOnly value from an explicitly empty/false value.
+		cookiePath     types.Optional[string]
+		cookieHttpOnly types.Optional[bool]
+
+		// Kept outside ServerOptionsInterface so existing custom option
+		// implementations remain source-compatible.
+		generateId types.Optional[IdGenerator]
 
 		// the options that will be forwarded to the cors module
 		cors types.Optional[*types.Cors]
@@ -162,11 +185,33 @@ func (s *ServerOptions) Assign(data ServerOptionsInterface) ServerOptionsInterfa
 	if data.GetRawHttpCompression() != nil {
 		s.SetHttpCompression(data.HttpCompression())
 	}
+	if data.GetRawWebSocketEngine() != nil {
+		s.SetWebSocketEngine(data.WebSocketEngine())
+	}
 	if data.GetRawInitialPacket() != nil {
 		s.SetInitialPacket(data.InitialPacket())
 	}
 	if data.GetRawCookie() != nil {
 		s.SetCookie(data.Cookie())
+	}
+	if cookieOptions, ok := data.(interface {
+		GetRawCookiePath() types.Optional[string]
+		CookiePath() string
+		GetRawCookieHttpOnly() types.Optional[bool]
+		CookieHttpOnly() bool
+	}); ok {
+		if cookieOptions.GetRawCookiePath() != nil {
+			s.SetCookiePath(cookieOptions.CookiePath())
+		}
+		if cookieOptions.GetRawCookieHttpOnly() != nil {
+			s.SetCookieHttpOnly(cookieOptions.CookieHttpOnly())
+		}
+	}
+	if idOptions, ok := data.(interface {
+		GetRawGenerateId() types.Optional[IdGenerator]
+		GenerateId() IdGenerator
+	}); ok && idOptions.GetRawGenerateId() != nil {
+		s.SetGenerateId(idOptions.GenerateId())
 	}
 	if data.GetRawCors() != nil {
 		s.SetCors(data.Cors())
@@ -325,6 +370,19 @@ func (s *ServerOptions) HttpCompression() *types.HttpCompression {
 	return s.httpCompression.Get()
 }
 
+func (s *ServerOptions) SetWebSocketEngine(engine WebSocketEngine) {
+	s.webSocketEngine = types.NewSome(engine)
+}
+func (s *ServerOptions) GetRawWebSocketEngine() types.Optional[WebSocketEngine] {
+	return s.webSocketEngine
+}
+func (s *ServerOptions) WebSocketEngine() WebSocketEngine {
+	if s.webSocketEngine == nil {
+		return nil
+	}
+	return s.webSocketEngine.Get()
+}
+
 // an optional packet which will be concatenated to the handshake packet emitted by Engine.IO.
 func (s *ServerOptions) SetInitialPacket(initialPacket io.Reader) {
 	s.initialPacket = types.NewSome(initialPacket)
@@ -354,6 +412,50 @@ func (s *ServerOptions) Cookie() *http.Cookie {
 	}
 
 	return s.cookie.Get()
+}
+
+// SetCookiePath overrides the cookie Path attribute. An empty path explicitly
+// omits the attribute, matching Engine.IO's `cookie.path = false` behavior.
+func (s *ServerOptions) SetCookiePath(path string) {
+	s.cookiePath = types.NewSome(path)
+}
+func (s *ServerOptions) GetRawCookiePath() types.Optional[string] {
+	return s.cookiePath
+}
+func (s *ServerOptions) CookiePath() string {
+	if s.cookiePath == nil {
+		return ""
+	}
+	return s.cookiePath.Get()
+}
+
+// SetCookieHttpOnly explicitly enables or disables the HttpOnly attribute.
+func (s *ServerOptions) SetCookieHttpOnly(httpOnly bool) {
+	s.cookieHttpOnly = types.NewSome(httpOnly)
+}
+func (s *ServerOptions) GetRawCookieHttpOnly() types.Optional[bool] {
+	return s.cookieHttpOnly
+}
+func (s *ServerOptions) CookieHttpOnly() bool {
+	if s.cookieHttpOnly == nil {
+		return false
+	}
+	return s.cookieHttpOnly.Get()
+}
+
+// SetGenerateId installs a fallible session ID generator. This is the Go
+// equivalent of overriding Engine.IO's asynchronous generateId() method.
+func (s *ServerOptions) SetGenerateId(generateId IdGenerator) {
+	s.generateId = types.NewSome(generateId)
+}
+func (s *ServerOptions) GetRawGenerateId() types.Optional[IdGenerator] {
+	return s.generateId
+}
+func (s *ServerOptions) GenerateId() IdGenerator {
+	if s.generateId == nil {
+		return nil
+	}
+	return s.generateId.Get()
 }
 
 // the options that will be forwarded to the cors module

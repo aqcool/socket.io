@@ -1,0 +1,9 @@
+{
+  "name": "socket-io-go-cluster-official-matrix",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "engine.io-client": "6.6.6",
+    "socket.io-client": "4.8.3"
+  }
+}

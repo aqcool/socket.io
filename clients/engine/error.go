@@ -1,6 +1,28 @@
 package engine
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
+
+// HTTPStatusError carries the HTTP response details that caused a polling
+// transport failure. It is the Go equivalent of engine.io-client's numeric
+// error description and XMLHttpRequest/fetch response context.
+type HTTPStatusError struct {
+	StatusCode int
+	Status     string
+	Body       []byte
+}
+
+func (e *HTTPStatusError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if e.Status != "" {
+		return e.Status
+	}
+	return fmt.Sprintf("HTTP status %d", e.StatusCode)
+}
 
 // Error represents a custom error type for Engine.IO transport errors.
 // It provides detailed information about transport-related errors, including

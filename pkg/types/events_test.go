@@ -186,7 +186,7 @@ func TestRemoveListener(t *testing.T) {
 		t.Fatal("Should return 'false' when removes nothing")
 	}
 
-	if e.Len() != 3 {
+	if e.Len() != 2 {
 		t.Fatal("Length of all listeners must be 2")
 	}
 
@@ -195,6 +195,72 @@ func TestRemoveListener(t *testing.T) {
 	}
 
 	e.Emit("my_event")
+}
+
+func TestRemoveListenerDeletesEmptyEvent(t *testing.T) {
+	emitter := NewEventEmitter()
+	listener := func(...any) {}
+	if err := emitter.On("temporary", listener); err != nil {
+		t.Fatal(err)
+	}
+	if !emitter.RemoveListener("temporary", listener) {
+		t.Fatal("last listener was not removed")
+	}
+	if emitter.Len() != 0 || len(emitter.EventNames()) != 0 {
+		t.Fatalf("empty event key was retained: len=%d names=%v", emitter.Len(), emitter.EventNames())
+	}
+}
+
+func TestOnceRemovesListenerBeforeInvocation(t *testing.T) {
+	emitter := NewEventEmitter()
+	called := 0
+	if err := emitter.Once("once", func(...any) {
+		called++
+		if emitter.ListenerCount("once") != 0 || emitter.Len() != 0 {
+			t.Fatalf("once listener remained visible during callback: listeners=%d events=%d",
+				emitter.ListenerCount("once"), emitter.Len())
+		}
+		emitter.Emit("once")
+	}); err != nil {
+		t.Fatal(err)
+	}
+	emitter.Emit("once")
+	if called != 1 {
+		t.Fatalf("once listener called %d times", called)
+	}
+}
+
+func TestConcurrentLastRemovalDoesNotDropNewListener(t *testing.T) {
+	for iteration := range 1_000 {
+		emitter := NewEventEmitter()
+		oldListener := func(...any) {}
+		var called atomic.Int64
+		newListener := func(...any) { called.Add(1) }
+		if err := emitter.On("event", oldListener); err != nil {
+			t.Fatal(err)
+		}
+		start := make(chan struct{})
+		var wait sync.WaitGroup
+		wait.Add(2)
+		go func() {
+			defer wait.Done()
+			<-start
+			emitter.RemoveListener("event", oldListener)
+		}()
+		go func() {
+			defer wait.Done()
+			<-start
+			if err := emitter.On("event", newListener); err != nil {
+				t.Errorf("adding concurrent listener: %v", err)
+			}
+		}()
+		close(start)
+		wait.Wait()
+		emitter.Emit("event")
+		if called.Load() != 1 {
+			t.Fatalf("iteration %d lost concurrent listener", iteration)
+		}
+	}
 }
 
 func BenchmarkConcurrentEmit(b *testing.B) {

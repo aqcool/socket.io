@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -142,6 +143,10 @@ func (p *parserv4) decodeStringPacket(sb *types.StringBuffer) (*packet.Packet, e
 		return newErrorPacket(), fmt.Errorf("%w: [%c]", ErrUnknownPacketType, msgType)
 	}
 
+	if sb.Len() == 0 {
+		return &packet.Packet{Type: packetType}, nil
+	}
+
 	stringBuffer := types.NewStringBuffer(nil)
 	if _, err := stringBuffer.ReadFrom(sb); err != nil {
 		return newErrorPacket(), err
@@ -203,35 +208,24 @@ func (p *parserv4) EncodePayload(packets []*packet.Packet, _ ...bool) (types.Buf
 // DecodePayload decodes a payload buffer into multiple packets.
 // Packets are separated by SEPARATOR (0x1E).
 func (p *parserv4) DecodePayload(data types.BufferInterface) ([]*packet.Packet, error) {
-	packets := make([]*packet.Packet, 0, 4)
-
-	for data.Len() > 0 {
-		scanBytes, err := data.ReadBytes(SEPARATOR)
-		if err != nil && err != io.EOF {
-			return packets, err
-		}
-
-		if len(scanBytes) > 0 && scanBytes[len(scanBytes)-1] == SEPARATOR {
-			scanBytes = scanBytes[:len(scanBytes)-1]
-		}
-
-		if len(scanBytes) == 0 {
-			if err == io.EOF {
-				break
-			}
-			continue
-		}
-
-		pkt, decodeErr := p.DecodePacket(types.NewStringBuffer(scanBytes))
-		if decodeErr != nil {
-			return packets, decodeErr
-		}
-		packets = append(packets, pkt)
-
-		if err == io.EOF {
-			break
-		}
+	if data == nil {
+		return []*packet.Packet{newErrorPacket()}, ErrDataNil
+	}
+	if data.Len() == 0 {
+		// Unlike JavaScript's callback-only encodePayload([]), Go can represent
+		// an empty payload synchronously and round-trip it without inventing a
+		// parser-error packet.
+		return []*packet.Packet{}, nil
 	}
 
+	encodedPackets := bytes.Split(data.Bytes(), []byte{SEPARATOR})
+	packets := make([]*packet.Packet, 0, len(encodedPackets))
+	for _, encoded := range encodedPackets {
+		pkt, err := p.DecodePacket(types.NewStringBuffer(encoded))
+		packets = append(packets, pkt)
+		if err != nil {
+			return packets, err
+		}
+	}
 	return packets, nil
 }

@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/vmihailenco/msgpack/v5"
 	"github.com/aqcool/socket.io/adapters/adapter/v3"
 	"github.com/aqcool/socket.io/servers/socket/v3"
 	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 func TestRawClusterMessage_Getters(t *testing.T) {
@@ -601,6 +601,17 @@ func TestIsEphemeral(t *testing.T) {
 			t.Error("Expected true for FETCH_SOCKETS")
 		}
 	})
+
+	for name, messageType := range map[string]adapter.MessageType{
+		"COUNT_SOCKETS is ephemeral": adapter.COUNT_SOCKETS,
+		"LIST_ROOMS is ephemeral":    adapter.LIST_ROOMS,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if !isEphemeral(&adapter.ClusterMessage{Type: messageType}) {
+				t.Errorf("expected message type %d to be ephemeral", messageType)
+			}
+		})
+	}
 
 	t.Run("SOCKETS_JOIN is not ephemeral", func(t *testing.T) {
 		msg := &adapter.ClusterMessage{

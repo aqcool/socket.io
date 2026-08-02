@@ -18,20 +18,20 @@ func TestAttachOptionsDefauleValue(t *testing.T) {
 	})
 
 	t.Run("destroyUpgrade", func(t *testing.T) {
-		if destroyUpgrade := opts.DestroyUpgrade(); opts.GetRawDestroyUpgrade() == nil && destroyUpgrade != false {
-			t.Fatalf(`*AttachOptions.DestroyUpgrade() = %t, want match for %t`, destroyUpgrade, false)
+		if destroyUpgrade := opts.DestroyUpgrade(); opts.GetRawDestroyUpgrade() == nil && !destroyUpgrade {
+			t.Fatalf(`*AttachOptions.DestroyUpgrade() = %t, want match for %t`, destroyUpgrade, true)
 		}
 	})
 
 	t.Run("destroyUpgradeTimeout", func(t *testing.T) {
-		if destroyUpgradeTimeout := opts.DestroyUpgradeTimeout(); opts.GetRawDestroyUpgradeTimeout() == nil && destroyUpgradeTimeout != 0*time.Millisecond {
-			t.Fatalf(`*AttachOptions.DestroyUpgradeTimeout() = %d, want match for %d`, destroyUpgradeTimeout, 0*time.Millisecond)
+		if destroyUpgradeTimeout := opts.DestroyUpgradeTimeout(); opts.GetRawDestroyUpgradeTimeout() == nil && destroyUpgradeTimeout != time.Second {
+			t.Fatalf(`*AttachOptions.DestroyUpgradeTimeout() = %d, want match for %d`, destroyUpgradeTimeout, time.Second)
 		}
 	})
 
 	t.Run("addTrailingSlash", func(t *testing.T) {
-		if addTrailingSlash := opts.AddTrailingSlash(); opts.GetRawAddTrailingSlash() == nil && addTrailingSlash != false {
-			t.Fatalf(`*AttachOptions.AddTrailingSlash() = %t, want match for %t`, addTrailingSlash, false)
+		if addTrailingSlash := opts.AddTrailingSlash(); opts.GetRawAddTrailingSlash() == nil && !addTrailingSlash {
+			t.Fatalf(`*AttachOptions.AddTrailingSlash() = %t, want match for %t`, addTrailingSlash, true)
 		}
 	})
 }
@@ -120,6 +120,10 @@ func TestServerOptionsDefauleValue(t *testing.T) {
 	t.Run("cookie", func(t *testing.T) {
 		if cookie := opts.Cookie(); opts.GetRawCookie() == nil && cookie != nil {
 			t.Fatalf(`*ServerOptions.Cookie() = %v, want match for nil`, cookie)
+		}
+		cookieOptions := opts.(*ServerOptions)
+		if cookieOptions.GetRawCookiePath() != nil || cookieOptions.GetRawCookieHttpOnly() != nil {
+			t.Fatal("cookie attribute overrides must be unset by default")
 		}
 	})
 
@@ -211,8 +215,26 @@ func TestServerOptionsSetValue(t *testing.T) {
 			Value: "value",
 		}
 		opts.SetCookie(input)
+		cookieOptions := opts.(*ServerOptions)
+		cookieOptions.SetCookiePath("")
+		cookieOptions.SetCookieHttpOnly(false)
 		if cookie := opts.Cookie(); cookie != input {
 			t.Fatalf(`*ServerOptions.Cookie() = %v, want match for %v`, cookie, input)
+		}
+		if cookieOptions.GetRawCookiePath() == nil || cookieOptions.CookiePath() != "" {
+			t.Fatal("explicit empty cookie path was not preserved")
+		}
+		if cookieOptions.GetRawCookieHttpOnly() == nil || cookieOptions.CookieHttpOnly() {
+			t.Fatal("explicit false cookie HttpOnly was not preserved")
+		}
+	})
+
+	t.Run("generateId", func(t *testing.T) {
+		serverOptions := opts.(*ServerOptions)
+		generator := func(*types.HttpContext) (string, error) { return "custom", nil }
+		serverOptions.SetGenerateId(generator)
+		if serverOptions.GetRawGenerateId() == nil || serverOptions.GenerateId() == nil {
+			t.Fatal("custom ID generator was not preserved")
 		}
 	})
 

@@ -3,25 +3,28 @@ package socket
 import (
 	"compress/flate"
 	"compress/gzip"
+	"embed"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/andybalholm/brotli"
-	"github.com/klauspost/compress/zstd"
 	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
 	"github.com/aqcool/socket.io/servers/engine/v3"
 	"github.com/aqcool/socket.io/v3/pkg/log"
 	"github.com/aqcool/socket.io/v3/pkg/slices"
 	"github.com/aqcool/socket.io/v3/pkg/types"
 	"github.com/aqcool/socket.io/v3/pkg/utils"
-	"github.com/aqcool/socket.io/v3/pkg/version"
+	"github.com/klauspost/compress/zstd"
 )
+
+var ErrAdapterDoesNotSupportConnectionStateRecovery = errors.New("socket.io: adapter does not support connection state recovery")
 
 const (
 	// DefaultConnectTimeout is the default time a client has to send its first namespace connection request.
@@ -32,11 +35,18 @@ const (
 
 	// DefaultSessionCleanupInterval is the default interval between two session cleanup sweeps.
 	DefaultSessionCleanupInterval = 60_000 * time.Millisecond
+
+	// EmbeddedClientVersion is the official Socket.IO JavaScript client version
+	// served by this module when ServeClient is enabled.
+	EmbeddedClientVersion = "4.8.3"
 )
 
 var (
 	dotMapRegex = regexp.MustCompile(`\.map`)
 	serverLog   = log.NewLog("socket.io:server")
+
+	//go:embed client-dist/*
+	clientDist embed.FS
 )
 
 type (
@@ -96,6 +106,11 @@ type (
 		_connectTimeout time.Duration
 		httpServer      *types.HttpServer
 		_corsMiddleware engine.Middleware
+		stateMu         sync.RWMutex
+
+		// dynamicNamespaceMu makes creation of a child namespace atomic when
+		// several clients concurrently match the same parent namespace.
+		dynamicNamespaceMu sync.Mutex
 	}
 )
 
@@ -109,18 +124,44 @@ func MakeServer() *Server {
 }
 
 func NewServer(srv any, opts ServerOptionsInterface) *Server {
+	s, err := NewServerWithError(srv, opts)
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
+// NewServerWithError creates a server and reports invalid startup
+// configuration instead of panicking.
+func NewServerWithError(srv any, opts ServerOptionsInterface) (*Server, error) {
 	s := MakeServer()
 
-	s.Construct(srv, opts)
+	if err := s.construct(srv, opts); err != nil {
+		return nil, err
+	}
 
-	return s
+	return s, nil
 }
 
 func (s *Server) Sockets() Namespace {
 	return s.sockets
 }
 
+// Namespaces returns a snapshot of all currently registered namespaces.
+//
+// The returned slice is safe to iterate while namespaces are added or removed.
+func (s *Server) Namespaces() []Namespace {
+	namespaces := make([]Namespace, 0, s._nsps.Len())
+	s._nsps.Range(func(_ string, namespace Namespace) bool {
+		namespaces = append(namespaces, namespace)
+		return true
+	})
+	return namespaces
+}
+
 func (s *Server) Engine() engine.BaseServer {
+	s.stateMu.RLock()
+	defer s.stateMu.RUnlock()
 	return s.engine
 }
 
@@ -129,8 +170,20 @@ func (s *Server) Encoder() parser.Encoder {
 }
 
 func (s *Server) Construct(srv any, opts ServerOptionsInterface) {
+	if err := s.construct(srv, opts); err != nil {
+		panic(err)
+	}
+}
+
+func (s *Server) construct(srv any, opts ServerOptionsInterface) error {
 	if opts == nil {
 		opts = DefaultServerOptions()
+	}
+
+	if recovery := opts.ConnectionStateRecovery(); recovery != nil {
+		if adapter := opts.Adapter(); adapter != nil && !CapabilitiesOf(adapter).ConnectionStateRecovery {
+			return fmt.Errorf("%w: %T", ErrAdapterDoesNotSupportConnectionStateRecovery, adapter)
+		}
 	}
 
 	if opts.GetRawPath() != nil {
@@ -143,7 +196,13 @@ func (s *Server) Construct(srv any, opts ServerOptionsInterface) {
 	} else {
 		s.SetConnectTimeout(DefaultConnectTimeout)
 	}
-	s.SetServeClient(opts.ServeClient())
+	if opts.GetRawServeClient() != nil {
+		s.SetServeClient(opts.ServeClient())
+	} else {
+		// Match the official Server default: browser bundles are served unless
+		// the application explicitly disables them.
+		s.SetServeClient(true)
+	}
 	if _parser := opts.Parser(); _parser != nil {
 		s._parser = _parser
 	} else {
@@ -177,6 +236,8 @@ func (s *Server) Construct(srv any, opts ServerOptionsInterface) {
 	if cors := s.opts.Cors(); cors != nil {
 		s._corsMiddleware = types.MiddlewareWrapper(cors)
 	}
+
+	return nil
 }
 
 func (s *Server) Opts() ServerOptionsInterface {
@@ -197,31 +258,47 @@ func (s *Server) ServeClient() bool {
 // _checkNamespace executes the middleware for an incoming namespace not already created on the server.
 // name is the name of the incoming namespace, auth is the auth parameters, fn is the callback.
 func (s *Server) _checkNamespace(name string, auth map[string]any, fn func(nsp Namespace)) {
-	end := true
-	s.parentNsps.Range(func(nextFn ParentNspNameMatchFn, pnsp ParentNamespace) bool {
-		status := false
-		(*nextFn)(name, auth, func(err error, allow bool) {
-			if err != nil || !allow {
-				status = true
-				return
-			}
-			if nsp, ok := s._nsps.Load(name); ok {
-				// the namespace was created in the meantime
-				serverLog.Debug("dynamic namespace %s already exists", name)
-				fn(nsp)
-				end = false
-				return
-			}
-			namespace := pnsp.CreateChild(name)
-			serverLog.Debug("dynamic namespace %s was created", name)
-			fn(namespace)
-			end = false
-		})
-		return status // whether to continue traversing.
-	})
-	if end {
-		fn(nil)
+	type parentMatcher struct {
+		match  ParentNspNameMatchFn
+		parent ParentNamespace
 	}
+	matchers := make([]parentMatcher, 0, s.parentNsps.Len())
+	s.parentNsps.Range(func(match ParentNspNameMatchFn, parent ParentNamespace) bool {
+		matchers = append(matchers, parentMatcher{match: match, parent: parent})
+		return true
+	})
+
+	var run func(int)
+	run = func(index int) {
+		if index >= len(matchers) {
+			fn(nil)
+			return
+		}
+
+		matcher := matchers[index]
+		var callbackOnce sync.Once
+		(*matcher.match)(name, auth, func(err error, allow bool) {
+			callbackOnce.Do(func() {
+				if err != nil || !allow {
+					run(index + 1)
+					return
+				}
+
+				s.dynamicNamespaceMu.Lock()
+				namespace, exists := s._nsps.Load(name)
+				if !exists {
+					namespace = matcher.parent.CreateChild(name)
+					serverLog.Debug("dynamic namespace %s was created", name)
+				} else {
+					serverLog.Debug("dynamic namespace %s already exists", name)
+				}
+				s.dynamicNamespaceMu.Unlock()
+				fn(namespace)
+			})
+		})
+	}
+
+	run(0)
 }
 
 // SetPath sets the client serving path.
@@ -310,8 +387,11 @@ func (s *Server) Attach(srv any, opts *ServerOptions) *Server {
 // ServeHandler returns an http.Handler for the server.
 func (s *Server) ServeHandler(opts *ServerOptions) http.Handler {
 	// If an instance already exists, reuse it.
-	if s.eio != nil {
-		return s.eio
+	s.stateMu.RLock()
+	existing := s.eio
+	s.stateMu.RUnlock()
+	if existing != nil {
+		return s.wrapServeHandler(existing)
 	}
 
 	if opts == nil {
@@ -327,29 +407,62 @@ func (s *Server) ServeHandler(opts *ServerOptions) http.Handler {
 
 	// initialize engine
 	serverLog.Debug("creating http.Handler-based engine with opts %v", opts)
-	s.eio = engine.NewServer(opts)
+	eio := engine.NewServer(opts)
+	created := false
+	s.stateMu.Lock()
+	if s.eio == nil {
+		s.eio = eio
+		created = true
+	} else {
+		eio = s.eio
+	}
+	s.stateMu.Unlock()
 	// bind to engine events
-	s.Bind(s.eio)
+	if created {
+		s.Bind(eio)
+	}
 
-	return s.eio
+	return s.wrapServeHandler(eio)
+}
+
+func (s *Server) wrapServeHandler(eio engine.Server) http.Handler {
+	if !s._serveClient {
+		return eio
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.clientPathRegex.MatchString(r.URL.Path) {
+			if s._corsMiddleware != nil {
+				s._corsMiddleware(types.NewHttpContext(w, r), func(error) {
+					s.serve(w, r)
+				})
+				return
+			}
+			s.serve(w, r)
+			return
+		}
+		eio.ServeHTTP(w, r)
+	})
 }
 
 // initEngine initializes the engine.io server and attaches it to the HTTP server.
 func (s *Server) initEngine(srv *types.HttpServer, opts ServerOptionsInterface) {
 	// initialize engine
 	serverLog.Debug("creating engine.io instance with opts %+v", opts)
-	s.eio = engine.Attach(srv, opts)
+	eio := engine.Attach(srv, opts)
 
 	// attach static file serving
 	if s._serveClient {
-		s.attachServe(srv, s.eio, opts)
+		s.attachServe(srv, eio, opts)
 	}
 
 	// Export http server
+	s.stateMu.Lock()
+	s.eio = eio
 	s.httpServer = srv
+	s.stateMu.Unlock()
 
 	// bind to engine events
-	s.Bind(s.eio)
+	s.Bind(eio)
 }
 
 // attachServe attaches the static file serving handler.
@@ -388,11 +501,13 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	// Per the standard, ETags must be quoted:
 	// https://tools.ietf.org/html/rfc7232#section-2.3
-	expectedEtag := `"` + version.VERSION + `"`
+	expectedEtag := `"` + EmbeddedClientVersion + `"`
 	if s.opts.GetRawClientVersion() != nil {
 		expectedEtag = `"` + s.opts.ClientVersion() + `"`
 	}
 	weakEtag := "W/" + expectedEtag
+	w.Header().Set("Cache-Control", "public, max-age=0")
+	w.Header().Set("ETag", expectedEtag)
 
 	if etag := r.Header.Get("If-None-Match"); etag != "" {
 		if expectedEtag == etag || weakEtag == etag {
@@ -404,34 +519,17 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serverLog.Debug("serve client %s", _type)
-	w.Header().Set("Cache-Control", "public, max-age=0")
 	if isMap {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	} else {
 		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
 	}
-	w.Header().Set("ETag", expectedEtag)
 	s.sendFile(filename, w, r)
 }
 
 // sendFile sends a static file to the client.
-func (Server) sendFile(filename string, w http.ResponseWriter, r *http.Request) {
-	_file, err := os.Executable()
-	if err != nil {
-		serverLog.Debug("Failed to get run path: %v", err)
-		http.Error(w, "file not found", http.StatusNotFound)
-		return
-	}
-	// Construct the full, intended destination path
-	basePath := filepath.Dir(filepath.Dir(_file))
-	targetPath := filepath.Clean(filepath.Join(basePath, "client-dist", filename))
-
-	// Verify the target path is still within the intended directory boundary
-	if !strings.HasPrefix(targetPath, basePath) {
-		http.Error(w, "file not found", http.StatusNotFound)
-		return
-	}
-	file, err := os.Open(targetPath)
+func (*Server) sendFile(filename string, w http.ResponseWriter, r *http.Request) {
+	file, err := clientDist.Open("client-dist/" + filename)
 	if err != nil {
 		serverLog.Debug("File read failed: %v", err)
 		http.Error(w, "file not found", http.StatusNotFound)
@@ -448,6 +546,9 @@ func (Server) sendFile(filename string, w http.ResponseWriter, r *http.Request) 
 	}
 
 	encoding := utils.Contains(r.Header.Get("Accept-Encoding"), []string{"gzip", "deflate", "br", "zstd"})
+	if encoding != "" {
+		w.Header().Add("Vary", "Accept-Encoding")
+	}
 
 	switch encoding {
 	case "br":
@@ -499,8 +600,11 @@ func (Server) sendFile(filename string, w http.ResponseWriter, r *http.Request) 
 // Bind binds socket.io to an engine.io instance.
 // egs is the engine.io (or compatible) server.
 func (s *Server) Bind(egs engine.BaseServer) *Server {
+	s.stateMu.Lock()
 	s.engine = egs
-	_ = s.engine.On("connection", s.onconnection)
+	s.stateMu.Unlock()
+	_ = egs.On("connection", s.onconnection)
+	s.EmitReserved("engine_initialized", egs)
 	return s
 }
 
@@ -599,14 +703,20 @@ func (s *Server) Close(fn func(error)) {
 		return true
 	})
 
-	if s.httpServer != nil {
-		_ = s.httpServer.Close(fn)
-		// The engine has been closed through the close event processing, and the subsequent process is exited here.
-		return
+	// The official server always closes Engine.IO before closing the HTTP
+	// listener. This also clears clients and connection timers when the HTTP
+	// server was never started and its Close operation returns an error.
+	s.stateMu.RLock()
+	engineServer := s.engine
+	httpServer := s.httpServer
+	s.stateMu.RUnlock()
+	if engineServer != nil {
+		engineServer.Close()
 	}
 
-	if s.engine != nil {
-		s.engine.Close()
+	if httpServer != nil {
+		_ = httpServer.Close(fn)
+		return
 	}
 
 	if fn != nil {
@@ -637,7 +747,11 @@ func (s *Server) Except(room ...Room) *BroadcastOperator {
 
 // Emit broadcasts an event to all connected clients.
 func (s *Server) Emit(ev string, args ...any) *Server {
-	_ = s.sockets.Emit(ev, args...)
+	if err := s.sockets.Emit(ev, args...); err != nil {
+		// Match the official Server API: emitting a reserved event is a
+		// programmer error and must not be silently ignored.
+		panic(err)
+	}
 	return s
 }
 
@@ -692,6 +806,23 @@ func (s *Server) Timeout(timeout time.Duration) *BroadcastOperator {
 // FetchSockets returns a function to fetch the matching socket instances.
 func (s *Server) FetchSockets() func(func([]*RemoteSocket, error)) {
 	return s.sockets.FetchSockets()
+}
+
+// AllSockets returns the IDs of sockets in the default namespace.
+//
+// Deprecated: use FetchSockets instead.
+func (s *Server) AllSockets() func(func(*types.Set[SocketId], error)) {
+	return s.sockets.AllSockets()
+}
+
+// CountSockets returns the number of sockets in the default namespace.
+func (s *Server) CountSockets() func(func(uint64, error)) {
+	return s.sockets.CountSockets()
+}
+
+// ListRooms returns room names and socket counts in the default namespace.
+func (s *Server) ListRooms() func(func(map[Room]uint64, error)) {
+	return s.sockets.ListRooms()
 }
 
 // SocketsJoin makes the matching socket instances join the specified rooms.

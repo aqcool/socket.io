@@ -30,6 +30,10 @@ func DeconstructPacket(packet *Packet) (*Packet, []types.BufferInterface) {
 // deconstructData recursively traverses the data structure and replaces
 // binary data with placeholders while collecting the binary data into buffers.
 func deconstructData(data any, buffers *[]types.BufferInterface) any {
+	return deconstructDataWithToJSON(data, buffers, true)
+}
+
+func deconstructDataWithToJSON(data any, buffers *[]types.BufferInterface, allowToJSON bool) any {
 	if data == nil {
 		return nil
 	}
@@ -44,6 +48,11 @@ func deconstructData(data any, buffers *[]types.BufferInterface) any {
 	case map[string]any:
 		return deconstructMap(typedData, buffers)
 	default:
+		if allowToJSON {
+			if transformer, ok := data.(JSONTransformer); ok {
+				return deconstructDataWithToJSON(transformer.ToJSON(), buffers, false)
+			}
+		}
 		return data
 	}
 }
@@ -135,8 +144,14 @@ func reconstructSlice(data []any, buffers []types.BufferInterface) ([]any, error
 // reconstructMap processes a map, reconstructing any placeholders within.
 // If the map itself is a placeholder, it returns the corresponding buffer.
 func reconstructMap(data map[string]any, buffers []types.BufferInterface) (any, error) {
-	// Check if this map is a placeholder
-	if placeholder, err := parsePlaceholder(data); err == nil && placeholder.Placeholder {
+	// Only the literal boolean value true marks a placeholder. Once marked, an
+	// invalid or out-of-range num attribute is an illegal attachment instead of
+	// being treated as an ordinary object.
+	if placeholderFlag, ok := data["_placeholder"].(bool); ok && placeholderFlag {
+		placeholder, err := parsePlaceholder(data)
+		if err != nil {
+			return nil, ErrIllegalAttachments
+		}
 		if placeholder.Num < 0 || placeholder.Num >= int64(len(buffers)) {
 			return nil, ErrIllegalAttachments
 		}

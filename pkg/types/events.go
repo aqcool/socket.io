@@ -62,6 +62,7 @@ type (
 	}
 
 	emmiter struct {
+		mutationMu   sync.Mutex
 		evtListeners Map[EventName, *Slice[*eventEntry]]
 	}
 )
@@ -92,6 +93,8 @@ func (e *emmiter) addListeners(evt EventName, listeners []*eventEntry) error {
 		return nil
 	}
 
+	e.mutationMu.Lock()
+	defer e.mutationMu.Unlock()
 	evtEntry, _ := e.evtListeners.LoadOrStore(evt, NewSlice[*eventEntry]())
 	evtEntry.Push(listeners...)
 	return nil
@@ -180,7 +183,7 @@ type oneTimeListener struct {
 
 func (l *oneTimeListener) execute(vals ...any) {
 	l.fired.Do(func() {
-		defer l.emitter.RemoveListener(l.evt, l.fn)
+		l.emitter.RemoveListener(l.evt, l.fn)
 		l.fn(vals...)
 	})
 }
@@ -205,6 +208,8 @@ func (e *emmiter) RemoveListener(evt EventName, listener EventListener) bool {
 	if listener == nil {
 		return false
 	}
+	e.mutationMu.Lock()
+	defer e.mutationMu.Unlock()
 
 	evtEntry, ok := e.evtListeners.Load(evt)
 
@@ -221,15 +226,23 @@ func (e *emmiter) RemoveListener(evt EventName, listener EventListener) bool {
 	remove, _ := evtEntry.RangeAndSplice(func(listener *eventEntry, i int) (bool, int, int, []*eventEntry) {
 		return listener.ptr == targetPtr, i, 1, nil
 	})
-	return len(remove) > 0
+	removed := len(remove) > 0
+	if removed && evtEntry.Len() == 0 {
+		e.evtListeners.CompareAndDelete(evt, evtEntry)
+	}
+	return removed
 }
 
 func (e *emmiter) RemoveAllListeners(evt EventName) bool {
+	e.mutationMu.Lock()
+	defer e.mutationMu.Unlock()
 	_, loaded := e.evtListeners.LoadAndDelete(evt)
 	return loaded
 }
 
 func (e *emmiter) Clear() {
+	e.mutationMu.Lock()
+	defer e.mutationMu.Unlock()
 	e.evtListeners.Clear()
 }
 

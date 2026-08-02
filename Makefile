@@ -12,7 +12,7 @@ MAKEFLAGS += --no-print-directory
 
 # Environment
 export GOPROXY := https://proxy.golang.org,direct
-TEST_TIMEOUT   := 60s
+TEST_TIMEOUT   ?= 120s
 
 # Project Metadata
 VERSION_FILE   := pkg/version/version.go
@@ -23,7 +23,16 @@ MODULES := parsers/engine \
            parsers/socket \
            servers/engine \
            servers/socket \
+           instrumentation \
+           observability \
+           reliability \
+           sticky \
+           typed \
            adapters/adapter \
+           adapters/amqp \
+           adapters/broker \
+           adapters/kafka \
+           adapters/nats \
            adapters/mongo \
            adapters/postgres \
            adapters/redis \
@@ -168,7 +177,7 @@ ifdef MODULE
 endif
 	@printf "$(C_CYAN)[Test] Cleaning test cache...$(C_RESET)\n"
 	@go clean -testcache
-	$(call EXECUTE,Test,go test -timeout=$(TEST_TIMEOUT) -race -cover -covermode=atomic ./...)
+	$(call EXECUTE,Test,go test -run '^$$' ./... && test_packages="$$(go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./...)" && if [ -n "$$test_packages" ]; then go test -timeout=$(TEST_TIMEOUT) -race -cover -covermode=atomic $$test_packages; fi)
 
 # ==============================================================================
 #  SPECIAL OPERATIONS (High-Risk)

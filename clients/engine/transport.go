@@ -73,7 +73,31 @@ func (s *transport) Proto() Transport {
 // Returns:
 //   - url.Values: The current query parameters
 func (t *transport) Query() url.Values {
-	return t.query
+	query := cloneURLValues(t.query)
+	// The session id lives on the parent socket and is atomic. Deriving it here
+	// avoids mutating a shared url.Values map while Polling GET and POST requests
+	// construct their URIs concurrently, and also works for custom transports
+	// that embed the base Transport implementation.
+	if t.socket != nil {
+		if id := t.socket.Id(); id != "" {
+			if query == nil {
+				query = url.Values{}
+			}
+			query.Set("sid", id)
+		}
+	}
+	return query
+}
+
+func cloneURLValues(values url.Values) url.Values {
+	if values == nil {
+		return nil
+	}
+	cloned := make(url.Values, len(values))
+	for key, entries := range values {
+		cloned[key] = append([]string(nil), entries...)
+	}
+	return cloned
 }
 
 // SetWritable updates the writable state of the transport.
@@ -178,7 +202,7 @@ func NewTransport(socket Socket, opts SocketOptionsInterface) Transport {
 //   - opts: The socket options configuration
 func (t *transport) Construct(socket Socket, opts SocketOptionsInterface) {
 	t.opts = opts
-	t.query = opts.Query()
+	t.query = cloneURLValues(opts.Query())
 	t.socket = socket
 	t.supportsBinary = !opts.ForceBase64()
 }

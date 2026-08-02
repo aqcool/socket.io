@@ -82,6 +82,15 @@ var (
 	ErrParser = errors.New("parsing error")
 	// ErrUnknownPacketType is returned when an unknown packet type byte is encountered.
 	ErrUnknownPacketType = errors.New("unknown packet type")
+	// ErrPayloadTooLarge is returned when a WebTransport frame exceeds maxPayload.
+	ErrPayloadTooLarge = errors.New("payload exceeds maximum size")
+	// ErrPayloadLengthUnsafe is returned for a WebTransport frame length that
+	// cannot be represented safely by the official JavaScript parser.
+	ErrPayloadLengthUnsafe = errors.New("payload length exceeds Number.MAX_SAFE_INTEGER")
+	// ErrReaderNil is returned when a packet stream has no source reader.
+	ErrReaderNil = errors.New("reader must not be nil")
+	// ErrWriterNil is returned when a packet stream has no destination writer.
+	ErrWriterNil = errors.New("writer must not be nil")
 )
 
 // lookupPacketType returns the packet type for the given byte.

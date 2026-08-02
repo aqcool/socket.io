@@ -2,11 +2,17 @@ package parser
 
 import (
 	"encoding/json"
+	"errors"
+	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/aqcool/socket.io/v3/pkg/types"
 )
+
+// ErrCircularReference is raised by Encoder.Encode when packet data contains
+// a cycle that cannot be represented by JSON.
+var ErrCircularReference = errors.New("circular reference")
 
 // encoder implements the Encoder interface for Socket.IO packet encoding.
 type encoder struct{}
@@ -21,6 +27,9 @@ func NewEncoder() Encoder {
 // For binary packets, it returns the encoded packet header followed by binary buffers.
 func (e *encoder) Encode(packet *Packet) []types.BufferInterface {
 	parserLog.Debug("encoding packet %v", packet)
+	if hasCircularReference(packet.Data) {
+		panic(ErrCircularReference)
+	}
 
 	// Check if the packet contains binary data and upgrade packet type if needed
 	if packet.Type == EVENT || packet.Type == ACK {
@@ -36,6 +45,94 @@ func (e *encoder) Encode(packet *Packet) []types.BufferInterface {
 	}
 
 	return []types.BufferInterface{e.encodeAsString(packet)}
+}
+
+func hasCircularReference(data any) bool {
+	return hasCircularValue(reflect.ValueOf(data), make(map[visit]bool))
+}
+
+func hasCircularValue(value reflect.Value, stack map[visit]bool) bool {
+	if !value.IsValid() || isNilReflectValue(value) {
+		return false
+	}
+
+	if value.CanInterface() {
+		data := value.Interface()
+		if IsBinary(data) {
+			return false
+		}
+		if _, ok := data.(JSONTransformer); ok {
+			// ToJSON is evaluated later by the normal binary-detection and
+			// deconstruction pipeline. Do not invoke user code an extra time here.
+			return false
+		}
+		if _, ok := data.(json.Marshaler); ok {
+			return false
+		}
+	}
+
+	switch value.Kind() {
+	case reflect.Interface:
+		return hasCircularValue(value.Elem(), stack)
+	case reflect.Pointer:
+		if !enterCircularVisit(value, stack) {
+			return true
+		}
+		defer leaveCircularVisit(value, stack)
+		return hasCircularValue(value.Elem(), stack)
+	case reflect.Map:
+		if !enterCircularVisit(value, stack) {
+			return true
+		}
+		defer leaveCircularVisit(value, stack)
+		iterator := value.MapRange()
+		for iterator.Next() {
+			if hasCircularValue(iterator.Value(), stack) {
+				return true
+			}
+		}
+	case reflect.Slice:
+		if !enterCircularVisit(value, stack) {
+			return true
+		}
+		defer leaveCircularVisit(value, stack)
+		for index := 0; index < value.Len(); index++ {
+			if hasCircularValue(value.Index(index), stack) {
+				return true
+			}
+		}
+	case reflect.Array:
+		for index := 0; index < value.Len(); index++ {
+			if hasCircularValue(value.Index(index), stack) {
+				return true
+			}
+		}
+	case reflect.Struct:
+		valueType := value.Type()
+		for index := 0; index < value.NumField(); index++ {
+			if valueType.Field(index).PkgPath != "" {
+				continue
+			}
+			if hasCircularValue(value.Field(index), stack) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func enterCircularVisit(value reflect.Value, stack map[visit]bool) bool {
+	key := visit{typeOf: value.Type(), pointer: value.Pointer()}
+	if stack[key] {
+		return false
+	}
+	stack[key] = true
+	return true
+}
+
+func leaveCircularVisit(value reflect.Value, stack map[visit]bool) {
+	delete(stack, visit{typeOf: value.Type(), pointer: value.Pointer()})
 }
 
 // encodeAsString encodes a packet as a string buffer.

@@ -15,11 +15,11 @@
   - 回退机制
 
 - **连接管理**
-  - 自动重连
   - 心跳机制
   - 连接状态处理
   - Cookie 支持
   - 自定义请求头
+  - 按顺序尝试所有传输方式（`tryAllTransports`）
 
 - **数据处理**
   - 二进制数据支持
@@ -30,9 +30,12 @@
 - **高级特性**
   - 事件驱动架构
   - 可配置超时
+  - 自定义 HTTP 客户端、RoundTripper、代理和 TLS
   - 调试日志
   - 跨平台兼容
-  - 支持协议 v3 和 v4
+  - Engine.IO 协议 v4
+
+Engine.IO 的 `Socket` 本身不会自动重连，这与官方 `engine.io-client` 一致。自动重连属于上层 Socket.IO Manager 的职责。
 
 ## 安装
 
@@ -82,7 +85,7 @@ package main
 import (
     "time"
 
-    "github.com/aqcool/socket.io/clients/engine/v3"
+    engine "github.com/aqcool/socket.io/clients/engine/v3"
     "github.com/aqcool/socket.io/clients/engine/v3/transports"
 )
 
@@ -90,11 +93,12 @@ func main() {
     opts := engine.DefaultSocketOptions()
 
     // Transport configuration
-    opts.SetTransports(types.NewSet(
+    // 传输顺序有业务含义，应使用有序 API。
+    opts.SetTransportList([]engine.TransportCtor{
         transports.WebSocket,
         transports.Polling,
         transports.WebTransport,
-    ))
+    })
 
     // Connection settings
     opts.SetPath("/engine.io")
@@ -104,6 +108,7 @@ func main() {
     // Upgrade configuration
     opts.SetUpgrade(true)
     opts.SetRememberUpgrade(true)
+    opts.SetTryAllTransports(true)
 
     socket := engine.NewSocket("ws://localhost", opts)
     // ... event handlers
@@ -148,6 +153,8 @@ transports.WebTransport // WebTransport (experimental)
 ```bash
 make test
 ```
+
+官方 `engine.io-client@6.6.6` 测试分母、Go 等价项和平台不适用项见 [官方测试映射](OFFICIAL_TEST_MAPPING.md)。
 
 ### 调试
 

@@ -1,13 +1,16 @@
 package socket
 
 import (
-	"fmt"
+	"errors"
 	"sync/atomic"
+	"time"
 
 	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
 	"github.com/aqcool/socket.io/v3/pkg/types"
 	"github.com/aqcool/socket.io/v3/pkg/utils"
 )
+
+var ErrServerSideEmitNotSupported = errors.New("socket.io: adapter does not support server-side emit")
 
 // AdapterBuilder is a builder for creating Adapter instances.
 type AdapterBuilder struct {
@@ -29,6 +32,18 @@ type adapter struct {
 // New creates a new Adapter for the given Namespace.
 func (*AdapterBuilder) New(nsp Namespace) Adapter {
 	return NewAdapter(nsp)
+}
+
+func (*AdapterBuilder) SupportsConnectionStateRecovery() bool {
+	return false
+}
+
+func (*AdapterBuilder) Capabilities() AdapterCapabilities {
+	return AdapterCapabilities{
+		Broadcast: true, RoomBroadcast: true, BroadcastAck: true,
+		FetchSockets: true, SocketManagement: true, ServerSideEmit: true,
+		OrderedDelivery: true, DuplicateSuppression: true,
+	}
 }
 
 // MakeAdapter returns a new default Adapter instance.
@@ -64,6 +79,14 @@ func (a *adapter) Proto() Adapter {
 	return a._proto_
 }
 
+func (a *adapter) SupportsConnectionStateRecovery() bool {
+	return false
+}
+
+func (a *adapter) Capabilities() AdapterCapabilities {
+	return (&AdapterBuilder{}).Capabilities()
+}
+
 // Rooms returns the map of rooms and their associated socket IDs.
 func (a *adapter) Rooms() *types.Map[Room, *types.Set[SocketId]] {
 	return a.rooms
@@ -96,6 +119,64 @@ func (a *adapter) Close() {
 // ServerCount returns the number of Socket.IO servers in the cluster.
 func (a *adapter) ServerCount() int64 {
 	return 1
+}
+
+func (a *adapter) CountSockets(opts *BroadcastOptions) func(func(uint64, error)) {
+	return func(callback func(uint64, error)) {
+		rooms := types.NewSet[Room]()
+		except := types.NewSet[Room]()
+		if opts != nil {
+			if opts.Rooms != nil {
+				rooms = opts.Rooms
+			}
+			if opts.Except != nil {
+				except = opts.Except
+			}
+		}
+		matching := types.NewSet[SocketId]()
+		if rooms.Len() == 0 {
+			for _, id := range a.sids.Keys() {
+				matching.Add(id)
+			}
+		} else {
+			for _, room := range rooms.Keys() {
+				if ids, ok := a.rooms.Load(room); ok {
+					matching.Add(ids.Keys()...)
+				}
+			}
+		}
+		for _, room := range except.Keys() {
+			if ids, ok := a.rooms.Load(room); ok {
+				for _, id := range ids.Keys() {
+					matching.Delete(id)
+				}
+			}
+		}
+		callback(uint64(matching.Len()), nil)
+	}
+}
+
+func (a *adapter) ListRooms(opts *BroadcastOptions) func(func(map[Room]uint64, error)) {
+	return func(callback func(map[Room]uint64, error)) {
+		selected := types.NewSet[Room]()
+		except := types.NewSet[Room]()
+		if opts != nil {
+			if opts.Rooms != nil {
+				selected = opts.Rooms
+			}
+			if opts.Except != nil {
+				except = opts.Except
+			}
+		}
+		counts := make(map[Room]uint64)
+		a.rooms.Range(func(room Room, ids *types.Set[SocketId]) bool {
+			if (selected.Len() == 0 || selected.Has(room)) && !except.Has(room) {
+				counts[room] = uint64(ids.Len())
+			}
+			return true
+		})
+		callback(counts, nil)
+	}
 }
 
 // AddAll adds a socket to a list of rooms.
@@ -147,6 +228,16 @@ func (a *adapter) DelAll(id SocketId) {
 
 // Broadcast sends a packet to all matching sockets.
 func (a *adapter) Broadcast(packet *parser.Packet, opts *BroadcastOptions) {
+	startedAt := time.Now()
+	defer func() {
+		a.Emit("adapter_operation", AdapterTelemetryEvent{
+			Operation: "broadcast",
+			Namespace: a.nsp.Name(),
+			Duration:  time.Since(startedAt),
+			Success:   true,
+			At:        time.Now(),
+		})
+	}()
 	flags := &BroadcastFlags{}
 	if opts != nil && opts.Flags != nil {
 		flags = opts.Flags
@@ -181,7 +272,9 @@ func (a *adapter) BroadcastWithAck(packet *parser.Packet, opts *BroadcastOptions
 
 	packet.Nsp = a.nsp.Name()
 	// we can use the same id for each packet, since the _ids counter is common (no duplicate)
-	packet.Id = utils.Ptr(a.nsp.Ids())
+	if packet.Id == nil {
+		packet.Id = utils.Ptr(a.nsp.Ids())
+	}
 	encodedPackets := a._encode(packet, packetOpts)
 	var clientCount atomic.Uint64
 	a.apply(opts, func(socket *Socket) {
@@ -321,7 +414,7 @@ func (a *adapter) computeExceptSids(exceptRooms *types.Set[Room]) *types.Set[Soc
 
 // ServerSideEmit sends a packet to the other Socket.IO servers in the cluster.
 func (a *adapter) ServerSideEmit(packet []any) error {
-	return fmt.Errorf(`this adapter does not support the ServerSideEmit() functionality`)
+	return ErrServerSideEmitNotSupported
 }
 
 // PersistSession saves the client session to restore it upon reconnection.

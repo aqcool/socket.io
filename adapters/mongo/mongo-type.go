@@ -4,6 +4,7 @@ package mongo
 
 import (
 	"errors"
+	"time"
 
 	"github.com/aqcool/socket.io/adapters/adapter/v3"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -22,5 +23,6 @@ type (
 		Type      adapter.MessageType `bson:"type,omitempty"`
 		Data      bson.RawValue       `bson:"data,omitempty"`
 		CreatedAt bson.DateTime       `bson:"createdAt,omitempty"`
+		ExpiresAt time.Time           `bson:"expiresAt,omitempty"`
 	}
 )

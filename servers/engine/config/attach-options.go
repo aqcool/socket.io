@@ -93,7 +93,7 @@ func (a *AttachOptions) GetRawDestroyUpgrade() types.Optional[bool] {
 }
 func (a *AttachOptions) DestroyUpgrade() bool {
 	if a.destroyUpgrade == nil {
-		return false
+		return true
 	}
 
 	return a.destroyUpgrade.Get()
@@ -108,7 +108,7 @@ func (a *AttachOptions) GetRawDestroyUpgradeTimeout() types.Optional[time.Durati
 }
 func (a *AttachOptions) DestroyUpgradeTimeout() time.Duration {
 	if a.destroyUpgradeTimeout == nil {
-		return 0
+		return time.Second
 	}
 
 	return a.destroyUpgradeTimeout.Get()
@@ -123,7 +123,7 @@ func (a *AttachOptions) GetRawAddTrailingSlash() types.Optional[bool] {
 }
 func (a *AttachOptions) AddTrailingSlash() bool {
 	if a.addTrailingSlash == nil {
-		return false
+		return true
 	}
 
 	return a.addTrailingSlash.Get()

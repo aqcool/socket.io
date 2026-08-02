@@ -20,12 +20,12 @@ import (
 //
 // Example usage:
 //
-//	socket := NewSocketWithoutUpgrade("http://localhost:8080", &SocketOptions{
-//	    Transports: types.NewSet[string](transports.WEBSOCKET),
-//	})
+//	opts := DefaultSocketOptions()
+//	opts.SetTransportList([]TransportCtor{&WebSocketBuilder{}})
+//	socket := NewSocketWithoutUpgrade("http://localhost:8080", opts)
 //
 //	socket.On(SocketStateOpen, func() {
-//	    socket.Send("hello")
+//	    socket.Send(strings.NewReader("hello"), nil, nil)
 //	})
 //
 // See: [SocketWithUpgrade] for an implementation with transport upgrade support
@@ -125,12 +125,12 @@ type SocketWithoutUpgrade interface {
 //
 // Example usage:
 //
-//	socket := NewSocketWithUpgrade("http://localhost:8080", &SocketOptions{
-//	    Transports: types.NewSet[string](transports.WEBSOCKET),
-//	})
+//	opts := DefaultSocketOptions()
+//	opts.SetTransportList([]TransportCtor{&PollingBuilder{}, &WebSocketBuilder{}})
+//	socket := NewSocketWithUpgrade("http://localhost:8080", opts)
 //
 //	socket.On("open", func() {
-//	    socket.Send("hello")
+//	    socket.Send(strings.NewReader("hello"), nil, nil)
 //	})
 //
 // Events:
@@ -156,7 +156,6 @@ type SocketWithUpgrade interface {
 //   - Multiple transport support (WebSocket, WebTransport, Polling)
 //   - Event-based communication
 //   - Support for binary data
-//   - Automatic reconnection
 //   - Comprehensive error handling
 //   - Binary data support
 //   - Cross-platform compatibility

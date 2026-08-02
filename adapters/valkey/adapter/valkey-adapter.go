@@ -67,6 +67,8 @@ type (
 )
 
 // New creates a new ValkeyAdapter for the given namespace.
+func (vb *ValkeyAdapterBuilder) SupportsConnectionStateRecovery() bool { return false }
+
 func (vb *ValkeyAdapterBuilder) New(nsp socket.Namespace) socket.Adapter {
 	return NewValkeyAdapter(nsp, vb.Valkey, vb.Opts)
 }
@@ -399,10 +401,14 @@ func (r *valkeyAdapter) handleServerSideEmitRequest(request *Request) {
 	callback := func(args []any, err error) {
 		called.Do(func() {
 			valkeyLog.Debug("calling acknowledgement with %v", args)
+			var data any
+			if len(args) > 0 {
+				data = args[0]
+			}
 			response, err := json.Marshal(&Response{
 				Type:      valkey.SERVER_SIDE_EMIT,
 				RequestId: request.RequestId,
-				Data:      args,
+				Data:      data,
 			})
 			if err != nil {
 				valkeyLog.Debug("Error marshaling SERVER_SIDE_EMIT response: %s", err.Error())
@@ -438,10 +444,14 @@ func (r *valkeyAdapter) handleBroadcastRequest(request *Request) {
 		},
 		func(args []any, _ error) {
 			valkeyLog.Debug("received acknowledgement with value %v", args)
+			var packet any
+			if len(args) > 0 {
+				packet = args[0]
+			}
 			response, err := r.parser.Encode(&Response{
 				Type:      valkey.BROADCAST_ACK,
 				RequestId: request.RequestId,
-				Packet:    args,
+				Packet:    packet,
 			})
 			if err != nil {
 				valkeyLog.Debug("Error marshaling BROADCAST_ACK response: %s", err.Error())
@@ -490,7 +500,7 @@ func (r *valkeyAdapter) onResponse(_ string, msg []byte) {
 		case valkey.BROADCAST_CLIENT_COUNT:
 			ackRequest.ClientCountCallback(response.ClientCount)
 		case valkey.BROADCAST_ACK:
-			ackRequest.Ack(response.Packet, nil)
+			ackRequest.Ack([]any{response.Packet}, nil)
 		}
 		return
 	}
@@ -602,14 +612,17 @@ func (r *valkeyAdapter) BroadcastWithAck(packet *parser.Packet, opts *socket.Bro
 			Packet:    packet,
 			Opts:      adapter.EncodeOptions(opts),
 		}); err == nil {
-			if err := r.valkeyClient.Publish(r.ctx, r.requestChannel, request); err != nil {
-				r.valkeyClient.Emit("error", err)
-			}
-
 			r.ackRequests.Store(requestId, &AckRequest{
 				ClientCountCallback: clientCountCallback,
 				Ack:                 ack,
 			})
+
+			// Store the request before publishing. Valkey may deliver the message
+			// back to this process before Publish returns.
+			if err := r.valkeyClient.Publish(r.ctx, r.requestChannel, request); err != nil {
+				r.ackRequests.Delete(requestId)
+				r.valkeyClient.Emit("error", err)
+			}
 
 			timeout := adapter.DEFAULT_TIMEOUT
 			if opts != nil && opts.Flags != nil && opts.Flags.Timeout != nil {

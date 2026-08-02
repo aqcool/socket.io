@@ -1,0 +1,10 @@
+{
+  "name": "socket-io-go-admin-ui-official-interop",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Locked official Socket.IO client for Admin UI protocol interoperability",
+  "dependencies": {
+    "@socket.io/admin-ui": "0.5.1",
+    "socket.io-client": "4.8.3"
+  }
+}

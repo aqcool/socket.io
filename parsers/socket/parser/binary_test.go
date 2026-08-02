@@ -7,6 +7,14 @@ import (
 	"github.com/aqcool/socket.io/v3/pkg/types"
 )
 
+type messageWithToJSON struct {
+	internal types.BufferInterface
+}
+
+func (m *messageWithToJSON) ToJSON() any {
+	return map[string]any{"file": m.internal}
+}
+
 // TestDeconstructPacket tests the DeconstructPacket function
 func TestDeconstructPacket(t *testing.T) {
 	Data := []any{
@@ -351,5 +359,56 @@ func TestDeconstructWithSliceInMap(t *testing.T) {
 		if placeholder.Num != int64(i) {
 			t.Errorf("Expected placeholder num %d, got %d", i, placeholder.Num)
 		}
+	}
+}
+
+func TestOfficialNestedBufferFromToJSONRoundTrip(t *testing.T) {
+	encoder := NewEncoder()
+	encoded := encoder.Encode(&Packet{
+		Type: EVENT,
+		Nsp:  "/",
+		Data: []any{
+			"a",
+			&messageWithToJSON{internal: types.NewBytesBufferString("abc")},
+		},
+	})
+
+	if len(encoded) != 2 {
+		t.Fatalf("Encode() returned %d packets, want 2", len(encoded))
+	}
+	if got, want := encoded[0].String(), `51-["a",{"file":{"_placeholder":true,"num":0}}]`; got != want {
+		t.Fatalf("encoded header = %q, want %q", got, want)
+	}
+
+	decoder := NewDecoder()
+	var decoded *Packet
+	if err := decoder.On("decoded", func(args ...any) {
+		decoded, _ = args[0].(*Packet)
+	}); err != nil {
+		t.Fatalf("On() error = %v", err)
+	}
+	for _, packet := range encoded {
+		if err := decoder.Add(packet); err != nil {
+			t.Fatalf("Add(%T) error = %v", packet, err)
+		}
+	}
+
+	if decoded == nil {
+		t.Fatal("decoded event was not emitted")
+	}
+	data, ok := decoded.Data.([]any)
+	if !ok || len(data) != 2 {
+		t.Fatalf("decoded data = %#v, want a 2-item array", decoded.Data)
+	}
+	fileObject, ok := data[1].(map[string]any)
+	if !ok {
+		t.Fatalf("decoded data[1] = %T, want map[string]any", data[1])
+	}
+	file, ok := fileObject["file"].(types.BufferInterface)
+	if !ok {
+		t.Fatalf("decoded file = %T, want types.BufferInterface", fileObject["file"])
+	}
+	if !bytes.Equal(file.Bytes(), []byte("abc")) {
+		t.Fatalf("decoded file = %v, want %v", file.Bytes(), []byte("abc"))
 	}
 }

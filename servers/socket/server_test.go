@@ -1,9 +1,86 @@
 package socket
 
 import (
+	"errors"
+	"sync"
 	"testing"
 	"time"
 )
+
+func TestCheckNamespaceSupportsAsyncMatcherAndConcurrentCreation(t *testing.T) {
+	server := NewServer(nil, nil)
+	t.Cleanup(func() { server.Close(nil) })
+
+	matcher := func(name string, _ map[string]any, next func(error, bool)) {
+		time.AfterFunc(10*time.Millisecond, func() {
+			next(nil, name == "/dynamic-test")
+		})
+	}
+	parent := server.Of(ParentNspNameMatchFn(&matcher), nil).(ParentNamespace)
+
+	const clients = 16
+	results := make(chan Namespace, clients)
+	var calls sync.WaitGroup
+	calls.Add(clients)
+	for range clients {
+		go func() {
+			defer calls.Done()
+			server._checkNamespace("/dynamic-test", nil, func(namespace Namespace) {
+				results <- namespace
+			})
+		}()
+	}
+	calls.Wait()
+
+	var expected Namespace
+	for range clients {
+		select {
+		case namespace := <-results:
+			if namespace == nil {
+				t.Fatal("asynchronous matcher unexpectedly rejected the namespace")
+			}
+			if expected == nil {
+				expected = namespace
+			} else if namespace != expected {
+				t.Fatal("concurrent matches created different child namespace instances")
+			}
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for asynchronous namespace matcher")
+		}
+	}
+	if parent.Children().Len() != 1 {
+		t.Fatalf("expected one dynamic child, got %d", parent.Children().Len())
+	}
+}
+
+func TestNewServerWithErrorRejectsUnsupportedRecoveryAdapter(t *testing.T) {
+	opts := DefaultServerOptions()
+	opts.SetConnectionStateRecovery(DefaultConnectionStateRecovery())
+	opts.SetAdapter(&AdapterBuilder{})
+
+	server, err := NewServerWithError(nil, opts)
+	if server != nil {
+		t.Fatal("expected no server for an invalid recovery adapter")
+	}
+	if !errors.Is(err, ErrAdapterDoesNotSupportConnectionStateRecovery) {
+		t.Fatalf("expected unsupported recovery adapter error, got %v", err)
+	}
+}
+
+func TestNewServerPanicsForUnsupportedRecoveryAdapter(t *testing.T) {
+	opts := DefaultServerOptions()
+	opts.SetConnectionStateRecovery(DefaultConnectionStateRecovery())
+	opts.SetAdapter(&AdapterBuilder{})
+
+	defer func() {
+		recovered := recover()
+		err, ok := recovered.(error)
+		if !ok || !errors.Is(err, ErrAdapterDoesNotSupportConnectionStateRecovery) {
+			t.Fatalf("expected unsupported recovery adapter panic, got %v", recovered)
+		}
+	}()
+	NewServer(nil, opts)
+}
 
 func TestNewServerNilArgs(t *testing.T) {
 	server := NewServer(nil, nil)

@@ -53,13 +53,38 @@ func (t PacketType) String() string {
 // and the count of binary attachments for binary packets.
 type Packet struct {
 	// Type is the packet type.
-	Type PacketType `json:"type" msgpack:"type"`
+	Type PacketType `json:"type" msgpack:"type" bson:"type"`
 	// Nsp is the namespace this packet belongs to.
-	Nsp string `json:"nsp" msgpack:"nsp"`
+	Nsp string `json:"nsp" msgpack:"nsp" bson:"nsp"`
 	// Data is the payload of the packet.
-	Data any `json:"data,omitempty" msgpack:"data,omitempty"`
+	Data any `json:"data,omitempty" msgpack:"data,omitempty" bson:"data,omitempty"`
 	// Id is the optional packet ID for acknowledgment.
-	Id *uint64 `json:"id,omitempty" msgpack:"id,omitempty"`
+	Id *uint64 `json:"id,omitempty" msgpack:"id,omitempty" bson:"id,omitempty"`
 	// Attachments is the number of binary attachments for binary packets.
-	Attachments *uint64 `json:"attachments,omitempty" msgpack:"attachments,omitempty"`
+	Attachments *uint64 `json:"attachments,omitempty" msgpack:"attachments,omitempty" bson:"attachments,omitempty"`
+}
+
+// IsPacketValid reports whether a packet has a payload valid for its type.
+// Packet.Nsp and Packet.Id are already constrained to a string and an optional
+// unsigned integer by Go's type system, which provides the namespace and ACK ID
+// checks performed dynamically by the JavaScript implementation.
+func IsPacketValid(packet *Packet) bool {
+	if packet == nil {
+		return false
+	}
+
+	switch packet.Type {
+	case CONNECT:
+		return packet.Data == nil || isMap(packet.Data)
+	case DISCONNECT:
+		return packet.Data == nil
+	case EVENT:
+		return isValidEventPayload(packet.Data)
+	case ACK:
+		return isSlice(packet.Data)
+	case CONNECT_ERROR:
+		return isString(packet.Data) || isMap(packet.Data)
+	default:
+		return false
+	}
 }

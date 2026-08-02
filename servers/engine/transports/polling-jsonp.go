@@ -75,20 +75,18 @@ func (j *jsonp) DoWrite(ctx *types.HttpContext, data types.BufferInterface, opti
 	// See: https://timelessrepo.com/json-isnt-a-javascript-subset
 	payload, err := json.Marshal(data.String())
 	if err != nil {
-		ctx.Cleanup()
+		ctx.RunCleanup()
 		defer callback(err)
 
 		// Respond with 500 Internal Server Error if encoding fails
-		_ = ctx.SetStatusCode(http.StatusInternalServerError)
-		_, _ = ctx.Write(nil)
+		_, _ = ctx.WriteResponse(http.StatusInternalServerError, nil, nil)
 		return
 	}
 	if len(payload) > types.MaxPayloadSize {
-		ctx.Cleanup()
+		ctx.RunCleanup()
 		defer callback(errors.New("jsonp payload too large"))
 
-		_ = ctx.SetStatusCode(http.StatusInternalServerError)
-		_, _ = ctx.Write(nil)
+		_, _ = ctx.WriteResponse(http.StatusInternalServerError, nil, nil)
 		return
 	}
 

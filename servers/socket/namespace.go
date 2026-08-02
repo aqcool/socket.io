@@ -269,33 +269,30 @@ func (n *namespace) Add(client *Client, auth map[string]any, fn func(*Socket)) {
 		return
 	}
 	n.run(socket, func(err *ExtendedError) {
-		socket.Enqueue(func() {
-			if client.conn.ReadyState() != "open" {
-				namespaceLog.Debug("next called after client was closed - ignoring socket")
-				socket._cleanup()
-				return
-			}
-			if err != nil {
-				namespaceLog.Debug("middleware error, sending CONNECT_ERROR packet to the client")
-				socket._cleanup()
-				if client.conn.Protocol() == 3 {
-					if e := err.Data; e != nil {
-						socket._error(e)
-						return
-					}
-					socket._error(err.Error())
-					return
-				} else {
-					socket._error(map[string]any{
-						"message": err.Error(),
-						"data":    err.Data,
-					})
+		if client.conn.ReadyState() != "open" {
+			namespaceLog.Debug("next called after client was closed - ignoring socket")
+			socket._cleanup()
+			return
+		}
+		if err != nil {
+			namespaceLog.Debug("middleware error, sending CONNECT_ERROR packet to the client")
+			socket._cleanup()
+			if client.conn.Protocol() == 3 {
+				if e := err.Data; e != nil {
+					socket._error(e)
 					return
 				}
+				socket._error(err.Error())
+				return
 			}
+			socket._error(map[string]any{
+				"message": err.Error(),
+				"data":    err.Data,
+			})
+			return
+		}
 
-			n._doConnect(socket, fn)
-		})
+		n._doConnect(socket, fn)
 	})
 }
 
@@ -332,18 +329,42 @@ func (n *namespace) _createSocket(client *Client, auth map[string]any) *Socket {
 }
 
 func (n *namespace) _doConnect(socket *Socket, fn func(*Socket)) {
+	// The transport reader may dispatch a client event immediately after the
+	// CONNECT packet is written. Keep packet dispatch behind this barrier until
+	// all connection callbacks have installed their handlers.
+	defer socket.markConnectReady()
+
 	// track socket
 	n.sockets.Store(socket.Id(), socket)
+	// Register the socket in the owning Client before writing the namespace
+	// CONNECT packet. The official implementation gets this ordering from the
+	// Node.js event loop; in Go, a transport reader can otherwise receive the
+	// client's first EVENT before Client.nsps contains this namespace and close
+	// an otherwise valid connection as an invalid state.
+	if fn != nil {
+		fn(socket)
+	}
 
 	// it's paramount that the internal `onconnect` logic
 	// fires before user-set events to prevent state order
 	// violations (such as a disconnection before the connection
 	// logic is complete)
 	socket._onconnect()
-	if fn != nil {
-		fn(socket)
-	}
-
+	socket.emitTelemetry(&TelemetryEvent{
+		Kind:              TelemetryConnection,
+		Recovered:         socket.Recovered(),
+		RecoveryAttempted: socket.Handshake().Auth["pid"] != nil,
+		Success:           true,
+		TraceMetadata:     telemetryHandshakeTrace(socket.Handshake()),
+	})
+	previousTransport := socket.Conn().Transport().Name()
+	_ = socket.Conn().Once("upgrade", func(...any) {
+		socket.emitTelemetry(&TelemetryEvent{
+			Kind:    TelemetryTransportUpgrade,
+			Reason:  previousTransport,
+			Success: true,
+		})
+	})
 	// fire user-set events
 	n.EmitReserved("connect", socket)
 	n.EmitReserved("connection", socket)
@@ -558,6 +579,21 @@ func (n *namespace) Timeout(timeout time.Duration) *BroadcastOperator {
 //	})
 func (n *namespace) FetchSockets() func(func([]*RemoteSocket, error)) {
 	return NewBroadcastOperator(n.Proto().Adapter(), nil, nil, nil).FetchSockets()
+}
+
+// AllSockets returns the IDs of sockets in this namespace.
+//
+// Deprecated: use FetchSockets instead.
+func (n *namespace) AllSockets() func(func(*types.Set[SocketId], error)) {
+	return NewBroadcastOperator(n.Proto().Adapter(), nil, nil, nil).AllSockets()
+}
+
+func (n *namespace) CountSockets() func(func(uint64, error)) {
+	return NewBroadcastOperator(n.Proto().Adapter(), nil, nil, nil).CountSockets()
+}
+
+func (n *namespace) ListRooms() func(func(map[Room]uint64, error)) {
+	return NewBroadcastOperator(n.Proto().Adapter(), nil, nil, nil).ListRooms()
 }
 
 // Makes the matching socket instances join the specified rooms

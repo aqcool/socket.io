@@ -13,12 +13,12 @@ import (
 	"time"
 
 	"github.com/andybalholm/brotli"
-	"github.com/klauspost/compress/zstd"
 	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
 	"github.com/aqcool/socket.io/v3/pkg/log"
 	"github.com/aqcool/socket.io/v3/pkg/queue"
 	"github.com/aqcool/socket.io/v3/pkg/types"
 	"github.com/aqcool/socket.io/v3/pkg/utils"
+	"github.com/klauspost/compress/zstd"
 )
 
 var pollingLog = log.NewLog("engine:polling")
@@ -61,6 +61,11 @@ type polling struct {
 
 	req     atomic.Pointer[types.HttpContext]
 	dataCtx atomic.Pointer[types.HttpContext]
+	// dataReading distinguishes an upload whose body is still in progress
+	// from the synchronous packet-dispatch phase after EOF. Closing the
+	// transport must abort the former, but must let the latter return the
+	// official 200/"ok" response for a protocol-violation packet.
+	dataReading atomic.Bool
 
 	shouldClose atomic.Pointer[types.Callable]
 	mu          sync.Mutex
@@ -127,13 +132,14 @@ func (p *polling) onPollRequest(ctx *types.HttpContext) {
 
 	onClose := types.EventListener(func(...any) {
 		p.SetWritable(false)
+		p.Discard()
 		p.OnError("poll connection closed prematurely", nil)
 	})
 
-	ctx.Cleanup = func() {
+	ctx.SetCleanup(func() {
 		ctx.RemoveListener("close", onClose)
 		p.req.Store(nil)
-	}
+	})
 
 	_ = ctx.Once("close", onClose)
 
@@ -171,6 +177,7 @@ func (p *polling) onDataRequest(ctx *types.HttpContext) {
 	}
 
 	p.dataCtx.Store(ctx)
+	p.dataReading.Store(true)
 
 	var cleanup types.Callable
 
@@ -178,19 +185,22 @@ func (p *polling) onDataRequest(ctx *types.HttpContext) {
 		if cleanup != nil {
 			cleanup()
 		}
+		p.Discard()
 		p.OnError("data request connection closed prematurely", nil)
 	}
 
 	cleanup = func() {
 		ctx.RemoveListener("close", onClose)
+		p.dataReading.Store(false)
 		p.dataCtx.Store(nil)
 	}
 
 	_ = ctx.Once("close", onClose)
 
-	if ctx.Request().ContentLength > p.MaxHttpBufferSize() {
+	maxPayload := p.MaxHttpBufferSize()
+	if ctx.Request().ContentLength > maxPayload {
 		cleanup()
-
+		p.OnError("payload too large", nil)
 		_ = ctx.SetStatusCode(http.StatusRequestEntityTooLarge)
 		_, _ = ctx.Write(nil)
 		return
@@ -203,9 +213,24 @@ func (p *polling) onDataRequest(ctx *types.HttpContext) {
 		packet = types.NewStringBuffer(nil)
 	}
 	if body := ctx.Request().Body; body != nil {
-		_, _ = packet.ReadFrom(io.LimitReader(body, p.MaxHttpBufferSize()))
+		read, readErr := packet.ReadFrom(io.LimitReader(body, maxPayload+1))
 		_ = body.Close()
+		if readErr != nil {
+			cleanup()
+			p.OnError("payload read error", readErr)
+			_ = ctx.SetStatusCode(http.StatusBadRequest)
+			_, _ = ctx.Write(nil)
+			return
+		}
+		if read > maxPayload {
+			cleanup()
+			p.OnError("payload too large", nil)
+			_ = ctx.SetStatusCode(http.StatusRequestEntityTooLarge)
+			_, _ = ctx.Write(nil)
+			return
+		}
 	}
+	p.dataReading.Store(false)
 	p.Proto().OnData(packet)
 
 	cleanup()
@@ -227,7 +252,7 @@ func (p *polling) onDataRequest(ctx *types.HttpContext) {
 func (p *polling) OnData(data types.BufferInterface) {
 	pollingLog.Debug(`received "%s"`, data)
 
-	packets, _ := p.Parser().DecodePayload(data)
+	packets, err := p.Parser().DecodePayload(data)
 	for _, packetData := range packets {
 		if packet.CLOSE == packetData.Type {
 			pollingLog.Debug("got xhr close packet")
@@ -236,6 +261,9 @@ func (p *polling) OnData(data types.BufferInterface) {
 		}
 
 		p.OnPacket(packetData)
+	}
+	if err != nil {
+		p.OnPacket(&packet.Packet{Type: packet.ERROR, Data: strings.NewReader("parser error")})
 	}
 }
 
@@ -265,13 +293,17 @@ func (p *polling) send(packets []*packet.Packet) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	var closeAfterDrain types.Callable
 	if shouldClose := p.shouldClose.Load(); shouldClose != nil {
 		pollingLog.Debug("appending close packet to payload")
 		packets = append(packets, &packet.Packet{
 			Type: packet.CLOSE,
 		})
-		(*shouldClose)()
+		closeAfterDrain = *shouldClose
 		p.shouldClose.Store(nil)
+	}
+	if closeAfterDrain != nil {
+		_ = p.Once("drain", func(...any) { closeAfterDrain() })
 	}
 
 	compress := false
@@ -323,13 +355,11 @@ func (p *polling) DoWrite(ctx *types.HttpContext, data types.BufferInterface, op
 	})
 
 	respond := func(data types.BufferInterface, length string) {
-		ctx.Cleanup()
-		defer callback(nil)
+		ctx.RunCleanup()
 
 		headers.Set("Content-Length", length)
-		ctx.ResponseHeaders().With(p.headers(ctx, headers).All())
-		_ = ctx.SetStatusCode(http.StatusOK)
-		_, _ = io.Copy(ctx, data)
+		_, err := ctx.WriteResponse(http.StatusOK, p.headers(ctx, headers), data)
+		callback(err)
 	}
 
 	if p.HttpCompression() == nil || (options != nil && options.Compress != nil && !*options.Compress) {
@@ -342,7 +372,7 @@ func (p *polling) DoWrite(ctx *types.HttpContext, data types.BufferInterface, op
 		return
 	}
 
-	encoding := utils.Contains(ctx.Headers().Peek("Accept-Encoding"), []string{"gzip", "deflate", "br", "zstd"})
+	encoding := negotiateEncoding(ctx.Headers().Peek("Accept-Encoding"))
 	if encoding == "" {
 		respond(data, strconv.Itoa(data.Len()))
 		return
@@ -350,16 +380,63 @@ func (p *polling) DoWrite(ctx *types.HttpContext, data types.BufferInterface, op
 
 	buf, err := p.compress(data, encoding)
 	if err != nil {
-		ctx.Cleanup()
+		ctx.RunCleanup()
 		defer callback(err)
 
-		_ = ctx.SetStatusCode(http.StatusInternalServerError)
-		_, _ = ctx.Write(nil)
+		_, _ = ctx.WriteResponse(http.StatusInternalServerError, nil, nil)
 		return
 	}
 
 	headers.Set("Content-Encoding", encoding)
 	respond(buf, strconv.Itoa(buf.Len()))
+}
+
+func negotiateEncoding(header string) string {
+	if strings.TrimSpace(header) == "" {
+		return ""
+	}
+
+	type preference struct {
+		quality float64
+		set     bool
+	}
+	preferences := make(map[string]preference)
+	for value := range strings.SplitSeq(header, ",") {
+		parts := strings.Split(value, ";")
+		name := strings.ToLower(strings.TrimSpace(parts[0]))
+		if name == "" {
+			continue
+		}
+		quality := 1.0
+		for _, parameter := range parts[1:] {
+			key, raw, found := strings.Cut(strings.TrimSpace(parameter), "=")
+			if !found || !strings.EqualFold(strings.TrimSpace(key), "q") {
+				continue
+			}
+			parsed, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+			if err != nil || parsed < 0 || parsed > 1 {
+				quality = 0
+			} else {
+				quality = parsed
+			}
+		}
+		preferences[name] = preference{quality: quality, set: true}
+	}
+
+	wildcard := preferences["*"]
+	bestEncoding := ""
+	bestQuality := 0.0
+	for _, encoding := range []string{"gzip", "deflate", "br", "zstd"} {
+		candidate := preferences[encoding]
+		if !candidate.set {
+			candidate = wildcard
+		}
+		if candidate.set && candidate.quality > bestQuality {
+			bestEncoding = encoding
+			bestQuality = candidate.quality
+		}
+	}
+	return bestEncoding
 }
 
 // Compresses data.
@@ -422,9 +499,8 @@ func (p *polling) compress(data types.BufferInterface, encoding string) (types.B
 // Closes the transport.
 func (p *polling) DoClose(fn types.Callable) {
 	pollingLog.Debug("closing")
-	p.writeQueue.TryClose()
 
-	if dataCtx := p.dataCtx.Load(); dataCtx != nil && !dataCtx.IsDone() {
+	if dataCtx := p.dataCtx.Load(); dataCtx != nil && p.dataReading.Load() && !dataCtx.IsDone() {
 		pollingLog.Debug("aborting ongoing data request")
 		dataCtx.ResponseHeaders().Set("Connection", "close")
 		_ = dataCtx.SetStatusCode(http.StatusTooManyRequests)
@@ -440,12 +516,15 @@ func (p *polling) DoClose(fn types.Callable) {
 
 	if p.Writable() {
 		pollingLog.Debug("transport writable - closing right away")
+		// The write queue is asynchronous. Closing the transport immediately
+		// after Send() can shut the queue down before the close packet reaches
+		// the outstanding poll request. Finalize only after the write drains.
+		_ = p.Once("drain", func(...any) { onClose() })
 		p.Send([]*packet.Packet{
 			{
 				Type: packet.CLOSE,
 			},
 		})
-		onClose()
 	} else if p.Discarded() {
 		pollingLog.Debug("transport discarded - closing right away")
 		onClose()

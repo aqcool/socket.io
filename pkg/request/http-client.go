@@ -25,6 +25,9 @@ func NewHTTPClient(options ...ClientOption) *HTTPClient {
 
 	// Create resty client
 	client := resty.New()
+	if opts.HTTPClient != nil {
+		client = resty.NewWithClient(opts.HTTPClient)
+	}
 
 	// Add decompresser into Resty
 	client.AddContentDecompresser("br", decompressBrotli)

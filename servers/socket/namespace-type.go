@@ -140,6 +140,17 @@ type Namespace interface {
 	// Returns the matching socket instances
 	FetchSockets() func(func([]*RemoteSocket, error))
 
+	// Returns the IDs of matching socket instances.
+	//
+	// Deprecated: use FetchSockets instead.
+	AllSockets() func(func(*types.Set[SocketId], error))
+
+	// Returns the number of matching socket instances.
+	CountSockets() func(func(uint64, error))
+
+	// Returns room names and socket counts.
+	ListRooms() func(func(map[Room]uint64, error))
+
 	// Makes the matching socket instances join the specified rooms
 	SocketsJoin(...Room)
 

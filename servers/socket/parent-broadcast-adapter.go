@@ -18,6 +18,14 @@ func (b *ParentBroadcastAdapterBuilder) New(nsp Namespace) Adapter {
 	return NewParentBroadcastAdapter(nsp)
 }
 
+func (b *ParentBroadcastAdapterBuilder) SupportsConnectionStateRecovery() bool {
+	return false
+}
+
+func (b *ParentBroadcastAdapterBuilder) Capabilities() AdapterCapabilities {
+	return (&AdapterBuilder{}).Capabilities()
+}
+
 func MakeParentBroadcastAdapter() ParentBroadcastAdapter {
 	s := &parentBroadcastAdapter{
 		Adapter: MakeAdapter(),

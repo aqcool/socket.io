@@ -1,14 +1,32 @@
 package engine
 
 import (
+	"context"
 	"crypto/tls"
 	"net/http"
 	"net/url"
 	"time"
 
-	"github.com/quic-go/quic-go"
 	"github.com/aqcool/socket.io/v3/pkg/types"
+	ws "github.com/gorilla/websocket"
+	"github.com/quic-go/quic-go"
+	wt "github.com/quic-go/webtransport-go"
 )
+
+type WebSocketDialer func(context.Context, string, http.Header) (*ws.Conn, *http.Response, error)
+type WebTransportDialer func(context.Context, string, http.Header) (*http.Response, *wt.Session, error)
+type NetworkObserver func(NetworkEvent)
+
+type NetworkEvent struct {
+	Kind      string
+	Operation string
+	Transport string
+	URL       string
+	Proxy     string
+	Duration  time.Duration
+	Success   bool
+	Err       error
+}
 
 // SocketOptionsInterface defines the configuration interface for Socket connections.
 // It provides methods to get and set various connection parameters including host,
@@ -121,6 +139,30 @@ type SocketOptionsInterface interface {
 	SetProtocols([]string)
 	GetRawProtocols() types.Optional[[]string]
 	Protocols() []string
+
+	SetRoundTripper(http.RoundTripper)
+	GetRawRoundTripper() types.Optional[http.RoundTripper]
+	RoundTripper() http.RoundTripper
+
+	SetHTTPClient(*http.Client)
+	GetRawHTTPClient() types.Optional[*http.Client]
+	HTTPClient() *http.Client
+
+	SetWebSocketDialer(WebSocketDialer)
+	GetRawWebSocketDialer() types.Optional[WebSocketDialer]
+	WebSocketDialer() WebSocketDialer
+
+	SetWebTransportDialer(WebTransportDialer)
+	GetRawWebTransportDialer() types.Optional[WebTransportDialer]
+	WebTransportDialer() WebTransportDialer
+
+	SetProxyURL(*url.URL)
+	GetRawProxyURL() types.Optional[*url.URL]
+	ProxyURL() *url.URL
+
+	SetNetworkObserver(NetworkObserver)
+	GetRawNetworkObserver() types.Optional[NetworkObserver]
+	NetworkObserver() NetworkObserver
 }
 
 // SocketOptions implements the SocketOptionsInterface and provides the default
@@ -172,6 +214,12 @@ type SocketOptions struct {
 	// The client will attempt to connect using the first transport that passes
 	// feature detection.
 	transports types.Optional[*types.Set[TransportCtor]]
+
+	// transportList preserves the caller-defined transport order. The historical
+	// SetTransports API cannot preserve order because types.Set is map-backed;
+	// callers that need official first-choice/fallback semantics should use
+	// SetTransportList.
+	transportList types.Optional[[]TransportCtor]
 
 	// tryAllTransports determines whether to attempt all available transports
 	// if the first one fails. If true, the client will try HTTP long-polling,
@@ -241,6 +289,13 @@ type SocketOptions struct {
 	// protocols specifies the WebSocket sub-protocols to use.
 	// This allows for protocol negotiation between client and server.
 	protocols types.Optional[[]string]
+
+	roundTripper       types.Optional[http.RoundTripper]
+	httpClient         types.Optional[*http.Client]
+	webSocketDialer    types.Optional[WebSocketDialer]
+	webTransportDialer types.Optional[WebTransportDialer]
+	proxyURL           types.Optional[*url.URL]
+	networkObserver    types.Optional[NetworkObserver]
 }
 
 func DefaultSocketOptions() *SocketOptions {
@@ -284,6 +339,12 @@ func (s *SocketOptions) Assign(data SocketOptionsInterface) SocketOptionsInterfa
 	}
 	if data.GetRawTransports() != nil {
 		s.SetTransports(data.Transports())
+	}
+	if ordered, ok := data.(interface {
+		GetRawTransportList() types.Optional[[]TransportCtor]
+		TransportList() []TransportCtor
+	}); ok && ordered.GetRawTransportList() != nil {
+		s.SetTransportList(ordered.TransportList())
 	}
 	if data.GetRawTryAllTransports() != nil {
 		s.SetTryAllTransports(data.TryAllTransports())
@@ -333,8 +394,104 @@ func (s *SocketOptions) Assign(data SocketOptionsInterface) SocketOptionsInterfa
 	if data.GetRawProtocols() != nil {
 		s.SetProtocols(data.Protocols())
 	}
+	if data.GetRawRoundTripper() != nil {
+		s.SetRoundTripper(data.RoundTripper())
+	}
+	if data.GetRawHTTPClient() != nil {
+		s.SetHTTPClient(data.HTTPClient())
+	}
+	if data.GetRawWebSocketDialer() != nil {
+		s.SetWebSocketDialer(data.WebSocketDialer())
+	}
+	if data.GetRawWebTransportDialer() != nil {
+		s.SetWebTransportDialer(data.WebTransportDialer())
+	}
+	if data.GetRawProxyURL() != nil {
+		s.SetProxyURL(data.ProxyURL())
+	}
+	if data.GetRawNetworkObserver() != nil {
+		s.SetNetworkObserver(data.NetworkObserver())
+	}
 
 	return s
+}
+
+func (s *SocketOptions) SetRoundTripper(value http.RoundTripper) {
+	s.roundTripper = types.NewSome(value)
+}
+func (s *SocketOptions) GetRawRoundTripper() types.Optional[http.RoundTripper] {
+	return s.roundTripper
+}
+func (s *SocketOptions) RoundTripper() http.RoundTripper {
+	if s.roundTripper == nil {
+		return nil
+	}
+	return s.roundTripper.Get()
+}
+
+func (s *SocketOptions) SetHTTPClient(value *http.Client) {
+	s.httpClient = types.NewSome(value)
+}
+func (s *SocketOptions) GetRawHTTPClient() types.Optional[*http.Client] {
+	return s.httpClient
+}
+func (s *SocketOptions) HTTPClient() *http.Client {
+	if s.httpClient == nil {
+		return nil
+	}
+	return s.httpClient.Get()
+}
+
+func (s *SocketOptions) SetWebSocketDialer(value WebSocketDialer) {
+	s.webSocketDialer = types.NewSome(value)
+}
+func (s *SocketOptions) GetRawWebSocketDialer() types.Optional[WebSocketDialer] {
+	return s.webSocketDialer
+}
+func (s *SocketOptions) WebSocketDialer() WebSocketDialer {
+	if s.webSocketDialer == nil {
+		return nil
+	}
+	return s.webSocketDialer.Get()
+}
+
+func (s *SocketOptions) SetWebTransportDialer(value WebTransportDialer) {
+	s.webTransportDialer = types.NewSome(value)
+}
+func (s *SocketOptions) GetRawWebTransportDialer() types.Optional[WebTransportDialer] {
+	return s.webTransportDialer
+}
+func (s *SocketOptions) WebTransportDialer() WebTransportDialer {
+	if s.webTransportDialer == nil {
+		return nil
+	}
+	return s.webTransportDialer.Get()
+}
+
+func (s *SocketOptions) SetProxyURL(value *url.URL) {
+	s.proxyURL = types.NewSome(value)
+}
+func (s *SocketOptions) GetRawProxyURL() types.Optional[*url.URL] {
+	return s.proxyURL
+}
+func (s *SocketOptions) ProxyURL() *url.URL {
+	if s.proxyURL == nil {
+		return nil
+	}
+	return s.proxyURL.Get()
+}
+
+func (s *SocketOptions) SetNetworkObserver(value NetworkObserver) {
+	s.networkObserver = types.NewSome(value)
+}
+func (s *SocketOptions) GetRawNetworkObserver() types.Optional[NetworkObserver] {
+	return s.networkObserver
+}
+func (s *SocketOptions) NetworkObserver() NetworkObserver {
+	if s.networkObserver == nil {
+		return nil
+	}
+	return s.networkObserver.Get()
 }
 
 func (s *SocketOptions) SetHost(host string) {
@@ -479,6 +636,7 @@ func (s *SocketOptions) TimestampRequests() bool {
 
 func (s *SocketOptions) SetTransports(transports *types.Set[TransportCtor]) {
 	s.transports = types.NewSome(transports)
+	s.transportList = nil
 }
 func (s *SocketOptions) GetRawTransports() types.Optional[*types.Set[TransportCtor]] {
 	return s.transports
@@ -489,6 +647,26 @@ func (s *SocketOptions) Transports() *types.Set[TransportCtor] {
 	}
 
 	return s.transports.Get()
+}
+
+// SetTransportList configures transports in exact attempt order. It is the Go
+// equivalent of engine.io-client's ordered `transports` array. SetTransports is
+// retained for compatibility, but a map-backed set cannot encode ordering.
+func (s *SocketOptions) SetTransportList(transports []TransportCtor) {
+	cloned := append([]TransportCtor(nil), transports...)
+	s.transportList = types.NewSome(cloned)
+	s.transports = types.NewSome(types.NewSet(cloned...))
+}
+
+func (s *SocketOptions) GetRawTransportList() types.Optional[[]TransportCtor] {
+	return s.transportList
+}
+
+func (s *SocketOptions) TransportList() []TransportCtor {
+	if s.transportList == nil {
+		return nil
+	}
+	return append([]TransportCtor(nil), s.transportList.Get()...)
 }
 
 func (s *SocketOptions) SetTryAllTransports(tryAllTransports bool) {
