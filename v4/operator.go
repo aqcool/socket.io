@@ -140,6 +140,64 @@ func (o *BroadcastOperator) Emit(event string, args ...any) error {
 	)
 }
 
+type broadcastAckState struct {
+	mu sync.Mutex
+
+	expectedServers int64
+	serverCounts    int64
+	expectedClients uint64
+	receivedAcks    uint64
+	responses       [][]any
+	firstErr        error
+
+	done chan struct{}
+	once sync.Once
+}
+
+func newBroadcastAckState(expectedServers int64) *broadcastAckState {
+	return &broadcastAckState{
+		expectedServers: expectedServers,
+		done:            make(chan struct{}),
+	}
+}
+
+func (s *broadcastAckState) addClientCount(count uint64) {
+	s.mu.Lock()
+	s.serverCounts++
+	s.expectedClients += count
+	s.finishLocked()
+	s.mu.Unlock()
+}
+
+func (s *broadcastAckState) addAck(values []any, err error) {
+	s.mu.Lock()
+	s.receivedAcks++
+	if err != nil && s.firstErr == nil {
+		s.firstErr = err
+	}
+	if err == nil {
+		s.responses = append(s.responses, append([]any(nil), values...))
+	}
+	s.finishLocked()
+	s.mu.Unlock()
+}
+
+func (s *broadcastAckState) finishLocked() {
+	if s.serverCounts >= s.expectedServers && s.receivedAcks >= s.expectedClients {
+		s.once.Do(func() { close(s.done) })
+	}
+}
+
+func (s *broadcastAckState) result() ([][]any, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	responses := make([][]any, len(s.responses))
+	for index := range s.responses {
+		responses[index] = append([]any(nil), s.responses[index]...)
+	}
+	return responses, s.firstErr
+}
+
 func (o *BroadcastOperator) EmitAcks(ctx context.Context, event string, args ...any) ([][]any, error) {
 	if o == nil || o.nsp == nil {
 		return nil, ErrClosed
@@ -147,6 +205,10 @@ func (o *BroadcastOperator) EmitAcks(ctx context.Context, event string, args ...
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	operator := o
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout := time.Until(deadline)
@@ -158,35 +220,46 @@ func (o *BroadcastOperator) EmitAcks(ctx context.Context, event string, args ...
 		}
 	}
 
+	waitContext := ctx
+	var cancel context.CancelFunc
+	if operator.opts.Flags.Timeout != nil {
+		waitContext, cancel = context.WithTimeout(ctx, *operator.opts.Flags.Timeout)
+		defer cancel()
+	}
+
+	expectedServers := int64(1)
+	if !operator.opts.Flags.Local {
+		serverCount, err := operator.nsp.adapter.ServerCount(waitContext)
+		if err != nil {
+			return nil, err
+		}
+		if serverCount > 0 {
+			expectedServers = serverCount
+		}
+	}
+
 	packet := Packet{
 		Type:      PacketEvent,
 		Namespace: operator.nsp.Name(),
 		Data:      append([]any{event}, args...),
 	}
-	var mu sync.Mutex
-	responses := make([][]any, 0)
-	var firstErr error
+	state := newBroadcastAckState(expectedServers)
 	if err := operator.nsp.adapter.BroadcastWithAck(
-		ctx,
+		waitContext,
 		packet,
 		operator.opts,
-		nil,
-		func(values []any, err error) {
-			mu.Lock()
-			defer mu.Unlock()
-			if err != nil && firstErr == nil {
-				firstErr = err
-			}
-			if err == nil {
-				responses = append(responses, append([]any(nil), values...))
-			}
-		},
+		state.addClientCount,
+		state.addAck,
 	); err != nil {
 		return nil, err
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	return append([][]any(nil), responses...), firstErr
+
+	select {
+	case <-state.done:
+		return state.result()
+	case <-waitContext.Done():
+		return nil, waitContext.Err()
+	}
 }
 
 func (o *BroadcastOperator) FetchSockets(ctx context.Context) ([]*RemoteSocket, error) {
@@ -274,42 +347,49 @@ func (s *RemoteSocket) ID() SocketID {
 	}
 	return s.details.ID
 }
+
 func (s *RemoteSocket) Handshake() Handshake {
 	if s == nil {
 		return Handshake{}
 	}
 	return s.details.Handshake
 }
+
 func (s *RemoteSocket) Rooms() []Room {
 	if s == nil {
 		return nil
 	}
 	return append([]Room(nil), s.details.Rooms...)
 }
+
 func (s *RemoteSocket) Data() any {
 	if s == nil {
 		return nil
 	}
 	return s.details.Data
 }
+
 func (s *RemoteSocket) Join(ctx context.Context, rooms ...Room) error {
 	if s == nil {
 		return ErrClosed
 	}
 	return s.operator.SocketsJoin(ctx, rooms...)
 }
+
 func (s *RemoteSocket) Leave(ctx context.Context, rooms ...Room) error {
 	if s == nil {
 		return ErrClosed
 	}
 	return s.operator.SocketsLeave(ctx, rooms...)
 }
+
 func (s *RemoteSocket) Disconnect(ctx context.Context, closeTransport bool) error {
 	if s == nil {
 		return ErrClosed
 	}
 	return s.operator.DisconnectSockets(ctx, closeTransport)
 }
+
 func (s *RemoteSocket) Emit(ctx context.Context, event string, args ...any) error {
 	if err := contextError(ctx); err != nil {
 		return err
@@ -319,6 +399,7 @@ func (s *RemoteSocket) Emit(ctx context.Context, event string, args ...any) erro
 	}
 	return s.operator.Emit(event, args...)
 }
+
 func (s *RemoteSocket) EmitAck(ctx context.Context, event string, args ...any) ([]any, error) {
 	if s == nil {
 		return nil, ErrClosed
@@ -332,6 +413,7 @@ func (s *RemoteSocket) EmitAck(ctx context.Context, event string, args ...any) (
 	}
 	return responses[0], nil
 }
+
 func (s *RemoteSocket) DecodeValue(src any, dst any) error {
 	if s == nil || s.nsp == nil {
 		return ErrUnsupported
