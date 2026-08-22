@@ -39,7 +39,7 @@ func TestV4PollingTypedAckAndSocketContext(t *testing.T) {
 			if ctx != socket.Context() {
 				t.Errorf("typed handler context is not the Socket lifetime context")
 			}
-			return testEchoResponse{Text: request.Text}, nil
+			return testEchoResponse(request), nil
 		})
 		connected <- socket
 	})
@@ -77,7 +77,7 @@ func TestV4PollingTypedAckAndSocketContext(t *testing.T) {
 	select {
 	case <-socket.Context().Done():
 	case <-time.After(2 * time.Second):
-		t.Fatal("Socket context was not cancelled after namespace disconnect")
+		t.Fatal("Socket context was not canceled after namespace disconnect")
 	}
 }
 
@@ -137,7 +137,7 @@ func pollingRequest(t *testing.T, method, target, payload string) string {
 	if err != nil {
 		t.Fatalf("%s %s: %v", method, target, err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Fatal(err)
