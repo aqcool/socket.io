@@ -51,18 +51,18 @@ func (h *eventHub) Once(event string, fn Listener) Subscription {
 }
 
 func (h *eventHub) add(event string, fn Listener, once bool) Subscription {
-	if h == nil || event == "" || fn == nil || h.attach == nil {
+	if h == nil || event == "" || fn == nil {
 		return closedSubscription{}
 	}
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	if !h.attached[event] {
+	if h.attach != nil && !h.attached[event] {
 		if err := h.attach(event, func(args ...any) {
 			h.dispatch(event, args)
 		}); err != nil {
-			h.logger.Error("socket.io v4: attach listener bridge", "event", event, "error", err)
+			h.logger.Error("socket.io v4: attach listener", "event", event, "error", err)
 			return closedSubscription{}
 		}
 		h.attached[event] = true
@@ -74,7 +74,13 @@ func (h *eventHub) add(event string, fn Listener, once bool) Subscription {
 	return &subscription{hub: h, event: event, id: entry.id}
 }
 
+// dispatch is the single native event-delivery entry point. It snapshots the
+// listeners so handlers may safely subscribe or unsubscribe while an event is
+// being delivered.
 func (h *eventHub) dispatch(event string, args []any) {
+	if h == nil {
+		return
+	}
 	h.mu.Lock()
 	entries := append([]*listenerEntry(nil), h.listeners[event]...)
 	h.mu.Unlock()
