@@ -26,11 +26,18 @@ type ServerSideEmitter interface {
 // OnConnect registers a statically typed listener for the reserved connect
 // event, whose official contract has no listener parameters.
 func OnConnect(registrar Registrar, handler func(context.Context) error) error {
+	return OnConnectContext(context.Background(), registrar, handler)
+}
+
+// OnConnectContext is OnConnect with an explicit handler context. Cancellation
+// and deadlines are propagated to every handler invocation.
+func OnConnectContext(ctx context.Context, registrar Registrar, handler func(context.Context) error) error {
 	if handler == nil {
 		return errors.New("typed socket.io: handler is required")
 	}
+	ctx = normalizeContext(ctx)
 	return register(registrar, ConnectEvent.Name, func(...any) {
-		_ = handler(context.Background())
+		_ = handler(ctx)
 	})
 }
 
@@ -57,9 +64,7 @@ func EmitAck[Request, Response any](
 	request Request,
 ) (Response, error) {
 	var zero Response
-	if ctx == nil {
-		ctx = context.Background()
-	}
+	ctx = normalizeContext(ctx)
 	result := make(chan ackResult[Response], 1)
 	var once sync.Once
 	ack := func(values []any, err error) {
@@ -88,13 +93,26 @@ func On[Request, Response any](
 	event Event[Request, Response],
 	handler func(context.Context, Request) error,
 ) error {
+	return OnContext(context.Background(), registrar, event, handler)
+}
+
+// OnContext registers a typed listener with a caller-provided context. It is a
+// v3-safe bridge toward socket-lifetime context propagation without changing
+// the existing On API.
+func OnContext[Request, Response any](
+	ctx context.Context,
+	registrar Registrar,
+	event Event[Request, Response],
+	handler func(context.Context, Request) error,
+) error {
 	if handler == nil {
 		return errors.New("typed socket.io: handler is required")
 	}
+	ctx = normalizeContext(ctx)
 	return register(registrar, event.Name, func(args ...any) {
 		request, err := decodeValue[Request](first(args))
 		if err == nil {
-			_ = handler(context.Background(), request)
+			_ = handler(ctx, request)
 		}
 	})
 }
@@ -104,9 +122,20 @@ func Handle[Request, Response any](
 	event Event[Request, Response],
 	handler func(context.Context, Request) (Response, error),
 ) error {
+	return HandleContext(context.Background(), registrar, event, handler)
+}
+
+// HandleContext registers a typed ACK handler with a caller-provided context.
+func HandleContext[Request, Response any](
+	ctx context.Context,
+	registrar Registrar,
+	event Event[Request, Response],
+	handler func(context.Context, Request) (Response, error),
+) error {
 	if handler == nil {
 		return errors.New("typed socket.io: handler is required")
 	}
+	ctx = normalizeContext(ctx)
 	return register(registrar, event.Name, func(args ...any) {
 		request, err := decodeValue[Request](first(args))
 		ack := findAck(args)
@@ -116,7 +145,7 @@ func Handle[Request, Response any](
 			}
 			return
 		}
-		response, handlerErr := handler(context.Background(), request)
+		response, handlerErr := handler(ctx, request)
 		if ack != nil {
 			if handlerErr != nil {
 				ack(nil, handlerErr)
@@ -141,9 +170,7 @@ func ServerSideEmitAck[Request, Response any](
 	event Event[Request, Response],
 	request Request,
 ) ([]Response, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
+	ctx = normalizeContext(ctx)
 	result := make(chan serverAckResult[Response], 1)
 	ack := func(values []any, err error) {
 		responses := make([]Response, 0, len(values))
@@ -245,4 +272,11 @@ func emit(emitter Emitter, event string, args ...any) error {
 	default:
 		return errors.New("typed socket.io: emitter does not support Emit")
 	}
+}
+
+func normalizeContext(ctx context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+	return ctx
 }
