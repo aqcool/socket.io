@@ -302,9 +302,9 @@ func (n *Namespace) ServerSideEmitAck(ctx context.Context, event string, args ..
 		err    error
 	}
 	ch := make(chan result, 1)
-	ack := legacy.Ack(func(values []any, err error) {
+	ack := func(values []any, err error) {
 		ch <- result{values: values, err: err}
-	})
+	}
 	if err := n.raw.ServerSideEmitWithAck(event, args...)(ack); err != nil {
 		return nil, err
 	}
