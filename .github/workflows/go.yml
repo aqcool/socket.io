@@ -47,6 +47,7 @@ jobs:
           - "adapters/valkey"
           - "clients/engine"
           - "clients/socket"
+          - "v4"
 
     steps:
       - name: Checkout code
@@ -68,11 +69,31 @@ jobs:
           working-directory: ${{ matrix.module }}
           args: --timeout=5m --config=${{ github.workspace }}/.golangci.yml
 
+  v4-test:
+    name: V4 Build and Race Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+          cache-dependency-path: "**/go.sum"
+
+      - name: Test v4
+        env:
+          TEST_TIMEOUT: "5m"
+        run: make test MODULE="v4"
+
   build-and-test:
     name: Build, Test and Analyze
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: lint
+    needs: [lint, v4-test]
 
     steps:
       - name: Checkout code
@@ -170,8 +191,13 @@ jobs:
             if docker exec ci-rabbitmq rabbitmq-diagnostics -q ping; then
               exit 0
             fi
+            if ! docker inspect -f '{{.State.Running}}' ci-rabbitmq 2>/dev/null | grep -q true; then
+              docker logs ci-rabbitmq || true
+              exit 1
+            fi
             sleep 2
           done
+          docker logs ci-rabbitmq || true
           exit 1
 
       - name: Start PostgreSQL
