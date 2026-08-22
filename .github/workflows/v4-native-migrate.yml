@@ -17,37 +17,36 @@ jobs:
   migrate:
     if: ${{ github.event.pull_request.head.ref == 'feat/v4-native-core' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
-      - name: Checkout migration branch
+      - name: Checkout native v4 branch
         uses: actions/checkout@v6
         with:
           ref: feat/v4-native-core
           fetch-depth: 0
 
-      - name: Skip completed migration
-        id: marker
+      - name: Detect migration state
+        id: state
         shell: bash
         run: |
-          if [ -f .native-v4-migrated ]; then
-            echo "done=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "done=false" >> "$GITHUB_OUTPUT"
-          fi
+          test -f .native-v4-migrated && echo "migrated=true" >> "$GITHUB_OUTPUT" || echo "migrated=false" >> "$GITHUB_OUTPUT"
+          test -f .native-v4-core-finalized && echo "finalized=true" >> "$GITHUB_OUTPUT" || echo "finalized=false" >> "$GITHUB_OUTPUT"
 
       - name: Set up Go
-        if: steps.marker.outputs.done != 'true'
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: false
 
-      - name: Apply native v4 migration
-        if: steps.marker.outputs.done != 'true'
+      - name: Apply module migration
+        if: steps.state.outputs.migrated != 'true'
         run: python3 .github/scripts/native_v4_migrate.py
 
+      - name: Apply native core finalization
+        if: steps.state.outputs.finalized != 'true'
+        run: python3 .github/scripts/native_v4_finalize.py
+
       - name: Format Go sources
-        if: steps.marker.outputs.done != 'true'
         run: |
           find . -type f -name '*.go' \
             -not -path './vendor/*' \
@@ -55,7 +54,6 @@ jobs:
             -print0 | xargs -0 gofmt -w
 
       - name: Wire local module graph
-        if: steps.marker.outputs.done != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -70,22 +68,18 @@ jobs:
               module_dirs+=("$dir")
             fi
           done
-
           for mod in "${mods[@]}"; do
             dir=$(dirname "$mod")
             for i in "${!module_names[@]}"; do
               target=${module_dirs[$i]}
               [[ "$dir" == "$target" ]] && continue
               rel=$(realpath --relative-to="$dir" "$target")
-              if [[ "$rel" != .* ]]; then
-                rel="./$rel"
-              fi
+              if [[ "$rel" != .* ]]; then rel="./$rel"; fi
               (cd "$dir" && go mod edit -replace="${module_names[$i]}=$rel")
             done
           done
 
       - name: Tidy modules
-        if: steps.marker.outputs.done != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -95,21 +89,22 @@ jobs:
             (cd "$dir" && go mod tidy)
           done < <(find . -name go.mod -not -path '*/vendor/*' | sort)
 
-      - name: Smoke compile native root
-        if: steps.marker.outputs.done != 'true'
-        run: go test -run '^$' ./...
+      - name: Test native root
+        run: go test -race ./...
 
-      - name: Commit migration
-        if: steps.marker.outputs.done != 'true'
+      - name: Test native Socket.IO core
+        run: cd servers/socket && go test -race ./...
+
+      - name: Commit generated native changes
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add -A -- ':!.github/workflows'
           if git diff --cached --quiet; then
-            echo "No migration changes"
+            echo "No generated source changes"
             exit 0
           fi
-          git commit -m "chore(v4): apply native module migration"
+          git commit -m "refactor(v4): finalize native core concurrency and lifecycle"
           git push origin HEAD:feat/v4-native-core
