@@ -2,406 +2,54 @@ package socketio
 
 import (
 	"context"
+	"errors"
 	"time"
-
-	legacy "github.com/aqcool/socket.io/servers/socket/v3"
 )
 
 type BroadcastOperator struct {
-	server  *Server
-	raw     *legacy.BroadcastOperator
-	timeout *time.Duration
+	nsp *Namespace
+	opts BroadcastOptions
 }
 
-func newBroadcastOperator(server *Server, raw *legacy.BroadcastOperator, timeout *time.Duration) *BroadcastOperator {
-	operator := &BroadcastOperator{server: server, raw: raw}
-	if timeout != nil {
-		value := *timeout
-		operator.timeout = &value
-	}
-	return operator
+func newBroadcastOperator(nsp *Namespace,opts BroadcastOptions)*BroadcastOperator{return &BroadcastOperator{nsp:nsp,opts:cloneBroadcastOptions(opts)}}
+func cloneBroadcastOptions(opts BroadcastOptions)BroadcastOptions{out:=opts;out.Rooms=append([]Room(nil),opts.Rooms...);out.Except=append([]Room(nil),opts.Except...);if opts.Flags.Compress!=nil{value:=*opts.Flags.Compress;out.Flags.Compress=&value};if opts.Flags.Timeout!=nil{value:=*opts.Flags.Timeout;out.Flags.Timeout=&value};return out}
+func (o *BroadcastOperator) clone()*BroadcastOperator{if o==nil{return nil};return newBroadcastOperator(o.nsp,o.opts)}
+func appendUniqueRooms(base []Room,rooms ...Room)[]Room{seen:=make(map[Room]struct{},len(base)+len(rooms));out:=make([]Room,0,len(base)+len(rooms));for _,r:=range append(append([]Room(nil),base...),rooms...){if r==""{continue};if _,ok:=seen[r];ok{continue};seen[r]=struct{}{};out=append(out,r)};return out}
+func (o *BroadcastOperator) To(rooms ...Room)*BroadcastOperator{c:=o.clone();if c!=nil{c.opts.Rooms=appendUniqueRooms(c.opts.Rooms,rooms...)};return c}
+func (o *BroadcastOperator) In(rooms ...Room)*BroadcastOperator{return o.To(rooms...)}
+func (o *BroadcastOperator) Except(rooms ...Room)*BroadcastOperator{c:=o.clone();if c!=nil{c.opts.Except=appendUniqueRooms(c.opts.Except,rooms...)};return c}
+func (o *BroadcastOperator) Local()*BroadcastOperator{c:=o.clone();if c!=nil{c.opts.Flags.Local=true};return c}
+func (o *BroadcastOperator) Volatile()*BroadcastOperator{c:=o.clone();if c!=nil{c.opts.Flags.Volatile=true};return c}
+func (o *BroadcastOperator) Compress(enabled bool)*BroadcastOperator{c:=o.clone();if c!=nil{c.opts.Flags.Compress=&enabled};return c}
+func (o *BroadcastOperator) Timeout(timeout time.Duration)*BroadcastOperator{c:=o.clone();if c!=nil{c.opts.Flags.Timeout=&timeout};return c}
+func (o *BroadcastOperator) Emit(event string,args ...any)error{
+	if o==nil||o.nsp==nil{return ErrClosed};if reservedEvent(event){return errors.New("socket.io: reserved event name: "+event)}
+	if len(args)>0{if ack,ok:=args[len(args)-1].(Ack);ok{responses,err:=o.EmitAcks(context.Background(),event,args[:len(args)-1]...);if err!=nil{ack(nil,err);return err};flat:=make([]any,0,len(responses));for _,values:=range responses{if len(values)==1{flat=append(flat,values[0])}else{flat=append(flat,values)}};ack(flat,nil);return nil}}
+	return o.nsp.adapter.Broadcast(context.Background(),Packet{Type:PacketEvent,Namespace:o.nsp.Name(),Data:append([]any{event},args...)},o.opts)
 }
-
-func (o *BroadcastOperator) To(rooms ...Room) *BroadcastOperator {
-	if o == nil || o.raw == nil {
-		return nil
-	}
-	return newBroadcastOperator(o.server, o.raw.To(toLegacyRooms(rooms)...), o.timeout)
+func (o *BroadcastOperator) EmitAcks(ctx context.Context,event string,args ...any)([][]any,error){
+	if o==nil||o.nsp==nil{return nil,ErrClosed};if ctx==nil{ctx=context.Background()};if deadline,ok:=ctx.Deadline();ok{d:=time.Until(deadline);if d<=0{return nil,context.DeadlineExceeded};if o.opts.Flags.Timeout==nil||d<*o.opts.Flags.Timeout{o=o.Timeout(d)}}
+	packet:=Packet{Type:PacketEvent,Namespace:o.nsp.Name(),Data:append([]any{event},args...)}
+	var muResponses = make(chan struct{},1);muResponses<-struct{}{};responses:=make([][]any,0);var firstErr error
+	err:=o.nsp.adapter.BroadcastWithAck(ctx,packet,o.opts,nil,func(values []any,err error){<-muResponses;if err!=nil&&firstErr==nil{firstErr=err};if err==nil{responses=append(responses,append([]any(nil),values...))};muResponses<-struct{}{}});if err!=nil{return nil,err};<-muResponses;muResponses<-struct{}{};return responses,firstErr
 }
+func (o *BroadcastOperator) FetchSockets(ctx context.Context)([]*RemoteSocket,error){if o==nil||o.nsp==nil{return nil,ErrClosed};details,err:=o.nsp.adapter.FetchSockets(ctx,o.opts);if err!=nil{return nil,err};out:=make([]*RemoteSocket,0,len(details));for _,d:=range details{out=append(out,newRemoteSocket(o.nsp,d))};return out,nil}
+func (o *BroadcastOperator) CountSockets(ctx context.Context)(uint64,error){if o==nil||o.nsp==nil{return 0,ErrClosed};return o.nsp.adapter.CountSockets(ctx,o.opts)}
+func (o *BroadcastOperator) ListRooms(ctx context.Context)(map[Room]uint64,error){if o==nil||o.nsp==nil{return nil,ErrClosed};return o.nsp.adapter.ListRooms(ctx,o.opts)}
+func (o *BroadcastOperator) SocketsJoin(ctx context.Context,rooms ...Room)error{if o==nil||o.nsp==nil{return ErrClosed};return o.nsp.adapter.AddSockets(ctx,o.opts,rooms...)}
+func (o *BroadcastOperator) SocketsLeave(ctx context.Context,rooms ...Room)error{if o==nil||o.nsp==nil{return ErrClosed};return o.nsp.adapter.DeleteSockets(ctx,o.opts,rooms...)}
+func (o *BroadcastOperator) DisconnectSockets(ctx context.Context,closeTransport bool)error{if o==nil||o.nsp==nil{return ErrClosed};return o.nsp.adapter.DisconnectSockets(ctx,o.opts,closeTransport)}
+func (o *BroadcastOperator) DecodeValue(src any,dst any)error{if o==nil||o.nsp==nil{return ErrUnsupported};return o.nsp.DecodeValue(src,dst)}
 
-func (o *BroadcastOperator) In(rooms ...Room) *BroadcastOperator {
-	return o.To(rooms...)
-}
-
-func (o *BroadcastOperator) Except(rooms ...Room) *BroadcastOperator {
-	if o == nil || o.raw == nil {
-		return nil
-	}
-	return newBroadcastOperator(o.server, o.raw.Except(toLegacyRooms(rooms)...), o.timeout)
-}
-
-func (o *BroadcastOperator) Local() *BroadcastOperator {
-	if o == nil || o.raw == nil {
-		return nil
-	}
-	return newBroadcastOperator(o.server, o.raw.Local(), o.timeout)
-}
-
-func (o *BroadcastOperator) Volatile() *BroadcastOperator {
-	if o == nil || o.raw == nil {
-		return nil
-	}
-	return newBroadcastOperator(o.server, o.raw.Volatile(), o.timeout)
-}
-
-func (o *BroadcastOperator) Compress(enabled bool) *BroadcastOperator {
-	if o == nil || o.raw == nil {
-		return nil
-	}
-	return newBroadcastOperator(o.server, o.raw.Compress(enabled), o.timeout)
-}
-
-func (o *BroadcastOperator) Timeout(timeout time.Duration) *BroadcastOperator {
-	if o == nil || o.raw == nil {
-		return nil
-	}
-	return newBroadcastOperator(o.server, o.raw.Timeout(timeout), &timeout)
-}
-
-func (o *BroadcastOperator) Emit(event string, args ...any) error {
-	if o == nil || o.raw == nil {
-		return ErrClosed
-	}
-	return o.raw.Emit(event, args...)
-}
-
-func (o *BroadcastOperator) EmitAcks(ctx context.Context, event string, args ...any) ([][]any, error) {
-	if o == nil || o.raw == nil {
-		return nil, ErrClosed
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-
-	raw := o.raw
-	if deadline, ok := ctx.Deadline(); ok {
-		timeout := time.Until(deadline)
-		if timeout <= 0 {
-			return nil, context.DeadlineExceeded
-		}
-		if o.timeout == nil || timeout < *o.timeout {
-			raw = raw.Timeout(timeout)
-		}
-	}
-
-	type result struct {
-		values [][]any
-		err    error
-	}
-	ch := make(chan result, 1)
-	ack := func(values []any, err error) {
-		responses := make([][]any, 0, len(values))
-		for _, value := range values {
-			if tuple, ok := value.([]any); ok {
-				responses = append(responses, tuple)
-			} else {
-				responses = append(responses, []any{value})
-			}
-		}
-		select {
-		case ch <- result{values: responses, err: err}:
-		default:
-		}
-	}
-	if err := raw.Emit(event, append(args, ack)...); err != nil {
-		return nil, err
-	}
-	select {
-	case value := <-ch:
-		return value.values, value.err
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-}
-
-func (o *BroadcastOperator) FetchSockets(ctx context.Context) ([]*RemoteSocket, error) {
-	if o == nil || o.raw == nil {
-		return nil, ErrClosed
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	type result struct {
-		sockets []*legacy.RemoteSocket
-		err     error
-	}
-	ch := make(chan result, 1)
-	o.raw.FetchSockets()(func(sockets []*legacy.RemoteSocket, err error) {
-		ch <- result{sockets: sockets, err: err}
-	})
-	select {
-	case value := <-ch:
-		if value.err != nil {
-			return nil, value.err
-		}
-		wrapped := make([]*RemoteSocket, 0, len(value.sockets))
-		for _, socket := range value.sockets {
-			wrapped = append(wrapped, newRemoteSocket(o.server, socket))
-		}
-		return wrapped, nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-}
-
-func (o *BroadcastOperator) CountSockets(ctx context.Context) (uint64, error) {
-	if o == nil || o.raw == nil {
-		return 0, ErrClosed
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	type result struct {
-		count uint64
-		err   error
-	}
-	ch := make(chan result, 1)
-	o.raw.CountSockets()(func(count uint64, err error) {
-		ch <- result{count: count, err: err}
-	})
-	select {
-	case value := <-ch:
-		return value.count, value.err
-	case <-ctx.Done():
-		return 0, ctx.Err()
-	}
-}
-
-func (o *BroadcastOperator) ListRooms(ctx context.Context) (map[Room]uint64, error) {
-	if o == nil || o.raw == nil {
-		return nil, ErrClosed
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	type result struct {
-		rooms map[legacy.Room]uint64
-		err   error
-	}
-	ch := make(chan result, 1)
-	o.raw.ListRooms()(func(rooms map[legacy.Room]uint64, err error) {
-		ch <- result{rooms: rooms, err: err}
-	})
-	select {
-	case value := <-ch:
-		if value.err != nil {
-			return nil, value.err
-		}
-		rooms := make(map[Room]uint64, len(value.rooms))
-		for room, count := range value.rooms {
-			rooms[Room(room)] = count
-		}
-		return rooms, nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-}
-
-func (o *BroadcastOperator) SocketsJoin(ctx context.Context, rooms ...Room) error {
-	if err := contextError(ctx); err != nil {
-		return err
-	}
-	if o == nil || o.raw == nil {
-		return ErrClosed
-	}
-	o.raw.SocketsJoin(toLegacyRooms(rooms)...)
-	return nil
-}
-
-func (o *BroadcastOperator) SocketsLeave(ctx context.Context, rooms ...Room) error {
-	if err := contextError(ctx); err != nil {
-		return err
-	}
-	if o == nil || o.raw == nil {
-		return ErrClosed
-	}
-	o.raw.SocketsLeave(toLegacyRooms(rooms)...)
-	return nil
-}
-
-func (o *BroadcastOperator) DisconnectSockets(ctx context.Context, closeTransport bool) error {
-	if err := contextError(ctx); err != nil {
-		return err
-	}
-	if o == nil || o.raw == nil {
-		return ErrClosed
-	}
-	o.raw.DisconnectSockets(closeTransport)
-	return nil
-}
-
-func (o *BroadcastOperator) DecodeValue(src any, dst any) error {
-	if o == nil || o.server == nil {
-		return ErrUnsupported
-	}
-	return o.server.DecodeValue(src, dst)
-}
-
-type RemoteSocket struct {
-	server *Server
-	raw    *legacy.RemoteSocket
-}
-
-func newRemoteSocket(server *Server, raw *legacy.RemoteSocket) *RemoteSocket {
-	return &RemoteSocket{server: server, raw: raw}
-}
-
-func (s *RemoteSocket) ID() SocketID {
-	if s == nil || s.raw == nil {
-		return ""
-	}
-	return SocketID(s.raw.Id())
-}
-
-func (s *RemoteSocket) Handshake() Handshake {
-	if s == nil || s.raw == nil {
-		return Handshake{}
-	}
-	return convertHandshake(s.raw.Handshake())
-}
-
-func (s *RemoteSocket) Rooms() []Room {
-	if s == nil || s.raw == nil {
-		return nil
-	}
-	rooms := s.raw.Rooms().Keys()
-	result := make([]Room, len(rooms))
-	for i, room := range rooms {
-		result[i] = Room(room)
-	}
-	return result
-}
-
-func (s *RemoteSocket) Data() any {
-	if s == nil || s.raw == nil {
-		return nil
-	}
-	return s.raw.Data()
-}
-
-func (s *RemoteSocket) Join(ctx context.Context, rooms ...Room) error {
-	if err := contextError(ctx); err != nil {
-		return err
-	}
-	if s == nil || s.raw == nil {
-		return ErrClosed
-	}
-	s.raw.Join(toLegacyRooms(rooms)...)
-	return nil
-}
-
-func (s *RemoteSocket) Leave(ctx context.Context, rooms ...Room) error {
-	if err := contextError(ctx); err != nil {
-		return err
-	}
-	if s == nil || s.raw == nil {
-		return ErrClosed
-	}
-	s.raw.Leave(toLegacyRooms(rooms)...)
-	return nil
-}
-
-func (s *RemoteSocket) Disconnect(ctx context.Context, closeTransport bool) error {
-	if err := contextError(ctx); err != nil {
-		return err
-	}
-	if s == nil || s.raw == nil {
-		return ErrClosed
-	}
-	s.raw.Disconnect(closeTransport)
-	return nil
-}
-
-func (s *RemoteSocket) Emit(ctx context.Context, event string, args ...any) error {
-	if err := contextError(ctx); err != nil {
-		return err
-	}
-	if s == nil || s.raw == nil {
-		return ErrClosed
-	}
-	return s.raw.Emit(event, args...)
-}
-
-func (s *RemoteSocket) EmitAck(ctx context.Context, event string, args ...any) ([]any, error) {
-	if s == nil || s.raw == nil {
-		return nil, ErrClosed
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	raw := s.raw
-	if deadline, ok := ctx.Deadline(); ok {
-		timeout := time.Until(deadline)
-		if timeout <= 0 {
-			return nil, context.DeadlineExceeded
-		}
-		rawOperator := raw.Timeout(timeout)
-		return emitLegacySingleAck(ctx, rawOperator, event, args...)
-	}
-	type result struct {
-		values []any
-		err    error
-	}
-	ch := make(chan result, 1)
-	ack := func(values []any, err error) {
-		select {
-		case ch <- result{values: values, err: err}:
-		default:
-		}
-	}
-	if err := raw.Emit(event, append(args, ack)...); err != nil {
-		return nil, err
-	}
-	select {
-	case value := <-ch:
-		return value.values, value.err
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-}
-
-func emitLegacySingleAck(ctx context.Context, raw *legacy.BroadcastOperator, event string, args ...any) ([]any, error) {
-	type result struct {
-		values []any
-		err    error
-	}
-	ch := make(chan result, 1)
-	ack := func(values []any, err error) {
-		select {
-		case ch <- result{values: values, err: err}:
-		default:
-		}
-	}
-	if err := raw.Emit(event, append(args, ack)...); err != nil {
-		return nil, err
-	}
-	select {
-	case value := <-ch:
-		return value.values, value.err
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-}
-
-func (s *RemoteSocket) DecodeValue(src any, dst any) error {
-	if s == nil || s.server == nil {
-		return ErrUnsupported
-	}
-	return s.server.DecodeValue(src, dst)
-}
+type RemoteSocket struct{nsp *Namespace;details SocketDetails;operator *BroadcastOperator}
+func newRemoteSocket(nsp *Namespace,details SocketDetails)*RemoteSocket{return &RemoteSocket{nsp:nsp,details:details,operator:newBroadcastOperator(nsp,BroadcastOptions{Rooms:[]Room{Room(details.ID)},Flags:BroadcastFlags{ExpectSingleResponse:true}})}}
+func (s *RemoteSocket) ID()SocketID{if s==nil{return ""};return s.details.ID}
+func (s *RemoteSocket) Handshake()Handshake{if s==nil{return Handshake{}};return s.details.Handshake}
+func (s *RemoteSocket) Rooms()[]Room{if s==nil{return nil};return append([]Room(nil),s.details.Rooms...)}
+func (s *RemoteSocket) Data()any{if s==nil{return nil};return s.details.Data}
+func (s *RemoteSocket) Join(ctx context.Context,rooms ...Room)error{if s==nil{return ErrClosed};return s.operator.SocketsJoin(ctx,rooms...)}
+func (s *RemoteSocket) Leave(ctx context.Context,rooms ...Room)error{if s==nil{return ErrClosed};return s.operator.SocketsLeave(ctx,rooms...)}
+func (s *RemoteSocket) Disconnect(ctx context.Context,closeTransport bool)error{if s==nil{return ErrClosed};return s.operator.DisconnectSockets(ctx,closeTransport)}
+func (s *RemoteSocket) Emit(ctx context.Context,event string,args ...any)error{if err:=contextError(ctx);err!=nil{return err};if s==nil{return ErrClosed};return s.operator.Emit(event,args...)}
+func (s *RemoteSocket) EmitAck(ctx context.Context,event string,args ...any)([]any,error){if s==nil{return nil,ErrClosed};responses,err:=s.operator.EmitAcks(ctx,event,args...);if err!=nil{return nil,err};if len(responses)==0{return nil,nil};return responses[0],nil}
+func (s *RemoteSocket) DecodeValue(src any,dst any)error{if s==nil||s.nsp==nil{return ErrUnsupported};return s.nsp.DecodeValue(src,dst)}
