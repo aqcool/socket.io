@@ -102,7 +102,7 @@ func (o *BroadcastOperator) EmitAcks(ctx context.Context, event string, args ...
 		err    error
 	}
 	ch := make(chan result, 1)
-	ack := legacy.Ack(func(values []any, err error) {
+	ack := func(values []any, err error) {
 		responses := make([][]any, 0, len(values))
 		for _, value := range values {
 			if tuple, ok := value.([]any); ok {
@@ -115,7 +115,7 @@ func (o *BroadcastOperator) EmitAcks(ctx context.Context, event string, args ...
 		case ch <- result{values: responses, err: err}:
 		default:
 		}
-	})
+	}
 	if err := raw.Emit(event, append(args, ack)...); err != nil {
 		return nil, err
 	}
@@ -359,12 +359,12 @@ func (s *RemoteSocket) EmitAck(ctx context.Context, event string, args ...any) (
 		err    error
 	}
 	ch := make(chan result, 1)
-	ack := legacy.Ack(func(values []any, err error) {
+	ack := func(values []any, err error) {
 		select {
 		case ch <- result{values: values, err: err}:
 		default:
 		}
-	})
+	}
 	if err := raw.Emit(event, append(args, ack)...); err != nil {
 		return nil, err
 	}
@@ -382,12 +382,12 @@ func emitLegacySingleAck(ctx context.Context, raw *legacy.BroadcastOperator, eve
 		err    error
 	}
 	ch := make(chan result, 1)
-	ack := legacy.Ack(func(values []any, err error) {
+	ack := func(values []any, err error) {
 		select {
 		case ch <- result{values: values, err: err}:
 		default:
 		}
-	})
+	}
 	if err := raw.Emit(event, append(args, ack)...); err != nil {
 		return nil, err
 	}
