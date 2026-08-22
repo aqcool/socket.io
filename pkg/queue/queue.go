@@ -1,81 +1,149 @@
-// Package queue provides a sequential, non-blocking, unbounded task execution queue.
-// It mimics Node.js's event loop and is deeply inspired by Kubernetes workqueue.
+// Package queue provides a sequential, non-blocking task execution queue.
 package queue
 
 import (
-	"runtime"
 	"runtime/debug"
 	"sync"
+	"sync/atomic"
 
 	"github.com/aqcool/socket.io/v4/pkg/log"
 )
 
 var queueLog = log.NewLog("engine:events")
 
+// EnqueueResult reports what happened to a submitted task.
+type EnqueueResult uint8
+
+const (
+	EnqueueAccepted EnqueueResult = iota
+	EnqueueClosed
+	EnqueueFull
+)
+
 // Queue serializes function execution through a single goroutine.
-// It uses an unbounded slice backed by a condition variable to ensure
-// Enqueue never blocks the caller.
+//
+// A MaxPending value of zero means unbounded. Production Socket.IO servers
+// should normally configure a positive bound to prevent a slow handler from
+// turning one connection into an unbounded memory queue.
 type Queue struct {
 	mu           sync.Mutex
 	cond         *sync.Cond
 	tasks        []func()
 	shuttingDown bool
 	done         chan struct{}
+	maxPending   int
+	overflows    atomic.Uint64
 }
 
-// New creates a new Queue and starts the internal consumer goroutine.
+// New creates an unbounded queue. It remains for low-level callers that need
+// the historical behavior. Socket.IO v4 configures a positive bound.
 func New() *Queue {
+	return NewBounded(0)
+}
+
+// NewBounded creates a queue with at most maxPending queued tasks. A value <= 0
+// disables the bound.
+func NewBounded(maxPending int) *Queue {
+	if maxPending < 0 {
+		maxPending = 0
+	}
+	capacity := maxPending
+	if capacity <= 0 || capacity > 1024 {
+		capacity = 1024
+	}
 	q := &Queue{
-		tasks: make([]func(), 0, 1024),
-		done:  make(chan struct{}),
+		tasks:      make([]func(), 0, capacity),
+		done:       make(chan struct{}),
+		maxPending: maxPending,
 	}
 	q.cond = sync.NewCond(&q.mu)
-
 	go q.loop()
-	runtime.SetFinalizer(q, func(q *Queue) { q.TryClose() })
 	return q
 }
 
-// Enqueue adds a task to the queue for sequential execution.
-// It returns immediately and NEVER blocks.
-func (q *Queue) Enqueue(task func()) {
-	if task == nil {
+// SetMaxPending changes the pending-task limit. Zero means unbounded. Existing
+// queued work is not discarded when a smaller limit is installed.
+func (q *Queue) SetMaxPending(maxPending int) {
+	if q == nil {
 		return
+	}
+	if maxPending < 0 {
+		maxPending = 0
+	}
+	q.mu.Lock()
+	q.maxPending = maxPending
+	q.mu.Unlock()
+}
+
+// MaxPending returns the configured pending-task limit. Zero means unbounded.
+func (q *Queue) MaxPending() int {
+	if q == nil {
+		return 0
+	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.maxPending
+}
+
+// TryEnqueue adds a task without blocking and reports whether it was accepted.
+func (q *Queue) TryEnqueue(task func()) EnqueueResult {
+	if q == nil || task == nil {
+		return EnqueueClosed
 	}
 
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	if q.shuttingDown {
-		return
+		return EnqueueClosed
+	}
+	if q.maxPending > 0 && len(q.tasks) >= q.maxPending {
+		q.overflows.Add(1)
+		return EnqueueFull
 	}
 
 	q.tasks = append(q.tasks, task)
 	q.cond.Signal()
+	return EnqueueAccepted
 }
 
-// Size returns the number of pending tasks in the queue.
+// Enqueue keeps the historical fire-and-forget surface. Call TryEnqueue when
+// overflow behavior matters.
+func (q *Queue) Enqueue(task func()) {
+	_ = q.TryEnqueue(task)
+}
+
+// Size returns the number of pending tasks, excluding the task currently being
+// executed.
 func (q *Queue) Size() int {
+	if q == nil {
+		return 0
+	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return len(q.tasks)
 }
 
-// loop is the main consumer goroutine.
+// OverflowCount reports how many submissions were rejected because the queue
+// was full.
+func (q *Queue) OverflowCount() uint64 {
+	if q == nil {
+		return 0
+	}
+	return q.overflows.Load()
+}
+
 func (q *Queue) loop() {
 	defer close(q.done)
-
 	for {
 		task, ok := q.get()
 		if !ok {
-			// Queue is empty and shutting down
 			return
 		}
 		q.execute(task)
 	}
 }
 
-// get safely retrieves the next task from the queue, blocking if necessary.
 func (q *Queue) get() (func(), bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -83,25 +151,19 @@ func (q *Queue) get() (func(), bool) {
 	for len(q.tasks) == 0 && !q.shuttingDown {
 		q.cond.Wait()
 	}
-
 	if len(q.tasks) == 0 && q.shuttingDown {
 		return nil, false
 	}
 
 	task := q.tasks[0]
-
 	q.tasks[0] = nil
 	q.tasks = q.tasks[1:]
-
 	if len(q.tasks) == 0 {
-		// Reset cursor when queue logically empties out to reuse backing array space
 		q.tasks = q.tasks[:0]
 	}
-
 	return task, true
 }
 
-// execute runs the task with built-in panic recovery.
 func (q *Queue) execute(task func()) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -111,26 +173,34 @@ func (q *Queue) execute(task func()) {
 	task()
 }
 
-// Close shuts down the Queue gracefully.
-// It waits for all previously enqueued tasks to complete before returning.
+// Close stops accepting new tasks, drains accepted tasks and waits for the
+// consumer goroutine to exit.
 func (q *Queue) Close() {
+	if q == nil {
+		return
+	}
 	q.mu.Lock()
 	q.shuttingDown = true
 	q.cond.Broadcast()
 	q.mu.Unlock()
-
 	<-q.done
 }
 
-// IsShuttingDown reports whether TryClose or Close has been called.
 func (q *Queue) IsShuttingDown() bool {
+	if q == nil {
+		return true
+	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return q.shuttingDown
 }
 
-// TryClose shuts down the Queue without waiting for completion.
+// TryClose stops accepting new tasks without waiting for already accepted work
+// to drain.
 func (q *Queue) TryClose() {
+	if q == nil {
+		return
+	}
 	q.mu.Lock()
 	q.shuttingDown = true
 	q.cond.Broadcast()
