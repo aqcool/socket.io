@@ -36,6 +36,7 @@ jobs:
           - "sticky"
           - "typed"
           - "adapters/adapter"
+          - "adapters/adapter/v4"
           - "adapters/amqp"
           - "adapters/broker"
           - "adapters/kafka"
@@ -84,10 +85,15 @@ jobs:
           go-version-file: "go.mod"
           cache-dependency-path: "**/go.sum"
 
-      - name: Test v4
+      - name: Test v4 runtime
         env:
           TEST_TIMEOUT: "5m"
         run: make test MODULE="v4"
+
+      - name: Test native v4 adapter foundation
+        env:
+          TEST_TIMEOUT: "5m"
+        run: make test MODULE="adapters/adapter/v4"
 
   build-and-test:
     name: Build, Test and Analyze

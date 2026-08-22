@@ -66,18 +66,19 @@ type Adapter interface {
 	DeleteAll(context.Context, SocketID) error
 	SocketRooms(context.Context, SocketID) ([]Room, error)
 
-	Broadcast(context.Context, Packet, BroadcastOptions) error
-	BroadcastWithAck(context.Context, Packet, BroadcastOptions, func(uint64), Ack) error
+	Broadcast(context.Context, Packet, *BroadcastOptions) error
+	BroadcastWithAck(context.Context, Packet, *BroadcastOptions, func(uint64), Ack) error
 
-	FetchSockets(context.Context, BroadcastOptions) ([]SocketDetails, error)
-	CountSockets(context.Context, BroadcastOptions) (uint64, error)
-	ListRooms(context.Context, BroadcastOptions) (map[Room]uint64, error)
+	FetchSockets(context.Context, *BroadcastOptions) ([]SocketDetails, error)
+	CountSockets(context.Context, *BroadcastOptions) (uint64, error)
+	ListRooms(context.Context, *BroadcastOptions) (map[Room]uint64, error)
 
-	AddSockets(context.Context, BroadcastOptions, ...Room) error
-	DeleteSockets(context.Context, BroadcastOptions, ...Room) error
-	DisconnectSockets(context.Context, BroadcastOptions, bool) error
+	AddSockets(context.Context, *BroadcastOptions, ...Room) error
+	DeleteSockets(context.Context, *BroadcastOptions, ...Room) error
+	DisconnectSockets(context.Context, *BroadcastOptions, bool) error
 
 	ServerSideEmit(context.Context, []any) error
+	ServerSideEmitAck(context.Context, []any) ([]any, error)
 
 	PersistSession(context.Context, Session) error
 	RestoreSession(context.Context, PrivateSessionID, string) (*RecoveredSession, error)

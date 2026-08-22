@@ -45,7 +45,7 @@ V3_MODULES := parsers/engine \
               clients/engine \
               clients/socket
 
-EXPERIMENTAL_MODULES := v4
+EXPERIMENTAL_MODULES := v4 adapters/adapter/v4
 MODULES := $(V3_MODULES) $(EXPERIMENTAL_MODULES)
 
 # Scope Logic: If MODULE=... is passed, use it; otherwise Root (.) + All Modules
