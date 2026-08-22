@@ -1,4 +1,4 @@
-# ==============================================================================
+# ============================================================================== 
 #  GLOBAL CONFIGURATION
 # ==============================================================================
 .DEFAULT_GOAL := help
@@ -39,7 +39,8 @@ MODULES := parsers/engine \
            adapters/unix \
            adapters/valkey \
            clients/engine \
-           clients/socket
+           clients/socket \
+           v4
 
 # Scope Logic: If MODULE=... is passed, use it; otherwise Root (.) + All Modules
 SCOPE := $(if $(MODULE),$(MODULE),. $(MODULES))
@@ -191,13 +192,13 @@ endif
 	@echo "$(VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z\-\.]+)?$$' || \
 		{ printf "$(C_RED)[Error] Invalid version format: $(VERSION)$(C_RESET)\n"; exit 1; }
 
-	@# 2. Update Version File (Portable atomic write)
+	@# 1. Update Version File (Portable atomic write)
 	@printf "$(C_CYAN)[Version] Updating $(VERSION_FILE) to $(VERSION)$(C_RESET)\n"
 	@[ -f "$(VERSION_FILE)" ] || { printf "$(C_RED)[Error] File not found: $(VERSION_FILE)$(C_RESET)\n"; exit 1; }
 	@sed 's/VERSION = ".*"/VERSION = "$(VERSION)"/' "$(VERSION_FILE)" > "$(VERSION_FILE).tmp" && \
 		mv "$(VERSION_FILE).tmp" "$(VERSION_FILE)"
 
-	@# 3. Update Dependencies in Submodules
+	@# 2. Update Dependencies in Submodules
 	@# Note: Replaced xargs -r with shell logic for macOS compatibility
 	@for mod in $(MODULES); do \
 		if [ -d "$$mod" ]; then \
