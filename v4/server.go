@@ -28,8 +28,9 @@ type Server struct {
 	closing     bool
 	closed      bool
 
-	namespaceMu sync.Mutex
-	namespaces  map[string]*Namespace
+	namespaceMu       sync.Mutex
+	namespaceCreateMu sync.Mutex
+	namespaces        map[string]*Namespace
 
 	socketMu sync.Mutex
 	sockets  map[*legacy.Socket]*Socket
@@ -159,6 +160,9 @@ func (s *Server) Serve(listener net.Listener) error {
 	if err != nil && !wasClosing {
 		s.cancel()
 		s.raw.Close(nil)
+		s.lifecycleMu.Lock()
+		s.closed = true
+		s.lifecycleMu.Unlock()
 		s.markDone()
 	}
 	return err
@@ -371,14 +375,26 @@ func (s *Server) Of(name string) *Namespace {
 	name = normalizeNamespace(name)
 
 	s.namespaceMu.Lock()
-	defer s.namespaceMu.Unlock()
 	if namespace := s.namespaces[name]; namespace != nil {
+		s.namespaceMu.Unlock()
 		return namespace
 	}
+	s.namespaceMu.Unlock()
+
+	// The create lock makes concurrent Of("/same") calls converge without
+	// holding namespaceMu while the v3 core synchronously emits new_namespace.
+	s.namespaceCreateMu.Lock()
+	defer s.namespaceCreateMu.Unlock()
+
+	s.namespaceMu.Lock()
+	if namespace := s.namespaces[name]; namespace != nil {
+		s.namespaceMu.Unlock()
+		return namespace
+	}
+	s.namespaceMu.Unlock()
+
 	raw := s.raw.Of(name, nil)
-	namespace := newNamespace(s, raw)
-	s.namespaces[name] = namespace
-	return namespace
+	return s.wrapNamespace(raw)
 }
 
 func (s *Server) Namespace(name string) (*Namespace, bool) {
