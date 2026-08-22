@@ -1,7 +1,7 @@
 # socket.io-go-redis
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/redis/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/redis/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/redis/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/redis/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/redis/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/redis/v4)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/redis/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/redis/v4)
 
 ## 简介
 
@@ -10,7 +10,7 @@
 ## 安装
 
 ```bash
-go get github.com/aqcool/socket.io/adapters/redis/v3
+go get github.com/aqcool/socket.io/adapters/redis/v4
 ```
 
 ## 特性
@@ -37,9 +37,9 @@ import (
     "syscall"
 
     rds "github.com/redis/go-redis/v9"
-    "github.com/aqcool/socket.io/adapters/redis/v3"
-    "github.com/aqcool/socket.io/adapters/redis/v3/adapter"
-    "github.com/aqcool/socket.io/servers/socket/v3"
+    "github.com/aqcool/socket.io/adapters/redis/v4"
+    "github.com/aqcool/socket.io/adapters/redis/v4/adapter"
+    "github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 func main() {
@@ -115,7 +115,7 @@ type RedisAdapterOptions struct {
 
 ## Engine.IO Cluster Engine Redis Bus
 
-`github.com/aqcool/socket.io/adapters/redis/v3/enginebus` 实现 `engine.ClusterBus`，用于让不同进程或主机上的 `ClusterServer` 转发已建立Engine.IO会话的后续Polling、WebSocket Upgrade和Packet：
+`github.com/aqcool/socket.io/adapters/redis/v4/enginebus` 实现 `engine.ClusterBus`，用于让不同进程或主机上的 `ClusterServer` 转发已建立Engine.IO会话的后续Polling、WebSocket Upgrade和Packet：
 
 ```go
 pubClient := redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"})

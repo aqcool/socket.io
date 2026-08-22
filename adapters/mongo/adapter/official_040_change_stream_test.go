@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aqcool/socket.io/servers/socket/v3"
+	"github.com/aqcool/socket.io/servers/socket/v4"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	mongod "go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"

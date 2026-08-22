@@ -3,7 +3,7 @@
 package valkey
 
 import (
-	"github.com/aqcool/socket.io/adapters/adapter/v3"
+	"github.com/aqcool/socket.io/adapters/adapter/v4"
 )
 
 // Message types for Socket.IO Valkey adapter inter-node communication.

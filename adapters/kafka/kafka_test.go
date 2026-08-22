@@ -7,7 +7,7 @@ import (
 
 	"github.com/IBM/sarama"
 	"github.com/IBM/sarama/mocks"
-	broker "github.com/aqcool/socket.io/adapters/broker/v3"
+	broker "github.com/aqcool/socket.io/adapters/broker/v4"
 )
 
 type fakeConsumer struct {

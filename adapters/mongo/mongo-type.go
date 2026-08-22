@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/aqcool/socket.io/adapters/adapter/v3"
+	"github.com/aqcool/socket.io/adapters/adapter/v4"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 

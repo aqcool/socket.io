@@ -4,7 +4,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
+	"github.com/aqcool/socket.io/parsers/engine/v4/packet"
 )
 
 // Flags represents emission flags for a socket event, such as volatile, timeout, and queue status.

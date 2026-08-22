@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"sync"
 
-	engine "github.com/aqcool/socket.io/servers/engine/v3"
+	engine "github.com/aqcool/socket.io/servers/engine/v4"
 	"github.com/redis/go-redis/v9"
 	"github.com/vmihailenco/msgpack/v5"
 )

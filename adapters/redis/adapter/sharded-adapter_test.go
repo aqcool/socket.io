@@ -3,8 +3,8 @@ package adapter
 import (
 	"testing"
 
-	"github.com/aqcool/socket.io/adapters/redis/v3"
-	"github.com/aqcool/socket.io/servers/socket/v3"
+	"github.com/aqcool/socket.io/adapters/redis/v4"
+	"github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 func TestShardedAdapterDecodesLegacyMessageWithoutNamespace(t *testing.T) {

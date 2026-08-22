@@ -1,7 +1,7 @@
 # Engine.IO Go 客户端
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/clients/engine/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/clients/engine/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/clients/engine/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/clients/engine/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/clients/engine/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/clients/engine/v4)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/clients/engine/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/clients/engine/v4)
 
 一个稳定可靠的 [Engine.IO](../../servers/engine) Go 客户端实现。Engine.IO 是支撑 [Socket.IO](../../servers/socket) 的实时双向通信层。
 
@@ -40,7 +40,7 @@ Engine.IO 的 `Socket` 本身不会自动重连，这与官方 `engine.io-client
 ## 安装
 
 ```bash
-go get github.com/aqcool/socket.io/clients/engine/v3
+go get github.com/aqcool/socket.io/clients/engine/v4
 ```
 
 ## 快速开始
@@ -53,8 +53,8 @@ package main
 import (
     "log"
 
-    eio "github.com/aqcool/socket.io/clients/engine/v3"
-    "github.com/aqcool/socket.io/v3/pkg/types"
+    eio "github.com/aqcool/socket.io/clients/engine/v4"
+    "github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 func main() {
@@ -85,8 +85,8 @@ package main
 import (
     "time"
 
-    engine "github.com/aqcool/socket.io/clients/engine/v3"
-    "github.com/aqcool/socket.io/clients/engine/v3/transports"
+    engine "github.com/aqcool/socket.io/clients/engine/v4"
+    "github.com/aqcool/socket.io/clients/engine/v4/transports"
 )
 
 func main() {
@@ -138,7 +138,7 @@ func main() {
 ### 传输类型
 
 ```go
-import "github.com/aqcool/socket.io/clients/engine/v3/transports"
+import "github.com/aqcool/socket.io/clients/engine/v4/transports"
 
 // Available transports
 transports.Polling      // HTTP long-polling
@@ -161,7 +161,7 @@ make test
 启用调试日志：
 
 ```go
-import "github.com/aqcool/socket.io/v3/pkg/log"
+import "github.com/aqcool/socket.io/v4/pkg/log"
 
 log.DEBUG = true
 ```

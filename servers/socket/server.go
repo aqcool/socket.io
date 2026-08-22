@@ -15,12 +15,12 @@ import (
 	"time"
 
 	"github.com/andybalholm/brotli"
-	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
-	"github.com/aqcool/socket.io/servers/engine/v3"
-	"github.com/aqcool/socket.io/v3/pkg/log"
-	"github.com/aqcool/socket.io/v3/pkg/slices"
-	"github.com/aqcool/socket.io/v3/pkg/types"
-	"github.com/aqcool/socket.io/v3/pkg/utils"
+	"github.com/aqcool/socket.io/parsers/socket/v4/parser"
+	"github.com/aqcool/socket.io/servers/engine/v4"
+	"github.com/aqcool/socket.io/v4/pkg/log"
+	"github.com/aqcool/socket.io/v4/pkg/slices"
+	"github.com/aqcool/socket.io/v4/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/utils"
 	"github.com/klauspost/compress/zstd"
 )
 
@@ -55,8 +55,8 @@ type (
 	// Represents a Socket.IO server.
 	//
 	//	import (
-	//		"github.com/aqcool/socket.io/v3/pkg/utils"
-	//		"github.com/aqcool/socket.io/servers/socket/v3"
+	//		"github.com/aqcool/socket.io/v4/pkg/utils"
+	//		"github.com/aqcool/socket.io/servers/socket/v4"
 	//	)
 	//
 	//	io := socket.NewServer(nil, nil)

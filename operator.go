@@ -4,16 +4,16 @@ import (
 	"context"
 	"time"
 
-	legacy "github.com/aqcool/socket.io/servers/socket/v3"
+	core "github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 type BroadcastOperator struct {
 	server  *Server
-	raw     *legacy.BroadcastOperator
+	raw     *core.BroadcastOperator
 	timeout *time.Duration
 }
 
-func newBroadcastOperator(server *Server, raw *legacy.BroadcastOperator, timeout *time.Duration) *BroadcastOperator {
+func newBroadcastOperator(server *Server, raw *core.BroadcastOperator, timeout *time.Duration) *BroadcastOperator {
 	operator := &BroadcastOperator{server: server, raw: raw}
 	if timeout != nil {
 		value := *timeout
@@ -135,11 +135,11 @@ func (o *BroadcastOperator) FetchSockets(ctx context.Context) ([]*RemoteSocket, 
 		ctx = context.Background()
 	}
 	type result struct {
-		sockets []*legacy.RemoteSocket
+		sockets []*core.RemoteSocket
 		err     error
 	}
 	ch := make(chan result, 1)
-	o.raw.FetchSockets()(func(sockets []*legacy.RemoteSocket, err error) {
+	o.raw.FetchSockets()(func(sockets []*core.RemoteSocket, err error) {
 		ch <- result{sockets: sockets, err: err}
 	})
 	select {
@@ -188,11 +188,11 @@ func (o *BroadcastOperator) ListRooms(ctx context.Context) (map[Room]uint64, err
 		ctx = context.Background()
 	}
 	type result struct {
-		rooms map[legacy.Room]uint64
+		rooms map[core.Room]uint64
 		err   error
 	}
 	ch := make(chan result, 1)
-	o.raw.ListRooms()(func(rooms map[legacy.Room]uint64, err error) {
+	o.raw.ListRooms()(func(rooms map[core.Room]uint64, err error) {
 		ch <- result{rooms: rooms, err: err}
 	})
 	select {
@@ -252,10 +252,10 @@ func (o *BroadcastOperator) DecodeValue(src any, dst any) error {
 
 type RemoteSocket struct {
 	server *Server
-	raw    *legacy.RemoteSocket
+	raw    *core.RemoteSocket
 }
 
-func newRemoteSocket(server *Server, raw *legacy.RemoteSocket) *RemoteSocket {
+func newRemoteSocket(server *Server, raw *core.RemoteSocket) *RemoteSocket {
 	return &RemoteSocket{server: server, raw: raw}
 }
 
@@ -376,7 +376,7 @@ func (s *RemoteSocket) EmitAck(ctx context.Context, event string, args ...any) (
 	}
 }
 
-func emitLegacySingleAck(ctx context.Context, raw *legacy.BroadcastOperator, event string, args ...any) ([]any, error) {
+func emitLegacySingleAck(ctx context.Context, raw *core.BroadcastOperator, event string, args ...any) ([]any, error) {
 	type result struct {
 		values []any
 		err    error

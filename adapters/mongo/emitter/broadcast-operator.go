@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aqcool/socket.io/adapters/adapter/v3"
-	"github.com/aqcool/socket.io/adapters/mongo/v3"
-	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
-	"github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/adapters/adapter/v4"
+	"github.com/aqcool/socket.io/adapters/mongo/v4"
+	"github.com/aqcool/socket.io/parsers/socket/v4/parser"
+	"github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 

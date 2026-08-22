@@ -3,8 +3,8 @@
 package emitter
 
 import (
-	valkey "github.com/aqcool/socket.io/adapters/valkey/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	valkey "github.com/aqcool/socket.io/adapters/valkey/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 const (

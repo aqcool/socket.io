@@ -16,7 +16,7 @@
 ## 安装
 
 ```bash
-go get github.com/aqcool/socket.io/adapters/unix/v3
+go get github.com/aqcool/socket.io/adapters/unix/v4
 ```
 
 ## 用法
@@ -30,9 +30,9 @@ import (
 	"context"
 	"net/http"
 
-	sio "github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/adapters/unix/v3"
-	unixadapter "github.com/aqcool/socket.io/adapters/unix/v3/adapter"
+	sio "github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/adapters/unix/v4"
+	unixadapter "github.com/aqcool/socket.io/adapters/unix/v4/adapter"
 )
 
 func main() {
@@ -73,8 +73,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aqcool/socket.io/adapters/unix/v3"
-	unixemitter "github.com/aqcool/socket.io/adapters/unix/v3/emitter"
+	"github.com/aqcool/socket.io/adapters/unix/v4"
+	unixemitter "github.com/aqcool/socket.io/adapters/unix/v4/emitter"
 )
 
 func main() {

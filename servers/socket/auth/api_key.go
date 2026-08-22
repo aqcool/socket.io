@@ -6,7 +6,7 @@ import (
 	"errors"
 	"strings"
 
-	socket "github.com/aqcool/socket.io/servers/socket/v3"
+	socket "github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 var (

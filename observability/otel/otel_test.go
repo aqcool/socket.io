@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	socket "github.com/aqcool/socket.io/servers/socket/v3"
+	socket "github.com/aqcool/socket.io/servers/socket/v4"
 	api "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"

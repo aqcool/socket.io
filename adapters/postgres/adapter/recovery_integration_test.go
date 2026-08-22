@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	clusteradapter "github.com/aqcool/socket.io/adapters/adapter/v3"
-	"github.com/aqcool/socket.io/adapters/postgres/v3"
-	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
-	"github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	clusteradapter "github.com/aqcool/socket.io/adapters/adapter/v4"
+	"github.com/aqcool/socket.io/adapters/postgres/v4"
+	"github.com/aqcool/socket.io/parsers/socket/v4/parser"
+	"github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

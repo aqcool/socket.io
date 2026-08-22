@@ -14,9 +14,9 @@ import (
     "context"
     "time"
 
-    "github.com/aqcool/socket.io/reliability/v3"
-    socket "github.com/aqcool/socket.io/servers/socket/v3"
-    "github.com/aqcool/socket.io/servers/socket/v3/presence"
+    "github.com/aqcool/socket.io/reliability/v4"
+    socket "github.com/aqcool/socket.io/servers/socket/v4"
+    "github.com/aqcool/socket.io/servers/socket/v4/presence"
 )
 
 io := socket.NewServer(nil, nil)

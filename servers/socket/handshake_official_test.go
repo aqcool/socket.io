@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 func newOfficialHandshakeServer(t *testing.T, options *ServerOptions) *httptest.Server {

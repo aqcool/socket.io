@@ -17,9 +17,9 @@ import (
 	"testing"
 	"time"
 
-	engineclient "github.com/aqcool/socket.io/clients/engine/v3"
-	enginepacket "github.com/aqcool/socket.io/parsers/engine/v3/packet"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	engineclient "github.com/aqcool/socket.io/clients/engine/v4"
+	enginepacket "github.com/aqcool/socket.io/parsers/engine/v4/packet"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 const officialClientInteropEnvironment = "SOCKET_IO_CLIENT_OFFICIAL_INTEROP"

@@ -5,7 +5,7 @@ package postgres
 import (
 	"errors"
 
-	"github.com/aqcool/socket.io/adapters/adapter/v3"
+	"github.com/aqcool/socket.io/adapters/adapter/v4"
 )
 
 // ErrNilPostgresPacket indicates an attempt to unmarshal into a nil PostgresPacket.

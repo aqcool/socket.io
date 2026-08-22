@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	clientsocket "github.com/aqcool/socket.io/clients/socket/v3"
-	serversocket "github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	clientsocket "github.com/aqcool/socket.io/clients/socket/v4"
+	serversocket "github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 func TestBrokerClusterContract(t *testing.T) {

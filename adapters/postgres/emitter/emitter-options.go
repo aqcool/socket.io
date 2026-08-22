@@ -3,8 +3,8 @@
 package emitter
 
 import (
-	"github.com/aqcool/socket.io/adapters/postgres/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/adapters/postgres/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 const (

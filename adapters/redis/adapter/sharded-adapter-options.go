@@ -3,8 +3,8 @@
 package adapter
 
 import (
-	"github.com/aqcool/socket.io/adapters/redis/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/adapters/redis/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 // Default configuration values for ShardedRedisAdapterOptions.

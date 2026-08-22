@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/aqcool/socket.io/v3/pkg/utils"
+	"github.com/aqcool/socket.io/v4/pkg/utils"
 )
 
 type (

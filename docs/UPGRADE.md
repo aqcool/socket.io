@@ -140,7 +140,7 @@ import "github.com/zishang520/socket.io-go-redis/types"
 var s types.String
 
 // After
-import "github.com/aqcool/socket.io/v3/pkg/types"
+import "github.com/aqcool/socket.io/v4/pkg/types"
 var s types.Atomic[string]
 ```
 
@@ -270,7 +270,7 @@ func configExample(config ConnectionStateRecoveryInterface) {
 
 ```go
 // Before
-import "github.com/aqcool/socket.io/v3/pkg/utils"
+import "github.com/aqcool/socket.io/v4/pkg/utils"
 
 func example() {
     var bag *utils.ParameterBag
@@ -278,7 +278,7 @@ func example() {
 }
 
 // After
-import "github.com/aqcool/socket.io/v3/pkg/types"
+import "github.com/aqcool/socket.io/v4/pkg/types"
 
 func example() {
     var bag *types.ParameterBag
@@ -297,7 +297,7 @@ func example() {
 
 ```go
 // Before
-import "github.com/aqcool/socket.io/adapters/adapter/v3"
+import "github.com/aqcool/socket.io/adapters/adapter/v4"
 
 func example() {
     adapter.SliceMap(/**/)
@@ -306,8 +306,8 @@ func example() {
 
 // After
 import (
-    "github.com/aqcool/socket.io/v3/pkg/slices"
-    "github.com/aqcool/socket.io/v3/pkg/utils"
+    "github.com/aqcool/socket.io/v4/pkg/slices"
+    "github.com/aqcool/socket.io/v4/pkg/utils"
 )
 
 func example() {
@@ -363,7 +363,7 @@ err := socket.NewExtendedError("middleware error", map[string]any{"code": 401})
 data := err.Data()  // Note: server-side had Data() method
 
 // After (unified)
-import "github.com/aqcool/socket.io/v3/pkg/types"
+import "github.com/aqcool/socket.io/v4/pkg/types"
 
 err := types.NewExtendedError("error message", map[string]any{"code": 401})
 data := err.Data  // Now uses direct field access
@@ -388,15 +388,15 @@ data := err.Data  // Now uses direct field access
 
 ```go
 // Before
-import "github.com/aqcool/socket.io/adapters/redis/v3/adapter"
+import "github.com/aqcool/socket.io/adapters/redis/v4/adapter"
 
 opts := adapter.NewShardedRedisAdapterOptions()
 opts.SetSubscriptionMode(adapter.DynamicSubscriptionMode)
 
 // After
 import (
-    "github.com/aqcool/socket.io/adapters/redis/v3"
-    "github.com/aqcool/socket.io/adapters/redis/v3/adapter"
+    "github.com/aqcool/socket.io/adapters/redis/v4"
+    "github.com/aqcool/socket.io/adapters/redis/v4/adapter"
 )
 
 opts := adapter.NewShardedRedisAdapterOptions()
@@ -456,15 +456,15 @@ emitterOpts.SetSubscriptionMode(redis.DynamicSubscriptionMode)
 更新 `go.mod`，引入 Socket.IO v3 包：
 
 ```bash
-go get github.com/aqcool/socket.io/v3@latest
-go get github.com/aqcool/socket.io/parsers/engine/v3@latest
-go get github.com/aqcool/socket.io/parsers/socket/v3@latest
-go get github.com/aqcool/socket.io/servers/engine/v3@latest
-go get github.com/aqcool/socket.io/servers/socket/v3@latest
-go get github.com/aqcool/socket.io/adapters/adapter/v3@latest
-go get github.com/aqcool/socket.io/adapters/redis/v3@latest
-go get github.com/aqcool/socket.io/clients/engine/v3@latest
-go get github.com/aqcool/socket.io/clients/socket/v3@latest
+go get github.com/aqcool/socket.io/v4@latest
+go get github.com/aqcool/socket.io/parsers/engine/v4@latest
+go get github.com/aqcool/socket.io/parsers/socket/v4@latest
+go get github.com/aqcool/socket.io/servers/engine/v4@latest
+go get github.com/aqcool/socket.io/servers/socket/v4@latest
+go get github.com/aqcool/socket.io/adapters/adapter/v4@latest
+go get github.com/aqcool/socket.io/adapters/redis/v4@latest
+go get github.com/aqcool/socket.io/clients/engine/v4@latest
+go get github.com/aqcool/socket.io/clients/socket/v4@latest
 ```
 
 更新后清理依赖：
@@ -477,15 +477,15 @@ go mod tidy
 
 ```go
 require (
-    github.com/aqcool/socket.io/v3 v3.0.0
-    github.com/aqcool/socket.io/parsers/engine/v3 v3.0.0
-    github.com/aqcool/socket.io/parsers/socket/v3 v3.0.0
-    github.com/aqcool/socket.io/servers/engine/v3 v3.0.0
-    github.com/aqcool/socket.io/servers/socket/v3 v3.0.0
-    github.com/aqcool/socket.io/adapters/adapter/v3 v3.0.0
-    github.com/aqcool/socket.io/adapters/redis/v3 v3.0.0
-    github.com/aqcool/socket.io/clients/engine/v3 v3.0.0
-    github.com/aqcool/socket.io/clients/socket/v3 v3.0.0
+    github.com/aqcool/socket.io/v4 v3.0.0
+    github.com/aqcool/socket.io/parsers/engine/v4 v3.0.0
+    github.com/aqcool/socket.io/parsers/socket/v4 v3.0.0
+    github.com/aqcool/socket.io/servers/engine/v4 v3.0.0
+    github.com/aqcool/socket.io/servers/socket/v4 v3.0.0
+    github.com/aqcool/socket.io/adapters/adapter/v4 v3.0.0
+    github.com/aqcool/socket.io/adapters/redis/v4 v3.0.0
+    github.com/aqcool/socket.io/clients/engine/v4 v3.0.0
+    github.com/aqcool/socket.io/clients/socket/v4 v3.0.0
 )
 ```
 
@@ -499,55 +499,55 @@ require (
 
 | v1/v2 导入 | v3 导入 |
 |--------------|-----------|
-| `github.com/zishang520/engine.io-go-parser/packet` | `github.com/aqcool/socket.io/parsers/engine/v3/packet` |
-| `github.com/zishang520/engine.io-go-parser/parser` | `github.com/aqcool/socket.io/parsers/engine/v3/parser` |
-| `github.com/zishang520/engine.io-go-parser/types` | `github.com/aqcool/socket.io/v3/pkg/types` |
-| `github.com/zishang520/engine.io-go-parser/utils` | `github.com/aqcool/socket.io/v3/pkg/utils` |
+| `github.com/zishang520/engine.io-go-parser/packet` | `github.com/aqcool/socket.io/parsers/engine/v4/packet` |
+| `github.com/zishang520/engine.io-go-parser/parser` | `github.com/aqcool/socket.io/parsers/engine/v4/parser` |
+| `github.com/zishang520/engine.io-go-parser/types` | `github.com/aqcool/socket.io/v4/pkg/types` |
+| `github.com/zishang520/engine.io-go-parser/utils` | `github.com/aqcool/socket.io/v4/pkg/utils` |
 
 ### Socket.IO 解析器
 
 | v1/v2 导入 | v3 导入 |
 |--------------|-----------|
-| `github.com/zishang520/socket.io-go-parser/parser` | `github.com/aqcool/socket.io/parsers/socket/v3/parser` |
-| `github.com/zishang520/socket.io-go-parser/v2/parser` | `github.com/aqcool/socket.io/parsers/socket/v3/parser` |
+| `github.com/zishang520/socket.io-go-parser/parser` | `github.com/aqcool/socket.io/parsers/socket/v4/parser` |
+| `github.com/zishang520/socket.io-go-parser/v2/parser` | `github.com/aqcool/socket.io/parsers/socket/v4/parser` |
 
 ### Engine.IO 服务端
 
 | v1/v2 导入 | v3 导入 |
 |--------------|-----------|
-| `github.com/zishang520/engine.io/config` | `github.com/aqcool/socket.io/servers/engine/v3/config` |
-| `github.com/zishang520/engine.io/v2/config` | `github.com/aqcool/socket.io/servers/engine/v3/config` |
-| `github.com/zishang520/engine.io/engine` | `github.com/aqcool/socket.io/servers/engine/v3` |
-| `github.com/zishang520/engine.io/v2/engine` | `github.com/aqcool/socket.io/servers/engine/v3` |
-| `github.com/zishang520/engine.io/errors` | `github.com/aqcool/socket.io/servers/engine/v3/errors` |
-| `github.com/zishang520/engine.io/v2/errors` | `github.com/aqcool/socket.io/servers/engine/v3/errors` |
-| `github.com/zishang520/engine.io/events` | `github.com/aqcool/socket.io/v3/pkg/events` |
-| `github.com/zishang520/engine.io/v2/events` | `github.com/aqcool/socket.io/v3/pkg/events` |
-| `github.com/zishang520/engine.io/log` | `github.com/aqcool/socket.io/v3/pkg/log` |
-| `github.com/zishang520/engine.io/v2/log` | `github.com/aqcool/socket.io/v3/pkg/log` |
-| `github.com/zishang520/engine.io/transports` | `github.com/aqcool/socket.io/servers/engine/v3/transports` |
-| `github.com/zishang520/engine.io/v2/transports` | `github.com/aqcool/socket.io/servers/engine/v3/transports` |
-| `github.com/zishang520/engine.io/types` | `github.com/aqcool/socket.io/v3/pkg/types` |
-| `github.com/zishang520/engine.io/v2/types` | `github.com/aqcool/socket.io/v3/pkg/types` |
-| `github.com/zishang520/engine.io/utils` | `github.com/aqcool/socket.io/v3/pkg/utils` |
-| `github.com/zishang520/engine.io/v2/utils` | `github.com/aqcool/socket.io/v3/pkg/utils` |
-| `github.com/zishang520/engine.io/v2/webtransport` | `github.com/aqcool/socket.io/v3/pkg/webtransport` |
+| `github.com/zishang520/engine.io/config` | `github.com/aqcool/socket.io/servers/engine/v4/config` |
+| `github.com/zishang520/engine.io/v2/config` | `github.com/aqcool/socket.io/servers/engine/v4/config` |
+| `github.com/zishang520/engine.io/engine` | `github.com/aqcool/socket.io/servers/engine/v4` |
+| `github.com/zishang520/engine.io/v2/engine` | `github.com/aqcool/socket.io/servers/engine/v4` |
+| `github.com/zishang520/engine.io/errors` | `github.com/aqcool/socket.io/servers/engine/v4/errors` |
+| `github.com/zishang520/engine.io/v2/errors` | `github.com/aqcool/socket.io/servers/engine/v4/errors` |
+| `github.com/zishang520/engine.io/events` | `github.com/aqcool/socket.io/v4/pkg/events` |
+| `github.com/zishang520/engine.io/v2/events` | `github.com/aqcool/socket.io/v4/pkg/events` |
+| `github.com/zishang520/engine.io/log` | `github.com/aqcool/socket.io/v4/pkg/log` |
+| `github.com/zishang520/engine.io/v2/log` | `github.com/aqcool/socket.io/v4/pkg/log` |
+| `github.com/zishang520/engine.io/transports` | `github.com/aqcool/socket.io/servers/engine/v4/transports` |
+| `github.com/zishang520/engine.io/v2/transports` | `github.com/aqcool/socket.io/servers/engine/v4/transports` |
+| `github.com/zishang520/engine.io/types` | `github.com/aqcool/socket.io/v4/pkg/types` |
+| `github.com/zishang520/engine.io/v2/types` | `github.com/aqcool/socket.io/v4/pkg/types` |
+| `github.com/zishang520/engine.io/utils` | `github.com/aqcool/socket.io/v4/pkg/utils` |
+| `github.com/zishang520/engine.io/v2/utils` | `github.com/aqcool/socket.io/v4/pkg/utils` |
+| `github.com/zishang520/engine.io/v2/webtransport` | `github.com/aqcool/socket.io/v4/pkg/webtransport` |
 
 ### Socket.IO 服务端
 
 | v1/v2 导入 | v3 导入 |
 |--------------|-----------|
-| `github.com/zishang520/socket.io/socket` | `github.com/aqcool/socket.io/servers/socket/v3` |
-| `github.com/zishang520/socket.io/v2/socket` | `github.com/aqcool/socket.io/servers/socket/v3` |
-| `github.com/zishang520/socket.io/v2/adapter` | `github.com/aqcool/socket.io/adapters/adapter/v3` |
+| `github.com/zishang520/socket.io/socket` | `github.com/aqcool/socket.io/servers/socket/v4` |
+| `github.com/zishang520/socket.io/v2/socket` | `github.com/aqcool/socket.io/servers/socket/v4` |
+| `github.com/zishang520/socket.io/v2/adapter` | `github.com/aqcool/socket.io/adapters/adapter/v4` |
 
 ### Redis 适配器
 
 | v1 导入 | v3 导入 |
 |-----------|-----------|
-| `github.com/zishang520/socket.io-go-redis/adapter` | `github.com/aqcool/socket.io/adapters/redis/v3/adapter` |
-| `github.com/zishang520/socket.io-go-redis/emitter` | `github.com/aqcool/socket.io/adapters/redis/v3/emitter` |
-| `github.com/zishang520/socket.io-go-redis/types` | `github.com/aqcool/socket.io/adapters/redis/v3` |
+| `github.com/zishang520/socket.io-go-redis/adapter` | `github.com/aqcool/socket.io/adapters/redis/v4/adapter` |
+| `github.com/zishang520/socket.io-go-redis/emitter` | `github.com/aqcool/socket.io/adapters/redis/v4/emitter` |
+| `github.com/zishang520/socket.io-go-redis/types` | `github.com/aqcool/socket.io/adapters/redis/v4` |
 
 ### Redis 适配器内部迁移（v3）
 
@@ -563,20 +563,20 @@ require (
 Valkey 适配器是 v3 新增的独立模块，功能与 `adapters/redis` 模块一致，但使用 [`valkey-go`](https://github.com/valkey-io/valkey-go) 客户端。
 
 ```bash
-go get github.com/aqcool/socket.io/adapters/valkey/v3@latest
+go get github.com/aqcool/socket.io/adapters/valkey/v4@latest
 ```
 
 | 包 | 导入路径 |
 |---------|-------------|
-| 根类型和客户端 | `github.com/aqcool/socket.io/adapters/valkey/v3` |
-| 经典、分片及 Streams 适配器 | `github.com/aqcool/socket.io/adapters/valkey/v3/adapter` |
-| 发射器 | `github.com/aqcool/socket.io/adapters/valkey/v3/emitter` |
+| 根类型和客户端 | `github.com/aqcool/socket.io/adapters/valkey/v4` |
+| 经典、分片及 Streams 适配器 | `github.com/aqcool/socket.io/adapters/valkey/v4/adapter` |
+| 发射器 | `github.com/aqcool/socket.io/adapters/valkey/v4/emitter` |
 
 **`go.mod` 示例：**
 
 ```go
 require (
-    github.com/aqcool/socket.io/adapters/valkey/v3 v3.x.y
+    github.com/aqcool/socket.io/adapters/valkey/v4 v3.x.y
 )
 ```
 
@@ -586,8 +586,8 @@ require (
 import (
     "context"
     vk "github.com/valkey-io/valkey-go"
-    valkey "github.com/aqcool/socket.io/adapters/valkey/v3"
-    vkadapter "github.com/aqcool/socket.io/adapters/valkey/v3/adapter"
+    valkey "github.com/aqcool/socket.io/adapters/valkey/v4"
+    vkadapter "github.com/aqcool/socket.io/adapters/valkey/v4/adapter"
 )
 
 client, _ := vk.NewClient(vk.ClientOption{InitAddress: []string{"localhost:6379"}})
@@ -608,23 +608,23 @@ server.SetAdapter(&vkadapter.ValkeyAdapterBuilder{Valkey: valkeyClient})
 
 | v1 导入 | v3 导入 |
 |-----------|-----------|
-| `github.com/zishang520/engine.io-client-go/engine` | `github.com/aqcool/socket.io/clients/engine/v3` |
-| `github.com/zishang520/engine.io-client-go/request` | `github.com/aqcool/socket.io/v3/pkg/request` |
-| `github.com/zishang520/engine.io-client-go/transports` | `github.com/aqcool/socket.io/clients/engine/v3/transports` |
+| `github.com/zishang520/engine.io-client-go/engine` | `github.com/aqcool/socket.io/clients/engine/v4` |
+| `github.com/zishang520/engine.io-client-go/request` | `github.com/aqcool/socket.io/v4/pkg/request` |
+| `github.com/zishang520/engine.io-client-go/transports` | `github.com/aqcool/socket.io/clients/engine/v4/transports` |
 
 ### Socket.IO 客户端
 
 | v1 导入 | v3 导入 |
 |-----------|-----------|
-| `github.com/zishang520/socket.io-client-go/socket` | `github.com/aqcool/socket.io/clients/socket/v3` |
-| `github.com/zishang520/socket.io-client-go/utils` | `github.com/aqcool/socket.io/v3/pkg/utils` |
+| `github.com/zishang520/socket.io-client-go/socket` | `github.com/aqcool/socket.io/clients/socket/v4` |
+| `github.com/zishang520/socket.io-client-go/utils` | `github.com/aqcool/socket.io/v4/pkg/utils` |
 
 ### 错误类型（v3 新增）
 
 | 旧导入 | v3 导入 |
 |------------|-----------|
-| `clients/socket.ExtendedError` | `github.com/aqcool/socket.io/v3/pkg/types.ExtendedError` |
-| `servers/socket.ExtendedError` | `github.com/aqcool/socket.io/v3/pkg/types.ExtendedError` |
+| `clients/socket.ExtendedError` | `github.com/aqcool/socket.io/v4/pkg/types.ExtendedError` |
+| `servers/socket.ExtendedError` | `github.com/aqcool/socket.io/v4/pkg/types.ExtendedError` |
 
 > **提示：** 使用 `grep -r "github.com/zishang520" .` 查找所有旧导入，再通过查找替换统一更新。
 
@@ -655,7 +655,7 @@ func example() {
 }
 
 // After
-import "github.com/aqcool/socket.io/v3/pkg/types"
+import "github.com/aqcool/socket.io/v4/pkg/types"
 
 func example() {
     var roomName types.Atomic[string]
@@ -714,11 +714,11 @@ func configExample(config ConnectionStateRecoveryInterface) {
 
 ```go
 // Before
-import "github.com/aqcool/socket.io/v3/pkg/utils"
+import "github.com/aqcool/socket.io/v4/pkg/utils"
 var bag *utils.ParameterBag = utils.NewParameterBag(nil)
 
 // After
-import "github.com/aqcool/socket.io/v3/pkg/types"
+import "github.com/aqcool/socket.io/v4/pkg/types"
 var bag *types.ParameterBag = types.NewParameterBag(nil)
 ```
 
@@ -770,12 +770,12 @@ data := err.Data
 
 ```go
 // Before
-import "github.com/aqcool/socket.io/adapters/redis/v3/adapter"
+import "github.com/aqcool/socket.io/adapters/redis/v4/adapter"
 
 opts.SetSubscriptionMode(adapter.DynamicSubscriptionMode)
 
 // After
-import "github.com/aqcool/socket.io/adapters/redis/v3"
+import "github.com/aqcool/socket.io/adapters/redis/v4"
 
 opts.SetSubscriptionMode(redis.DynamicSubscriptionMode)
 ```
@@ -793,7 +793,7 @@ import (
 	"fmt"
 	"net/http"
 
-	server "github.com/aqcool/socket.io/servers/socket/v3"
+	server "github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 func main() {
@@ -903,7 +903,7 @@ data := err.Data
 
 - [GitHub Issues](https://github.com/aqcool/socket.io/issues)——用于报告已确认的缺陷或提出功能请求
 - [GitHub Discussions](https://github.com/aqcool/socket.io/discussions/new?category=q-a)——用于一般问题与使用帮助
-- [Go 包文档](https://pkg.go.dev/github.com/aqcool/socket.io/v3)——API 参考
+- [Go 包文档](https://pkg.go.dev/github.com/aqcool/socket.io/v4)——API 参考
 - [Socket.IO 协议文档](https://socket.io/docs/v4/)——协议规范
 - [Socket.IO Go 仓库](https://github.com/aqcool/socket.io)——源代码和示例
 
@@ -955,7 +955,7 @@ data := err.Data
 
 ```go
 // Before (no longer works)
-import "github.com/aqcool/socket.io/parsers/engine/v3/parser"
+import "github.com/aqcool/socket.io/parsers/engine/v4/parser"
 var errPkt = parser.ERROR_PACKET
 
 // After (use alternatives)
@@ -975,7 +975,7 @@ Socket.IO 数据包编码器的 `Encode()` 方法现在会先复制数据包再�
 
 ```go
 // Before - Encode() modified the input packet's Type field
-import "github.com/aqcool/socket.io/parsers/socket/v3/parser"
+import "github.com/aqcool/socket.io/parsers/socket/v4/parser"
 
 pkt := &packet.Packet{Type: parser.EVENT, Data: binaryData}
 encoded := encoder.Encode(pkt)
@@ -998,7 +998,7 @@ encoded := encoder.Encode(pkt)
 附件上限由硬编码的 1000 调整为每个解码器实例可配置、默认 10 个（与上游 Node.js 实现一致），现通过 `DecoderOptions` 控制，不再使用包级常量。
 
 ```go
-import "github.com/aqcool/socket.io/parsers/socket/v3/parser"
+import "github.com/aqcool/socket.io/parsers/socket/v4/parser"
 
 // Default - limited to 10 attachments per packet
 decoder := parser.NewDecoder()
@@ -1032,7 +1032,7 @@ Polling 传输现在会在读取请求体时强制执行 `MaxHttpBufferSize` 限
 **影响：** 通过 Polling 发送大于 `MaxHttpBufferSize`（默认 1 MB）的载荷时，数据将被截断或拒绝。大型消息请使用 WebSocket/WebTransport，或提高限制：
 
 ```go
-import "github.com/aqcool/socket.io/servers/engine/v3/config"
+import "github.com/aqcool/socket.io/servers/engine/v4/config"
 
 opts := config.DefaultServerOptions()
 opts.SetMaxHttpBufferSize(10 * 1024 * 1024) // 10 MB
@@ -1180,7 +1180,7 @@ err := socket.NewExtendedError("middleware error", map[string]any{"code": 401})
 data := err.Data()  // Note: server-side had Data() method
 
 // After (unified)
-import "github.com/aqcool/socket.io/v3/pkg/types"
+import "github.com/aqcool/socket.io/v4/pkg/types"
 
 err := types.NewExtendedError("error message", map[string]any{"code": 401})
 data := err.Data  // Now uses direct field access
@@ -1205,15 +1205,15 @@ data := err.Data  // Now uses direct field access
 
 ```go
 // Before
-import "github.com/aqcool/socket.io/adapters/redis/v3/adapter"
+import "github.com/aqcool/socket.io/adapters/redis/v4/adapter"
 
 opts := adapter.NewShardedRedisAdapterOptions()
 opts.SetSubscriptionMode(adapter.DynamicSubscriptionMode)
 
 // After
 import (
-    "github.com/aqcool/socket.io/adapters/redis/v3"
-    "github.com/aqcool/socket.io/adapters/redis/v3/adapter"
+    "github.com/aqcool/socket.io/adapters/redis/v4"
+    "github.com/aqcool/socket.io/adapters/redis/v4/adapter"
 )
 
 opts := adapter.NewShardedRedisAdapterOptions()
@@ -1268,7 +1268,7 @@ emitterOpts.SetSubscriptionMode(redis.DynamicSubscriptionMode)
 
 ```go
 // Before
-import "github.com/aqcool/socket.io/adapters/adapter/v3"
+import "github.com/aqcool/socket.io/adapters/adapter/v4"
 
 func example() {
     adapter.SliceMap(/**/)
@@ -1277,8 +1277,8 @@ func example() {
 
 // After
 import (
-    "github.com/aqcool/socket.io/v3/pkg/slices"
-    "github.com/aqcool/socket.io/v3/pkg/utils"
+    "github.com/aqcool/socket.io/v4/pkg/slices"
+    "github.com/aqcool/socket.io/v4/pkg/utils"
 )
 
 func example() {
@@ -1372,7 +1372,7 @@ func example(ctx *types.HttpContext) {
 
 ```go
 // Before
-import "github.com/aqcool/socket.io/v3/pkg/utils"
+import "github.com/aqcool/socket.io/v4/pkg/utils"
 
 func example() {
     var bag *utils.ParameterBag
@@ -1380,7 +1380,7 @@ func example() {
 }
 
 // After
-import "github.com/aqcool/socket.io/v3/pkg/types"
+import "github.com/aqcool/socket.io/v4/pkg/types"
 
 func example() {
     var bag *types.ParameterBag

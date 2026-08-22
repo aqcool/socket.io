@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	engineclient "github.com/aqcool/socket.io/clients/engine/v3"
-	enginepacket "github.com/aqcool/socket.io/parsers/engine/v3/packet"
-	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	engineclient "github.com/aqcool/socket.io/clients/engine/v4"
+	enginepacket "github.com/aqcool/socket.io/parsers/engine/v4/packet"
+	"github.com/aqcool/socket.io/parsers/socket/v4/parser"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 	websocket "github.com/gorilla/websocket"
 )
 

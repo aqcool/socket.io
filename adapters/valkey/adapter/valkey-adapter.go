@@ -11,14 +11,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/aqcool/socket.io/adapters/adapter/v3"
-	valkey "github.com/aqcool/socket.io/adapters/valkey/v3"
-	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
-	"github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/log"
-	"github.com/aqcool/socket.io/v3/pkg/slices"
-	"github.com/aqcool/socket.io/v3/pkg/types"
-	"github.com/aqcool/socket.io/v3/pkg/utils"
+	"github.com/aqcool/socket.io/adapters/adapter/v4"
+	valkey "github.com/aqcool/socket.io/adapters/valkey/v4"
+	"github.com/aqcool/socket.io/parsers/socket/v4/parser"
+	"github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/log"
+	"github.com/aqcool/socket.io/v4/pkg/slices"
+	"github.com/aqcool/socket.io/v4/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/utils"
 )
 
 var valkeyLog = log.NewLog("socket.io-valkey")

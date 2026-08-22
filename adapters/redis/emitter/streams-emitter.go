@@ -8,12 +8,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aqcool/socket.io/adapters/adapter/v3"
-	redisbridge "github.com/aqcool/socket.io/adapters/redis/v3"
-	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
-	"github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
-	"github.com/aqcool/socket.io/v3/pkg/utils"
+	"github.com/aqcool/socket.io/adapters/adapter/v4"
+	redisbridge "github.com/aqcool/socket.io/adapters/redis/v4"
+	"github.com/aqcool/socket.io/parsers/socket/v4/parser"
+	"github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/utils"
 	rds "github.com/redis/go-redis/v9"
 )
 

@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"sync/atomic"
 
-	io "github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	io "github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 // Chat room example - Go implementation of the classic Socket.IO chat demo.

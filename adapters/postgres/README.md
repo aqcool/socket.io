@@ -1,7 +1,7 @@
 # socket.io-go-postgres
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/postgres/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/postgres/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/postgres/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/postgres/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/postgres/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/postgres/v4)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/postgres/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/postgres/v4)
 
 ## 简介
 
@@ -10,7 +10,7 @@ Socket.IO Go 服务端的 PostgreSQL 适配器，通过 PostgreSQL 的 `LISTEN`/
 ## 安装
 
 ```bash
-go get github.com/aqcool/socket.io/adapters/postgres/v3
+go get github.com/aqcool/socket.io/adapters/postgres/v4
 ```
 
 ## 特性
@@ -36,9 +36,9 @@ import (
     "syscall"
 
     "github.com/jackc/pgx/v5/pgxpool"
-    "github.com/aqcool/socket.io/adapters/postgres/v3"
-    pgadapter "github.com/aqcool/socket.io/adapters/postgres/v3/adapter"
-    "github.com/aqcool/socket.io/servers/socket/v3"
+    "github.com/aqcool/socket.io/adapters/postgres/v4"
+    pgadapter "github.com/aqcool/socket.io/adapters/postgres/v4/adapter"
+    "github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 func main() {
@@ -80,8 +80,8 @@ import (
     "context"
 
     "github.com/jackc/pgx/v5/pgxpool"
-    "github.com/aqcool/socket.io/adapters/postgres/v3"
-    pgemitter "github.com/aqcool/socket.io/adapters/postgres/v3/emitter"
+    "github.com/aqcool/socket.io/adapters/postgres/v4"
+    pgemitter "github.com/aqcool/socket.io/adapters/postgres/v4/emitter"
 )
 
 func main() {

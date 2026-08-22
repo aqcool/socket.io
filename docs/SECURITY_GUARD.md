@@ -6,7 +6,7 @@
 import (
     "time"
 
-    "github.com/aqcool/socket.io/servers/socket/v3/guard"
+    "github.com/aqcool/socket.io/servers/socket/v4/guard"
 )
 
 protection, err := guard.New(io, &guard.Options{

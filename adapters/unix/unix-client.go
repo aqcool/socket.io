@@ -14,7 +14,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 // maxMessageSize is the maximum allowed message size (10 MB).

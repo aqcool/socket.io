@@ -1,20 +1,20 @@
-module github.com/aqcool/socket.io/adapters/kafka/v3
+module github.com/aqcool/socket.io/adapters/kafka/v4
 
 go 1.26.0
 
 require (
 	github.com/IBM/sarama v1.45.1
-	github.com/aqcool/socket.io/adapters/broker/v3 v3.0.4
+	github.com/aqcool/socket.io/adapters/broker/v4 v4.0.0
 )
 
 require (
 	github.com/andybalholm/brotli v1.2.1 // indirect
-	github.com/aqcool/socket.io/adapters/adapter/v3 v3.0.4 // indirect
-	github.com/aqcool/socket.io/parsers/engine/v3 v3.0.4 // indirect
-	github.com/aqcool/socket.io/parsers/socket/v3 v3.0.4 // indirect
-	github.com/aqcool/socket.io/servers/engine/v3 v3.0.4 // indirect
-	github.com/aqcool/socket.io/servers/socket/v3 v3.0.4 // indirect
-	github.com/aqcool/socket.io/v3 v3.0.4 // indirect
+	github.com/aqcool/socket.io/adapters/adapter/v4 v4.0.0 // indirect
+	github.com/aqcool/socket.io/parsers/engine/v4 v4.0.0 // indirect
+	github.com/aqcool/socket.io/parsers/socket/v4 v4.0.0 // indirect
+	github.com/aqcool/socket.io/servers/engine/v4 v4.0.0 // indirect
+	github.com/aqcool/socket.io/servers/socket/v4 v4.0.0 // indirect
+	github.com/aqcool/socket.io/v4 v4.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dunglas/httpsfv v1.1.0 // indirect
 	github.com/eapache/go-resiliency v1.7.0 // indirect
@@ -47,13 +47,49 @@ require (
 )
 
 replace (
-	github.com/aqcool/socket.io/adapters/adapter/v3 => ../adapter
-	github.com/aqcool/socket.io/adapters/broker/v3 => ../broker
-	github.com/aqcool/socket.io/clients/engine/v3 => ../../clients/engine
-	github.com/aqcool/socket.io/clients/socket/v3 => ../../clients/socket
-	github.com/aqcool/socket.io/parsers/engine/v3 => ../../parsers/engine
-	github.com/aqcool/socket.io/parsers/socket/v3 => ../../parsers/socket
-	github.com/aqcool/socket.io/servers/engine/v3 => ../../servers/engine
-	github.com/aqcool/socket.io/servers/socket/v3 => ../../servers/socket
-	github.com/aqcool/socket.io/v3 => ../../
+	github.com/aqcool/socket.io/adapters/adapter/v4 => ../adapter
+	github.com/aqcool/socket.io/adapters/broker/v4 => ../broker
+	github.com/aqcool/socket.io/clients/engine/v4 => ../../clients/engine
+	github.com/aqcool/socket.io/clients/socket/v4 => ../../clients/socket
+	github.com/aqcool/socket.io/parsers/engine/v4 => ../../parsers/engine
+	github.com/aqcool/socket.io/parsers/socket/v4 => ../../parsers/socket
+	github.com/aqcool/socket.io/servers/engine/v4 => ../../servers/engine
+	github.com/aqcool/socket.io/servers/socket/v4 => ../../servers/socket
+	github.com/aqcool/socket.io/v4 => ../..
 )
+
+replace github.com/aqcool/socket.io/adapters/amqp/v4 => ../amqp
+
+replace github.com/aqcool/socket.io/adapters/mongo/v4 => ../mongo
+
+replace github.com/aqcool/socket.io/adapters/nats/v4 => ../nats
+
+replace github.com/aqcool/socket.io/adapters/postgres/v4 => ../postgres
+
+replace github.com/aqcool/socket.io/adapters/redis/v4 => ../redis
+
+replace github.com/aqcool/socket.io/adapters/unix/v4 => ../unix
+
+replace github.com/aqcool/socket.io/adapters/valkey/v4 => ../valkey
+
+replace github.com/aqcool/socket.io/examples/basic-crud-application => ../../examples/basic-crud-application
+
+replace github.com/aqcool/socket.io/examples/benchmark => ../../examples/benchmark
+
+replace github.com/aqcool/socket.io/examples/chat => ../../examples/chat
+
+replace github.com/aqcool/socket.io/examples/middleware-auth => ../../examples/middleware-auth
+
+replace github.com/aqcool/socket.io/examples/test-suite => ../../examples/test-suite
+
+replace github.com/aqcool/socket.io/examples/unix-adapter-debug => ../../examples/unix-adapter-debug
+
+replace github.com/aqcool/socket.io/instrumentation/v4 => ../../instrumentation
+
+replace github.com/aqcool/socket.io/observability/v4 => ../../observability
+
+replace github.com/aqcool/socket.io/reliability/v4 => ../../reliability
+
+replace github.com/aqcool/socket.io/sticky/v4 => ../../sticky
+
+replace github.com/aqcool/socket.io/typed/v4 => ../../typed

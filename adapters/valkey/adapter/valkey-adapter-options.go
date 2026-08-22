@@ -4,8 +4,8 @@ package adapter
 import (
 	"time"
 
-	"github.com/aqcool/socket.io/adapters/valkey/v3/emitter"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/adapters/valkey/v4/emitter"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 // DefaultRequestsTimeout is the default timeout for inter-node requests.

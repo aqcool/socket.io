@@ -7,11 +7,11 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/aqcool/socket.io/adapters/adapter/v3"
-	valkey "github.com/aqcool/socket.io/adapters/valkey/v3"
-	"github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/log"
-	"github.com/aqcool/socket.io/v3/pkg/utils"
+	"github.com/aqcool/socket.io/adapters/adapter/v4"
+	valkey "github.com/aqcool/socket.io/adapters/valkey/v4"
+	"github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/log"
+	"github.com/aqcool/socket.io/v4/pkg/utils"
 )
 
 const emitterUID adapter.ServerId = "emitter"

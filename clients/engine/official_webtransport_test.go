@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	engineServer "github.com/aqcool/socket.io/servers/engine/v3"
-	serverConfig "github.com/aqcool/socket.io/servers/engine/v3/config"
-	serverTransports "github.com/aqcool/socket.io/servers/engine/v3/transports"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	engineServer "github.com/aqcool/socket.io/servers/engine/v4"
+	serverConfig "github.com/aqcool/socket.io/servers/engine/v4/config"
+	serverTransports "github.com/aqcool/socket.io/servers/engine/v4/transports"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 	"github.com/quic-go/quic-go/http3"
 	webtransportgo "github.com/quic-go/webtransport-go"
 )

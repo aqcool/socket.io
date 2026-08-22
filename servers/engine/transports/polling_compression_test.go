@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
-	"github.com/aqcool/socket.io/v3/pkg/types"
-	"github.com/aqcool/socket.io/v3/pkg/utils"
+	"github.com/aqcool/socket.io/parsers/engine/v4/packet"
+	"github.com/aqcool/socket.io/v4/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/utils"
 )
 
 func writePollingResponse(t *testing.T, compression *types.HttpCompression, payload string, acceptEncoding string, compress bool, userAgent string) *httptest.ResponseRecorder {

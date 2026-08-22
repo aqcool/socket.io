@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 )

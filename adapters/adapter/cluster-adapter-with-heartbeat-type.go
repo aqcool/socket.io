@@ -5,8 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/aqcool/socket.io/v3/pkg/types"
-	"github.com/aqcool/socket.io/v3/pkg/utils"
+	"github.com/aqcool/socket.io/v4/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/utils"
 )
 
 // CustomClusterRequest represents a custom request in the cluster with tracking for missing responses.

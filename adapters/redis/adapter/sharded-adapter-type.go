@@ -3,8 +3,8 @@
 package adapter
 
 import (
-	"github.com/aqcool/socket.io/adapters/adapter/v3"
-	"github.com/aqcool/socket.io/adapters/redis/v3"
+	"github.com/aqcool/socket.io/adapters/adapter/v4"
+	"github.com/aqcool/socket.io/adapters/redis/v4"
 )
 
 // ShardedRedisAdapter defines the interface for a sharded Redis-based Socket.IO adapter.

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	cluster "github.com/aqcool/socket.io/adapters/adapter/v3"
-	socket "github.com/aqcool/socket.io/servers/socket/v3"
+	cluster "github.com/aqcool/socket.io/adapters/adapter/v4"
+	socket "github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 type Message struct {

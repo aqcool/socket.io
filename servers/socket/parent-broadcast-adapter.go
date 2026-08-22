@@ -1,7 +1,7 @@
 package socket
 
 import (
-	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
+	"github.com/aqcool/socket.io/parsers/socket/v4/parser"
 )
 
 type (

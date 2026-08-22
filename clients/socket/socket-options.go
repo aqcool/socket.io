@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 // SocketOptionsInterface defines the interface for accessing and modifying Socket options.

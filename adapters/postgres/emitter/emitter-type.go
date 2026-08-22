@@ -3,9 +3,9 @@
 package emitter
 
 import (
-	"github.com/aqcool/socket.io/adapters/adapter/v3"
-	"github.com/aqcool/socket.io/adapters/postgres/v3"
-	"github.com/aqcool/socket.io/servers/socket/v3"
+	"github.com/aqcool/socket.io/adapters/adapter/v4"
+	"github.com/aqcool/socket.io/adapters/postgres/v4"
+	"github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 type (

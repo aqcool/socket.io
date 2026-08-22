@@ -1,8 +1,8 @@
 # Go 语言 Socket.IO
 
 [![Go](https://github.com/aqcool/socket.io/actions/workflows/go.yml/badge.svg)](https://github.com/aqcool/socket.io/actions/workflows/go.yml)
-[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/v4)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/v4)
 
 一个现代、符合 Go 语言习惯的 [Socket.IO](https://socket.io/) 实现，用于通过 WebSocket 及其他传输方式进行实时双向通信。
 
@@ -19,25 +19,25 @@
 安装指定模块：
 
 ```bash
-go get github.com/aqcool/socket.io/servers/socket/v3
+go get github.com/aqcool/socket.io/servers/socket/v4
 ```
 
 安装 PostgreSQL 适配器：
 
 ```bash
-go get github.com/aqcool/socket.io/adapters/postgres/v3
+go get github.com/aqcool/socket.io/adapters/postgres/v4
 ```
 
 安装 Valkey 适配器：
 
 ```bash
-go get github.com/aqcool/socket.io/adapters/valkey/v3
+go get github.com/aqcool/socket.io/adapters/valkey/v4
 ```
 
 安装 MongoDB 适配器：
 
 ```bash
-go get github.com/aqcool/socket.io/adapters/mongo/v3
+go get github.com/aqcool/socket.io/adapters/mongo/v4
 ```
 
 ---
@@ -88,24 +88,24 @@ go get github.com/aqcool/socket.io/adapters/mongo/v3
 #### 根模块
 | 状态 | Go 模块 | 说明 |
 |-------|-----------|-------------|
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/v3) | `github.com/aqcool/socket.io/v3` | 提供共享接口、类型和基础定义的根模块 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/v4) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/v4) | `github.com/aqcool/socket.io/v4` | 提供共享接口、类型和基础定义的根模块 |
 
 ---
 
 #### 服务端
 | 状态 | Go 模块 | 说明 |
 |-------|-----------|-------------|
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/servers/engine/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/servers/engine/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/servers/engine/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/servers/engine/v3) | `github.com/aqcool/socket.io/servers/engine/v3` | Engine.IO 服务端及支持跨监听器包转发、读写锁和 Upgrade 接管的 `ClusterServer` |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/servers/socket/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/servers/socket/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/servers/socket/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/servers/socket/v3) | `github.com/aqcool/socket.io/servers/socket/v3` | 构建于 Engine.IO 服务端之上的 Socket.IO 服务端实现 |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/instrumentation/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/instrumentation/v3) | `github.com/aqcool/socket.io/instrumentation/v3` | 兼容官方 Admin UI 协议的运行时观测与管理模块 |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/observability/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/observability/v3) | `github.com/aqcool/socket.io/observability/v3` | Prometheus 指标与 OpenTelemetry tracing 扩展 |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/reliability/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/reliability/v3) | `github.com/aqcool/socket.io/reliability/v3` | 服务端可靠投递、长期离线重放与客户端消息去重 |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/sticky/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/sticky/v3) | `github.com/aqcool/socket.io/sticky/v3` | Engine.IO `sid` 感知的多进程 HTTP/WebSocket 路由器 |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/typed/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/typed/v3) | `github.com/aqcool/socket.io/typed/v3` | Go 强类型事件、ACK、Context 与 TypeScript/Go/文档生成 |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/amqp/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/amqp/v3) | `github.com/aqcool/socket.io/adapters/amqp/v3` | RabbitMQ / AMQP 0-9-1 集群 Adapter |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/broker/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/broker/v3) | `github.com/aqcool/socket.io/adapters/broker/v3` | 消息系统 Adapter 的统一集群协议与传输抽象 |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/kafka/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/kafka/v3) | `github.com/aqcool/socket.io/adapters/kafka/v3` | Apache Kafka 集群 Adapter |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/nats/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/nats/v3) | `github.com/aqcool/socket.io/adapters/nats/v3` | NATS Core 与 NATS JetStream 集群 Adapter |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/servers/engine/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/servers/engine/v4) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/servers/engine/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/servers/engine/v4) | `github.com/aqcool/socket.io/servers/engine/v4` | Engine.IO 服务端及支持跨监听器包转发、读写锁和 Upgrade 接管的 `ClusterServer` |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/servers/socket/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/servers/socket/v4) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/servers/socket/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/servers/socket/v4) | `github.com/aqcool/socket.io/servers/socket/v4` | 构建于 Engine.IO 服务端之上的 Socket.IO 服务端实现 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/instrumentation/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/instrumentation/v4) | `github.com/aqcool/socket.io/instrumentation/v4` | 兼容官方 Admin UI 协议的运行时观测与管理模块 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/observability/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/observability/v4) | `github.com/aqcool/socket.io/observability/v4` | Prometheus 指标与 OpenTelemetry tracing 扩展 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/reliability/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/reliability/v4) | `github.com/aqcool/socket.io/reliability/v4` | 服务端可靠投递、长期离线重放与客户端消息去重 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/sticky/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/sticky/v4) | `github.com/aqcool/socket.io/sticky/v4` | Engine.IO `sid` 感知的多进程 HTTP/WebSocket 路由器 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/typed/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/typed/v4) | `github.com/aqcool/socket.io/typed/v4` | Go 强类型事件、ACK、Context 与 TypeScript/Go/文档生成 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/amqp/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/amqp/v4) | `github.com/aqcool/socket.io/adapters/amqp/v4` | RabbitMQ / AMQP 0-9-1 集群 Adapter |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/broker/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/broker/v4) | `github.com/aqcool/socket.io/adapters/broker/v4` | 消息系统 Adapter 的统一集群协议与传输抽象 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/kafka/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/kafka/v4) | `github.com/aqcool/socket.io/adapters/kafka/v4` | Apache Kafka 集群 Adapter |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/nats/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/nats/v4) | `github.com/aqcool/socket.io/adapters/nats/v4` | NATS Core 与 NATS JetStream 集群 Adapter |
 
 ---
 
@@ -116,28 +116,28 @@ go get github.com/aqcool/socket.io/adapters/mongo/v3
 #### 客户端
 | 状态 | Go 模块 | 说明 |
 |-------|-----------|-------------|
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/clients/engine/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/clients/engine/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/clients/engine/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/clients/engine/v3) | `github.com/aqcool/socket.io/clients/engine/v3` | Engine.IO 客户端实现 |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/clients/socket/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/clients/socket/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/clients/socket/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/clients/socket/v3) | `github.com/aqcool/socket.io/clients/socket/v3` | 构建于 Engine.IO 客户端之上的 Socket.IO 客户端实现 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/clients/engine/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/clients/engine/v4) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/clients/engine/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/clients/engine/v4) | `github.com/aqcool/socket.io/clients/engine/v4` | Engine.IO 客户端实现 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/clients/socket/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/clients/socket/v4) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/clients/socket/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/clients/socket/v4) | `github.com/aqcool/socket.io/clients/socket/v4` | 构建于 Engine.IO 客户端之上的 Socket.IO 客户端实现 |
 
 ---
 
 #### 解析器
 | 状态 | Go 模块 | 说明 |
 |-------|-----------|-------------|
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/parsers/engine/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/parsers/engine/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/parsers/engine/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/parsers/engine/v3) | `github.com/aqcool/socket.io/parsers/engine/v3` | Engine.IO 协议的数据包解析器 |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/parsers/socket/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/parsers/socket/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/parsers/socket/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/parsers/socket/v3) | `github.com/aqcool/socket.io/parsers/socket/v3` | Socket.IO 协议的数据包解析器 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/parsers/engine/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/parsers/engine/v4) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/parsers/engine/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/parsers/engine/v4) | `github.com/aqcool/socket.io/parsers/engine/v4` | Engine.IO 协议的数据包解析器 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/parsers/socket/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/parsers/socket/v4) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/parsers/socket/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/parsers/socket/v4) | `github.com/aqcool/socket.io/parsers/socket/v4` | Socket.IO 协议的数据包解析器 |
 
 ---
 
 #### 适配器
 | 状态 | Go 模块 | 说明 |
 |-------|-----------|-------------|
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/adapter/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/adapter/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/adapter/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/adapter/v3) | `github.com/aqcool/socket.io/adapters/adapter/v3` | 用于实现广播机制的基础适配器接口 |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/redis/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/redis/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/redis/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/redis/v3) | `github.com/aqcool/socket.io/adapters/redis/v3` | Socket.IO Redis Adapter，以及与官方 Cluster Engine Redis 线路互通的 `enginebus` |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/valkey/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/valkey/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/valkey/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/valkey/v3) | `github.com/aqcool/socket.io/adapters/valkey/v3` | 基于 Valkey Pub/Sub、用于在分布式服务器间广播消息的适配器 |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/postgres/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/postgres/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/postgres/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/postgres/v3) | `github.com/aqcool/socket.io/adapters/postgres/v3` | 基于 PostgreSQL LISTEN/NOTIFY、用于在分布式服务器间广播消息的适配器 |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/mongo/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/mongo/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/mongo/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/mongo/v3) | `github.com/aqcool/socket.io/adapters/mongo/v3` | 基于 MongoDB、用于在分布式服务器间广播消息的适配器 |
-| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/unix/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/unix/v3) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/unix/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/unix/v3) | `github.com/aqcool/socket.io/adapters/unix/v3` | 基于 Unix 域套接字、用于同一主机进程间广播消息的适配器 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/adapter/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/adapter/v4) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/adapter/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/adapter/v4) | `github.com/aqcool/socket.io/adapters/adapter/v4` | 用于实现广播机制的基础适配器接口 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/redis/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/redis/v4) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/redis/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/redis/v4) | `github.com/aqcool/socket.io/adapters/redis/v4` | Socket.IO Redis Adapter，以及与官方 Cluster Engine Redis 线路互通的 `enginebus` |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/valkey/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/valkey/v4) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/valkey/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/valkey/v4) | `github.com/aqcool/socket.io/adapters/valkey/v4` | 基于 Valkey Pub/Sub、用于在分布式服务器间广播消息的适配器 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/postgres/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/postgres/v4) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/postgres/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/postgres/v4) | `github.com/aqcool/socket.io/adapters/postgres/v4` | 基于 PostgreSQL LISTEN/NOTIFY、用于在分布式服务器间广播消息的适配器 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/mongo/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/mongo/v4) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/mongo/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/mongo/v4) | `github.com/aqcool/socket.io/adapters/mongo/v4` | 基于 MongoDB、用于在分布式服务器间广播消息的适配器 |
+| [![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/unix/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/unix/v4) <br/> [![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/unix/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/unix/v4) | `github.com/aqcool/socket.io/adapters/unix/v4` | 基于 Unix 域套接字、用于同一主机进程间广播消息的适配器 |
 
 连接状态恢复支持范围：
 

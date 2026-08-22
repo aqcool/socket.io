@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	valkey "github.com/aqcool/socket.io/adapters/valkey/v3"
-	"github.com/aqcool/socket.io/servers/socket/v3"
+	valkey "github.com/aqcool/socket.io/adapters/valkey/v4"
+	"github.com/aqcool/socket.io/servers/socket/v4"
 	vk "github.com/valkey-io/valkey-go"
 )
 

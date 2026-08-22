@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aqcool/socket.io/servers/socket/v3"
+	"github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 type official258ClusterBus struct {

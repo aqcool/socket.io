@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	legacy "github.com/aqcool/socket.io/servers/socket/v3"
+	core "github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 type Server struct {
-	raw *legacy.Server
+	raw *core.Server
 	cfg Config
 
 	ctx    context.Context
@@ -33,7 +33,7 @@ type Server struct {
 	namespaces        map[string]*Namespace
 
 	socketMu sync.Mutex
-	sockets  map[*legacy.Socket]*Socket
+	sockets  map[*core.Socket]*Socket
 
 	hub *eventHub
 }
@@ -49,30 +49,30 @@ func New(options ...Option) (*Server, error) {
 		}
 	}
 
-	// v4 starts by reusing the proven v3 protocol core. Provider adapters and
+	// v4 starts by reusing the native v4 protocol core. Provider adapters and
 	// custom packet codecs move to the native v4 contracts in the adapter/parser
 	// migration phases rather than being hidden behind an unsafe method-shape bridge.
 	if cfg.Adapter != nil {
-		return nil, fmt.Errorf("%w: native v4 adapters are not wired to the bridge backend yet", ErrUnsupported)
+		return nil, fmt.Errorf("%w: native v4 adapters are not wired to the native core backend yet", ErrUnsupported)
 	}
 	if cfg.PacketCodec != nil {
-		return nil, fmt.Errorf("%w: native v4 packet codecs are not wired to the bridge backend yet", ErrUnsupported)
+		return nil, fmt.Errorf("%w: native v4 packet codecs are not wired to the native core backend yet", ErrUnsupported)
 	}
 
-	legacyOptions := legacy.DefaultServerOptions()
-	legacyOptions.SetPath(cfg.Path)
-	legacyOptions.SetServeClient(cfg.ServeClient)
-	legacyOptions.SetConnectTimeout(cfg.ConnectTimeout)
-	legacyOptions.SetCleanupEmptyChildNamespaces(cfg.CleanupEmptyChildNamespaces)
+	coreOptions := core.DefaultServerOptions()
+	coreOptions.SetPath(cfg.Path)
+	coreOptions.SetServeClient(cfg.ServeClient)
+	coreOptions.SetConnectTimeout(cfg.ConnectTimeout)
+	coreOptions.SetCleanupEmptyChildNamespaces(cfg.CleanupEmptyChildNamespaces)
 	if cfg.Recovery != nil {
-		recovery := legacy.DefaultConnectionStateRecovery()
+		recovery := core.DefaultConnectionStateRecovery()
 		recovery.SetMaxDisconnectionDuration(int64(cfg.Recovery.MaxDisconnectionDuration / time.Millisecond))
 		recovery.SetSkipMiddlewares(cfg.Recovery.SkipMiddleware)
 		recovery.SetSessionCleanupInterval(cfg.Recovery.CleanupInterval)
-		legacyOptions.SetConnectionStateRecovery(recovery)
+		coreOptions.SetConnectionStateRecovery(recovery)
 	}
 
-	raw, err := legacy.NewServerWithError(nil, legacyOptions)
+	raw, err := core.NewServerWithError(nil, coreOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func New(options ...Option) (*Server, error) {
 		cancel:     cancel,
 		done:       make(chan struct{}),
 		namespaces: make(map[string]*Namespace),
-		sockets:    make(map[*legacy.Socket]*Socket),
+		sockets:    make(map[*core.Socket]*Socket),
 	}
 	server.hub = newEventHub(
 		func(event string, listener func(...any)) error {
@@ -436,7 +436,7 @@ func (s *Server) OfMatch(matcher NamespaceMatcher) *ParentNamespace {
 	if s == nil || s.raw == nil || matcher == nil {
 		return nil
 	}
-	legacyMatcher := func(name string, auth map[string]any, next func(error, bool)) {
+	coreMatcher := func(name string, auth map[string]any, next func(error, bool)) {
 		ctx := s.Context()
 		if err := ctx.Err(); err != nil {
 			next(err, false)
@@ -445,9 +445,9 @@ func (s *Server) OfMatch(matcher NamespaceMatcher) *ParentNamespace {
 		allow, err := matcher(ctx, name, auth)
 		next(err, allow)
 	}
-	key := legacy.ParentNspNameMatchFn(&legacyMatcher)
+	key := core.ParentNspNameMatchFn(&coreMatcher)
 	raw := s.raw.Of(key, nil)
-	parent, ok := raw.(legacy.ParentNamespace)
+	parent, ok := raw.(core.ParentNamespace)
 	if !ok {
 		return nil
 	}
@@ -457,7 +457,7 @@ func (s *Server) OfMatch(matcher NamespaceMatcher) *ParentNamespace {
 	}
 }
 
-func (s *Server) wrapNamespace(raw legacy.Namespace) *Namespace {
+func (s *Server) wrapNamespace(raw core.Namespace) *Namespace {
 	if s == nil || raw == nil {
 		return nil
 	}
@@ -475,7 +475,7 @@ func (s *Server) wrapNamespace(raw legacy.Namespace) *Namespace {
 func (s *Server) transformArgs(_ string, args []any) []any {
 	result := append([]any(nil), args...)
 	for i, value := range result {
-		if raw, ok := value.(*legacy.Socket); ok {
+		if raw, ok := value.(*core.Socket); ok {
 			result[i] = s.wrapSocket(raw)
 		}
 	}
@@ -500,10 +500,10 @@ func normalizeNamespace(name string) string {
 	return name
 }
 
-func toLegacyRooms(rooms []Room) []legacy.Room {
-	result := make([]legacy.Room, len(rooms))
+func toLegacyRooms(rooms []Room) []core.Room {
+	result := make([]core.Room, len(rooms))
 	for i, room := range rooms {
-		result[i] = legacy.Room(room)
+		result[i] = core.Room(room)
 	}
 	return result
 }

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	broker "github.com/aqcool/socket.io/adapters/broker/v3"
+	broker "github.com/aqcool/socket.io/adapters/broker/v4"
 	amqp091 "github.com/rabbitmq/amqp091-go"
 )
 

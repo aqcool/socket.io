@@ -5,7 +5,7 @@
 ## 安装
 
 ```bash
-go get github.com/aqcool/socket.io/sticky/v3
+go get github.com/aqcool/socket.io/sticky/v4
 ```
 
 ## 使用
@@ -18,7 +18,7 @@ import (
     "net/http"
     "net/url"
 
-    "github.com/aqcool/socket.io/sticky/v3"
+    "github.com/aqcool/socket.io/sticky/v4"
 )
 
 func main() {

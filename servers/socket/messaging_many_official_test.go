@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	enginepacket "github.com/aqcool/socket.io/parsers/engine/v3/packet"
+	enginepacket "github.com/aqcool/socket.io/parsers/engine/v4/packet"
 )
 
 func TestOfficialMessagingManyRoomLifecycle(t *testing.T) {

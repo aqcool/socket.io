@@ -6,7 +6,7 @@ package mongo
 import (
 	"context"
 
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 

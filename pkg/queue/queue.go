@@ -7,7 +7,7 @@ import (
 	"runtime/debug"
 	"sync"
 
-	"github.com/aqcool/socket.io/v3/pkg/log"
+	"github.com/aqcool/socket.io/v4/pkg/log"
 )
 
 var queueLog = log.NewLog("engine:events")

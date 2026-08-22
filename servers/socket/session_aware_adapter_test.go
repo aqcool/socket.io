@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 func newTestSessionAwareAdapter() SessionAwareAdapter {

@@ -5,16 +5,16 @@ import (
 	"errors"
 	"time"
 
-	legacy "github.com/aqcool/socket.io/servers/socket/v3"
+	core "github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 type Namespace struct {
 	server *Server
-	raw    legacy.Namespace
+	raw    core.Namespace
 	hub    *eventHub
 }
 
-func newNamespace(server *Server, raw legacy.Namespace) *Namespace {
+func newNamespace(server *Server, raw core.Namespace) *Namespace {
 	namespace := &Namespace{server: server, raw: raw}
 	if server == nil || raw == nil {
 		return namespace
@@ -80,7 +80,7 @@ func (n *Namespace) Use(middleware ...Middleware) {
 			continue
 		}
 		mw := current
-		n.raw.Use(func(rawSocket *legacy.Socket, next func(*legacy.ExtendedError)) {
+		n.raw.Use(func(rawSocket *core.Socket, next func(*core.ExtendedError)) {
 			socket := n.server.wrapSocket(rawSocket)
 			ctx := socket.Context()
 			if err := ctx.Err(); err != nil {
@@ -96,7 +96,7 @@ func (n *Namespace) Use(middleware ...Middleware) {
 	}
 }
 
-func toLegacyConnectError(err error) *legacy.ExtendedError {
+func toLegacyConnectError(err error) *core.ExtendedError {
 	if err == nil {
 		return nil
 	}
@@ -106,9 +106,9 @@ func toLegacyConnectError(err error) *legacy.ExtendedError {
 		if message == "" {
 			message = connectErr.Error()
 		}
-		return legacy.NewExtendedError(message, connectErr.Data)
+		return core.NewExtendedError(message, connectErr.Data)
 	}
-	return legacy.NewExtendedError(err.Error(), nil)
+	return core.NewExtendedError(err.Error(), nil)
 }
 
 func (n *Namespace) Emit(event string, args ...any) error {
@@ -172,11 +172,11 @@ func (n *Namespace) FetchSockets(ctx context.Context) ([]*RemoteSocket, error) {
 		ctx = context.Background()
 	}
 	type result struct {
-		sockets []*legacy.RemoteSocket
+		sockets []*core.RemoteSocket
 		err     error
 	}
 	ch := make(chan result, 1)
-	n.raw.FetchSockets()(func(sockets []*legacy.RemoteSocket, err error) {
+	n.raw.FetchSockets()(func(sockets []*core.RemoteSocket, err error) {
 		ch <- result{sockets: sockets, err: err}
 	})
 	select {
@@ -225,11 +225,11 @@ func (n *Namespace) ListRooms(ctx context.Context) (map[Room]uint64, error) {
 		ctx = context.Background()
 	}
 	type result struct {
-		rooms map[legacy.Room]uint64
+		rooms map[core.Room]uint64
 		err   error
 	}
 	ch := make(chan result, 1)
-	n.raw.ListRooms()(func(rooms map[legacy.Room]uint64, err error) {
+	n.raw.ListRooms()(func(rooms map[core.Room]uint64, err error) {
 		ch <- result{rooms: rooms, err: err}
 	})
 	select {
@@ -333,7 +333,7 @@ func (n *Namespace) DecodeValue(src any, dst any) error {
 
 type ParentNamespace struct {
 	*Namespace
-	raw legacy.ParentNamespace
+	raw core.ParentNamespace
 }
 
 func (p *ParentNamespace) Children() []*Namespace {

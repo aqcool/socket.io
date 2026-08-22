@@ -1,7 +1,7 @@
 package socket
 
 import (
-	"github.com/aqcool/socket.io/servers/engine/v3/transports"
+	"github.com/aqcool/socket.io/servers/engine/v4/transports"
 )
 
 type (

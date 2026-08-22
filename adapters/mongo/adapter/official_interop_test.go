@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	mongoio "github.com/aqcool/socket.io/adapters/mongo/v3"
-	mgemitter "github.com/aqcool/socket.io/adapters/mongo/v3/emitter"
-	"github.com/aqcool/socket.io/servers/socket/v3"
+	mongoio "github.com/aqcool/socket.io/adapters/mongo/v4"
+	mgemitter "github.com/aqcool/socket.io/adapters/mongo/v4/emitter"
+	"github.com/aqcool/socket.io/servers/socket/v4"
 	mongod "go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"go.mongodb.org/mongo-driver/v2/mongo/readpref"

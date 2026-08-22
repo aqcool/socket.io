@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/aqcool/socket.io/adapters/redis/v3"
-	"github.com/aqcool/socket.io/v3/pkg/utils"
+	"github.com/aqcool/socket.io/adapters/redis/v4"
+	"github.com/aqcool/socket.io/v4/pkg/utils"
 	rds "github.com/redis/go-redis/v9"
 )
 

@@ -38,11 +38,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aqcool/socket.io/adapters/adapter/v3"
-	"github.com/aqcool/socket.io/adapters/unix/v3"
-	unix_adapter "github.com/aqcool/socket.io/adapters/unix/v3/adapter"
-	unix_emitter "github.com/aqcool/socket.io/adapters/unix/v3/emitter"
-	"github.com/aqcool/socket.io/servers/socket/v3"
+	"github.com/aqcool/socket.io/adapters/adapter/v4"
+	"github.com/aqcool/socket.io/adapters/unix/v4"
+	unix_adapter "github.com/aqcool/socket.io/adapters/unix/v4/adapter"
+	unix_emitter "github.com/aqcool/socket.io/adapters/unix/v4/emitter"
+	"github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 // ---------------------------------------------------------------------------

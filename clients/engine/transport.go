@@ -6,9 +6,9 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
-	"github.com/aqcool/socket.io/parsers/engine/v3/parser"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/parsers/engine/v4/packet"
+	"github.com/aqcool/socket.io/parsers/engine/v4/parser"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 // Transport represents the base transport implementation that provides common functionality

@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	io_client "github.com/aqcool/socket.io/clients/socket/v3"
-	io "github.com/aqcool/socket.io/servers/socket/v3"
+	io_client "github.com/aqcool/socket.io/clients/socket/v4"
+	io "github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 func main() {

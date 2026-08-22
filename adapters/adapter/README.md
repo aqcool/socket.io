@@ -1,7 +1,7 @@
 # socket.io-go-adapter
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/adapter/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/adapter/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/adapter/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/adapter/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/adapter/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/adapter/v4)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/adapter/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/adapter/v4)
 
 ## 简介
 
@@ -10,7 +10,7 @@ Socket.IO Go 服务端的基础适配器实现，提供构建自定义适配器�
 ## 安装
 
 ```bash
-go get github.com/aqcool/socket.io/adapters/adapter/v3
+go get github.com/aqcool/socket.io/adapters/adapter/v4
 ```
 
 ## 特性
@@ -30,8 +30,8 @@ go get github.com/aqcool/socket.io/adapters/adapter/v3
 package main
 
 import (
-    "github.com/aqcool/socket.io/adapters/adapter/v3"
-    "github.com/aqcool/socket.io/servers/socket/v3"
+    "github.com/aqcool/socket.io/adapters/adapter/v4"
+    "github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 func main() {

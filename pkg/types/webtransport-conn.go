@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/aqcool/socket.io/v3/pkg/webtransport"
+	"github.com/aqcool/socket.io/v4/pkg/webtransport"
 	wt "github.com/quic-go/webtransport-go"
 )
 

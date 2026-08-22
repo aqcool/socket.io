@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/andybalholm/brotli"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 func newOfficialAttachedHTTPServer(t *testing.T, options *ServerOptions) *httptest.Server {

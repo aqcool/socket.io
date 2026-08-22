@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
+	"github.com/aqcool/socket.io/parsers/socket/v4/parser"
 )
 
 func newBackpressureTestSocket(t *testing.T, configure func(*SocketOptions)) *Socket {

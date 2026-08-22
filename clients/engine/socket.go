@@ -8,7 +8,7 @@
 // Socket.IO Manager, not the Engine.IO socket itself.
 package engine
 
-import "github.com/aqcool/socket.io/v3/pkg/types"
+import "github.com/aqcool/socket.io/v4/pkg/types"
 
 // Socket provides a WebSocket-like interface to connect to an Engine.IO server.
 // It supports multiple transport protocols including HTTP long-polling, WebSocket,
@@ -25,7 +25,7 @@ import "github.com/aqcool/socket.io/v3/pkg/types"
 //	import (
 //		"strings"
 //
-//		"github.com/aqcool/socket.io/clients/engine/v3"
+//		"github.com/aqcool/socket.io/clients/engine/v4"
 //	)
 //
 //	func main() {

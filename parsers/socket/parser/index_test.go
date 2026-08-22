@@ -3,7 +3,7 @@ package parser
 import (
 	"testing"
 
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 func TestNewBinaryReconstructor(t *testing.T) {

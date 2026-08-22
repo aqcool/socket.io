@@ -3,9 +3,9 @@ package compilefail
 import (
 	"context"
 
-	socket "github.com/aqcool/socket.io/servers/socket/v3"
-	typed "github.com/aqcool/socket.io/typed/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	socket "github.com/aqcool/socket.io/servers/socket/v4"
+	typed "github.com/aqcool/socket.io/typed/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 type request struct {

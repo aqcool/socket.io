@@ -1,7 +1,7 @@
 # Go 语言 Socket.IO 服务端
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/servers/socket/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/servers/socket/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/servers/socket/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/servers/socket/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/servers/socket/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/servers/socket/v4)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/servers/socket/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/servers/socket/v4)
 
 ## 概述
 
@@ -31,7 +31,7 @@ Socket.IO 是面向 Go 的实时双向事件通信库。本模块提供 Socket.I
 ## 安装
 
 ```bash
-go get github.com/aqcool/socket.io/servers/socket/v3
+go get github.com/aqcool/socket.io/servers/socket/v4
 ```
 
 ## 快速开始
@@ -42,8 +42,8 @@ go get github.com/aqcool/socket.io/servers/socket/v3
 package main
 
 import (
-    "github.com/aqcool/socket.io/servers/socket/v3"
-    "github.com/aqcool/socket.io/v3/pkg/types"
+    "github.com/aqcool/socket.io/servers/socket/v4"
+    "github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 func main() {
@@ -157,7 +157,7 @@ make test
 
 详细 API 文档请参阅：
 
-- [GoDoc 文档](https://pkg.go.dev/github.com/aqcool/socket.io/servers/socket/v3)
+- [GoDoc 文档](https://pkg.go.dev/github.com/aqcool/socket.io/servers/socket/v4)
 - [Socket.IO 协议](https://github.com/socketio/socket.io-protocol)
 - [客户端兼容矩阵](../../docs/COMPATIBILITY.md)
 

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
+	"github.com/aqcool/socket.io/parsers/engine/v4/packet"
 )
 
 func TestPacketStreamRoundTrip(t *testing.T) {

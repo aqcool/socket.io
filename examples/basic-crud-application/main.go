@@ -8,8 +8,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	io "github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	io "github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 // Basic CRUD application - demonstrates real-time CRUD operations with Socket.IO.
