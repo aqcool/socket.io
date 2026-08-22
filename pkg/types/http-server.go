@@ -114,6 +114,34 @@ func (s *HttpServer) Close(fn func(error)) (err error) {
 	return err
 }
 
+// Serve serves HTTP requests on an already-bound listener and returns serving
+// errors to the caller instead of panicking in a background goroutine. This is
+// the preferred Go-native entry point when the caller owns listener lifecycle.
+func (s *HttpServer) Serve(listener net.Listener) error {
+	if listener == nil {
+		return errors.New("http server listener is nil")
+	}
+
+	server := s.httpServer(listener.Addr().String(), s)
+	s.Emit("listening")
+
+	if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
+}
+
+// ListenAndServe binds addr synchronously before serving. Bind failures are
+// returned directly, which makes this API suitable for normal Go error
+// handling. Existing Listen remains available for Socket.IO compatibility.
+func (s *HttpServer) ListenAndServe(addr string) error {
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	return s.Serve(listener)
+}
+
 func (s *HttpServer) Listen(addr string, fn Callable) *http.Server {
 	server := s.httpServer(addr, s)
 	// Idempotent repeated calls
