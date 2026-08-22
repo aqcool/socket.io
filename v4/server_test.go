@@ -73,7 +73,7 @@ func TestListenAndServeReturnsBindError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 
 	io, err := New()
 	if err != nil {
@@ -101,7 +101,7 @@ func TestCloseCancelsServerContextAndDone(t *testing.T) {
 	select {
 	case <-io.Context().Done():
 	case <-time.After(time.Second):
-		t.Fatal("server context was not cancelled")
+		t.Fatal("server context was not canceled")
 	}
 	select {
 	case <-io.Done():
