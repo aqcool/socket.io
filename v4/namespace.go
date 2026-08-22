@@ -2,355 +2,84 @@ package socketio
 
 import (
 	"context"
-	"errors"
+	"sync"
+	"sync/atomic"
 	"time"
-
-	legacy "github.com/aqcool/socket.io/servers/socket/v3"
 )
 
 type Namespace struct {
 	server *Server
-	raw    legacy.Namespace
-	hub    *eventHub
+	name string
+	hub *eventHub
+	adapter Adapter
+
+	mu sync.RWMutex
+	sockets map[SocketID]*Socket
+	preConnect map[SocketID]*Socket
+	middlewares []Middleware
+	ids atomic.Uint64
+	closed bool
 }
 
-func newNamespace(server *Server, raw legacy.Namespace) *Namespace {
-	namespace := &Namespace{server: server, raw: raw}
-	if server == nil || raw == nil {
-		return namespace
-	}
-	namespace.hub = newEventHub(
-		func(event string, listener func(...any)) error {
-			return raw.On(event, listener)
-		},
-		server.Context,
-		server.transformArgs,
-		server.cfg.Logger,
-	)
-	return namespace
+func newNamespace(server *Server,name string)(*Namespace,error){
+	n:=&Namespace{server:server,name:normalizeNamespace(name),sockets:make(map[SocketID]*Socket),preConnect:make(map[SocketID]*Socket)}
+	n.hub=newEventHub(nil,server.Context,nil,server.cfg.Logger)
+	adapter,err:=server.adapterFactory.New(n);if err!=nil{return nil,err};n.adapter=adapter
+	if err:=adapter.Init(server.Context());err!=nil{return nil,err}
+	return n,nil
 }
+func (n *Namespace) Name()string{if n==nil{return ""};return n.name}
+func (n *Namespace) On(event string,listener Listener)Subscription{if n==nil{return closedSubscription{}};return n.hub.On(event,listener)}
+func (n *Namespace) Once(event string,listener Listener)Subscription{if n==nil{return closedSubscription{}};return n.hub.Once(event,listener)}
+func (n *Namespace) RemoveAllListeners(event string){if n!=nil{n.hub.RemoveAll(event)}}
+func (n *Namespace) OnConnection(fn func(*Socket))Subscription{if fn==nil{return closedSubscription{}};return n.On("connection",func(_ context.Context,args ...any)error{if len(args)>0{if s,ok:=args[0].(*Socket);ok{fn(s)}};return nil})}
+func (n *Namespace) Use(middleware ...Middleware){if n==nil{return};n.mu.Lock();for _,mw:=range middleware{if mw!=nil{n.middlewares=append(n.middlewares,mw)}};n.mu.Unlock()}
 
-func (n *Namespace) Name() string {
-	if n == nil || n.raw == nil {
-		return ""
-	}
-	return n.raw.Name()
-}
+func (n *Namespace) connect(c *client,auth map[string]any)(*Socket,error){
+	if n==nil||c==nil{return nil,ErrClosed}
+	socket,err:=newSocket(n,c,auth);if err!=nil{return nil,err}
+	n.mu.Lock();if n.closed{n.mu.Unlock();socket.close("namespace closed");return nil,ErrClosed};n.preConnect[socket.ID()]=socket;middlewares:=append([]Middleware(nil),n.middlewares...);n.mu.Unlock()
 
-func (n *Namespace) On(event string, listener Listener) Subscription {
-	if n == nil || n.hub == nil {
-		return closedSubscription{}
-	}
-	return n.hub.On(event, listener)
-}
+	ctx:=socket.Context();var cancel context.CancelFunc
+	if timeout:=n.server.cfg.ConnectTimeout;timeout>0{ctx,cancel=context.WithTimeout(ctx,timeout);defer cancel()}
+	for _,mw:=range middlewares{if err:=mw(ctx,socket);err!=nil{n.removePreConnect(socket.ID());socket.close("middleware rejection");return nil,err};if err:=ctx.Err();err!=nil{n.removePreConnect(socket.ID());socket.close("connect timeout");return nil,err}}
 
-func (n *Namespace) Once(event string, listener Listener) Subscription {
-	if n == nil || n.hub == nil {
-		return closedSubscription{}
-	}
-	return n.hub.Once(event, listener)
+	n.mu.Lock();delete(n.preConnect,socket.ID());if n.closed{n.mu.Unlock();socket.close("namespace closed");return nil,ErrClosed};n.sockets[socket.ID()]=socket;n.mu.Unlock()
+	if err:=n.adapter.AddAll(socket.Context(),socket.ID(),Room(socket.ID()));err!=nil{n.remove(socket);socket.close("adapter error");return nil,err}
+	socket.markConnected()
+	connectData:=map[string]any{"sid":socket.ID()};if socket.pid!=""{connectData["pid"]=socket.pid}
+	if err:=c.writePacket(Packet{Type:PacketConnect,Namespace:n.name,Data:connectData},BroadcastFlags{});err!=nil{socket.close("transport error");return nil,err}
+	n.hub.dispatch("connect",[]any{socket});n.hub.dispatch("connection",[]any{socket})
+	if n.name=="/"{n.server.hub.dispatch("connect",[]any{socket});n.server.hub.dispatch("connection",[]any{socket})}
+	return socket,nil
 }
+func (n *Namespace) removePreConnect(id SocketID){n.mu.Lock();delete(n.preConnect,id);n.mu.Unlock()}
+func (n *Namespace) remove(socket *Socket){if n==nil||socket==nil{return};n.mu.Lock();delete(n.preConnect,socket.ID());delete(n.sockets,socket.ID());n.mu.Unlock();_ = n.adapter.DeleteAll(context.Background(),socket.ID())}
+func (n *Namespace) Socket(id SocketID)(*Socket,bool){if n==nil{return nil,false};n.mu.RLock();s,ok:=n.sockets[id];n.mu.RUnlock();return s,ok}
+func (n *Namespace) socketSnapshot()[]*Socket{n.mu.RLock();out:=make([]*Socket,0,len(n.sockets));for _,s:=range n.sockets{out=append(out,s)};n.mu.RUnlock();return out}
+func (n *Namespace) close()error{if n==nil{return nil};n.mu.Lock();if n.closed{n.mu.Unlock();return nil};n.closed=true;sockets:=make([]*Socket,0,len(n.sockets)+len(n.preConnect));for _,s:=range n.sockets{sockets=append(sockets,s)};for _,s:=range n.preConnect{sockets=append(sockets,s)};clear(n.sockets);clear(n.preConnect);n.mu.Unlock();for _,s:=range sockets{s.close("server shutting down")};return n.adapter.Close()}
 
-func (n *Namespace) RemoveAllListeners(event string) {
-	if n != nil && n.hub != nil {
-		n.hub.RemoveAll(event)
-	}
-}
+func (n *Namespace) nextID()uint64{return n.ids.Add(1)-1}
+func (n *Namespace) Emit(event string,args ...any)error{return n.To().Emit(event,args...)}
+func (n *Namespace) To(rooms ...Room)*BroadcastOperator{return newBroadcastOperator(n,BroadcastOptions{Rooms:append([]Room(nil),rooms...)})}
+func (n *Namespace) In(rooms ...Room)*BroadcastOperator{return n.To(rooms...)}
+func (n *Namespace) Except(rooms ...Room)*BroadcastOperator{return newBroadcastOperator(n,BroadcastOptions{Except:append([]Room(nil),rooms...)})}
+func (n *Namespace) Local()*BroadcastOperator{o:=n.To();return o.Local()}
+func (n *Namespace) Volatile()*BroadcastOperator{o:=n.To();return o.Volatile()}
+func (n *Namespace) Compress(enabled bool)*BroadcastOperator{o:=n.To();return o.Compress(enabled)}
+func (n *Namespace) Timeout(timeout time.Duration)*BroadcastOperator{o:=n.To();return o.Timeout(timeout)}
+func (n *Namespace) FetchSockets(ctx context.Context)([]*RemoteSocket,error){return n.To().FetchSockets(ctx)}
+func (n *Namespace) CountSockets(ctx context.Context)(uint64,error){return n.adapter.CountSockets(ctx,BroadcastOptions{})}
+func (n *Namespace) ListRooms(ctx context.Context)(map[Room]uint64,error){return n.adapter.ListRooms(ctx,BroadcastOptions{})}
+func (n *Namespace) SocketsJoin(ctx context.Context,rooms ...Room)error{return n.adapter.AddSockets(ctx,BroadcastOptions{},rooms...)}
+func (n *Namespace) SocketsLeave(ctx context.Context,rooms ...Room)error{return n.adapter.DeleteSockets(ctx,BroadcastOptions{},rooms...)}
+func (n *Namespace) DisconnectSockets(ctx context.Context,closeTransport bool)error{return n.adapter.DisconnectSockets(ctx,BroadcastOptions{},closeTransport)}
+func (n *Namespace) ServerSideEmit(ctx context.Context,event string,args ...any)error{return n.adapter.ServerSideEmit(ctx,append([]any{event},args...))}
+func (n *Namespace) ServerSideEmitAck(ctx context.Context,event string,args ...any)([]any,error){if err:=n.ServerSideEmit(ctx,event,args...);err!=nil{return nil,err};return nil,nil}
+func (n *Namespace) EmitAcks(ctx context.Context,event string,args ...any)([][]any,error){return n.To().EmitAcks(ctx,event,args...)}
+func (n *Namespace) DecodeValue(src any,dst any)error{return n.server.DecodeValue(src,dst)}
 
-func (n *Namespace) OnConnection(fn func(*Socket)) Subscription {
-	if fn == nil {
-		return closedSubscription{}
-	}
-	return n.On("connection", func(_ context.Context, args ...any) error {
-		if len(args) > 0 {
-			if socket, ok := args[0].(*Socket); ok {
-				fn(socket)
-			}
-		}
-		return nil
-	})
-}
-
-func (n *Namespace) Use(middleware ...Middleware) {
-	if n == nil || n.raw == nil {
-		return
-	}
-	for _, current := range middleware {
-		if current == nil {
-			continue
-		}
-		mw := current
-		n.raw.Use(func(rawSocket *legacy.Socket, next func(*legacy.ExtendedError)) {
-			socket := n.server.wrapSocket(rawSocket)
-			ctx := socket.Context()
-			if err := ctx.Err(); err != nil {
-				next(toLegacyConnectError(err))
-				return
-			}
-			if err := mw(ctx, socket); err != nil {
-				next(toLegacyConnectError(err))
-				return
-			}
-			next(nil)
-		})
-	}
-}
-
-func toLegacyConnectError(err error) *legacy.ExtendedError {
-	if err == nil {
-		return nil
-	}
-	var connectErr *ConnectError
-	if errors.As(err, &connectErr) {
-		message := connectErr.Message
-		if message == "" {
-			message = connectErr.Error()
-		}
-		return legacy.NewExtendedError(message, connectErr.Data)
-	}
-	return legacy.NewExtendedError(err.Error(), nil)
-}
-
-func (n *Namespace) Emit(event string, args ...any) error {
-	if n == nil || n.raw == nil {
-		return ErrClosed
-	}
-	return n.raw.Emit(event, args...)
-}
-
-func (n *Namespace) To(rooms ...Room) *BroadcastOperator {
-	if n == nil || n.raw == nil {
-		return nil
-	}
-	return newBroadcastOperator(n.server, n.raw.To(toLegacyRooms(rooms)...), nil)
-}
-
-func (n *Namespace) In(rooms ...Room) *BroadcastOperator {
-	return n.To(rooms...)
-}
-
-func (n *Namespace) Except(rooms ...Room) *BroadcastOperator {
-	if n == nil || n.raw == nil {
-		return nil
-	}
-	return newBroadcastOperator(n.server, n.raw.Except(toLegacyRooms(rooms)...), nil)
-}
-
-func (n *Namespace) Local() *BroadcastOperator {
-	if n == nil || n.raw == nil {
-		return nil
-	}
-	return newBroadcastOperator(n.server, n.raw.Local(), nil)
-}
-
-func (n *Namespace) Volatile() *BroadcastOperator {
-	if n == nil || n.raw == nil {
-		return nil
-	}
-	return newBroadcastOperator(n.server, n.raw.Volatile(), nil)
-}
-
-func (n *Namespace) Compress(enabled bool) *BroadcastOperator {
-	if n == nil || n.raw == nil {
-		return nil
-	}
-	return newBroadcastOperator(n.server, n.raw.Compress(enabled), nil)
-}
-
-func (n *Namespace) Timeout(timeout time.Duration) *BroadcastOperator {
-	if n == nil || n.raw == nil {
-		return nil
-	}
-	return newBroadcastOperator(n.server, n.raw.Timeout(timeout), &timeout)
-}
-
-func (n *Namespace) FetchSockets(ctx context.Context) ([]*RemoteSocket, error) {
-	if n == nil || n.raw == nil {
-		return nil, ErrClosed
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	type result struct {
-		sockets []*legacy.RemoteSocket
-		err     error
-	}
-	ch := make(chan result, 1)
-	n.raw.FetchSockets()(func(sockets []*legacy.RemoteSocket, err error) {
-		ch <- result{sockets: sockets, err: err}
-	})
-	select {
-	case value := <-ch:
-		if value.err != nil {
-			return nil, value.err
-		}
-		wrapped := make([]*RemoteSocket, 0, len(value.sockets))
-		for _, socket := range value.sockets {
-			wrapped = append(wrapped, newRemoteSocket(n.server, socket))
-		}
-		return wrapped, nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-}
-
-func (n *Namespace) CountSockets(ctx context.Context) (uint64, error) {
-	if n == nil || n.raw == nil {
-		return 0, ErrClosed
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	type result struct {
-		count uint64
-		err   error
-	}
-	ch := make(chan result, 1)
-	n.raw.CountSockets()(func(count uint64, err error) {
-		ch <- result{count: count, err: err}
-	})
-	select {
-	case value := <-ch:
-		return value.count, value.err
-	case <-ctx.Done():
-		return 0, ctx.Err()
-	}
-}
-
-func (n *Namespace) ListRooms(ctx context.Context) (map[Room]uint64, error) {
-	if n == nil || n.raw == nil {
-		return nil, ErrClosed
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	type result struct {
-		rooms map[legacy.Room]uint64
-		err   error
-	}
-	ch := make(chan result, 1)
-	n.raw.ListRooms()(func(rooms map[legacy.Room]uint64, err error) {
-		ch <- result{rooms: rooms, err: err}
-	})
-	select {
-	case value := <-ch:
-		if value.err != nil {
-			return nil, value.err
-		}
-		rooms := make(map[Room]uint64, len(value.rooms))
-		for room, count := range value.rooms {
-			rooms[Room(room)] = count
-		}
-		return rooms, nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-}
-
-func (n *Namespace) SocketsJoin(ctx context.Context, rooms ...Room) error {
-	if err := contextError(ctx); err != nil {
-		return err
-	}
-	if n == nil || n.raw == nil {
-		return ErrClosed
-	}
-	n.raw.SocketsJoin(toLegacyRooms(rooms)...)
-	return nil
-}
-
-func (n *Namespace) SocketsLeave(ctx context.Context, rooms ...Room) error {
-	if err := contextError(ctx); err != nil {
-		return err
-	}
-	if n == nil || n.raw == nil {
-		return ErrClosed
-	}
-	n.raw.SocketsLeave(toLegacyRooms(rooms)...)
-	return nil
-}
-
-func (n *Namespace) DisconnectSockets(ctx context.Context, closeTransport bool) error {
-	if err := contextError(ctx); err != nil {
-		return err
-	}
-	if n == nil || n.raw == nil {
-		return ErrClosed
-	}
-	n.raw.DisconnectSockets(closeTransport)
-	return nil
-}
-
-func (n *Namespace) ServerSideEmit(ctx context.Context, event string, args ...any) error {
-	if err := contextError(ctx); err != nil {
-		return err
-	}
-	if n == nil || n.raw == nil {
-		return ErrClosed
-	}
-	return n.raw.ServerSideEmit(event, args...)
-}
-
-func (n *Namespace) ServerSideEmitAck(ctx context.Context, event string, args ...any) ([]any, error) {
-	if n == nil || n.raw == nil {
-		return nil, ErrClosed
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	type result struct {
-		values []any
-		err    error
-	}
-	ch := make(chan result, 1)
-	ack := func(values []any, err error) {
-		ch <- result{values: values, err: err}
-	}
-	if err := n.raw.ServerSideEmitWithAck(event, args...)(ack); err != nil {
-		return nil, err
-	}
-	select {
-	case value := <-ch:
-		return value.values, value.err
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-}
-
-func (n *Namespace) EmitAcks(ctx context.Context, event string, args ...any) ([][]any, error) {
-	operator := n.To()
-	if operator == nil {
-		return nil, ErrClosed
-	}
-	return operator.EmitAcks(ctx, event, args...)
-}
-
-func (n *Namespace) DecodeValue(src any, dst any) error {
-	if n == nil || n.server == nil {
-		return ErrUnsupported
-	}
-	return n.server.DecodeValue(src, dst)
-}
-
-type ParentNamespace struct {
-	*Namespace
-	raw legacy.ParentNamespace
-}
-
-func (p *ParentNamespace) Children() []*Namespace {
-	if p == nil || p.raw == nil || p.server == nil {
-		return nil
-	}
-	children := p.raw.Children().Keys()
-	result := make([]*Namespace, 0, len(children))
-	for _, child := range children {
-		result = append(result, p.server.wrapNamespace(child))
-	}
-	return result
-}
-
-func contextError(ctx context.Context) error {
-	if ctx == nil {
-		return nil
-	}
-	return ctx.Err()
-}
+type ParentNamespace struct{server *Server;matcher NamespaceMatcher;mu sync.RWMutex;children map[string]*Namespace}
+func (p *ParentNamespace)addChild(n *Namespace){if p==nil||n==nil{return};p.mu.Lock();p.children[n.Name()]=n;p.mu.Unlock()}
+func (p *ParentNamespace)Children()[]*Namespace{if p==nil{return nil};p.mu.RLock();out:=make([]*Namespace,0,len(p.children));for _,n:=range p.children{out=append(out,n)};p.mu.RUnlock();return out}
+func contextError(ctx context.Context)error{if ctx==nil{return nil};return ctx.Err()}
