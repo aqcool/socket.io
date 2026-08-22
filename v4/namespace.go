@@ -305,10 +305,7 @@ func (n *Namespace) ServerSideEmit(ctx context.Context, event string, args ...an
 }
 
 func (n *Namespace) ServerSideEmitAck(ctx context.Context, event string, args ...any) ([]any, error) {
-	if err := n.ServerSideEmit(ctx, event, args...); err != nil {
-		return nil, err
-	}
-	return nil, nil
+	return n.adapter.ServerSideEmitAck(ctx, append([]any{event}, args...))
 }
 
 func (n *Namespace) EmitAcks(ctx context.Context, event string, args ...any) ([][]any, error) {
