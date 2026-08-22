@@ -1,6 +1,9 @@
 package v4preview
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type AdapterCapabilities struct {
 	Broadcast               bool
@@ -22,16 +25,8 @@ type BroadcastFlags struct {
 	Local                bool
 	Broadcast            bool
 	Binary               bool
-	Timeout              timeDuration
+	Timeout              *time.Duration
 	ExpectSingleResponse bool
-}
-
-// timeDuration keeps the contract preview independent from zero-value ambiguity.
-// The real v4 API should use `time.Duration` plus an explicit presence strategy
-// (for example `*time.Duration` or an internal optional field).
-type timeDuration struct {
-	Set   bool
-	Nanos int64
 }
 
 type BroadcastOptions struct {
