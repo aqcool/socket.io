@@ -64,6 +64,8 @@ func New(options ...Option) (*Server, error) {
 	coreOptions.SetServeClient(cfg.ServeClient)
 	coreOptions.SetConnectTimeout(cfg.ConnectTimeout)
 	coreOptions.SetCleanupEmptyChildNamespaces(cfg.CleanupEmptyChildNamespaces)
+	coreOptions.SetTaskQueueMaxPending(cfg.Queue.MaxPending)
+	coreOptions.SetTaskQueueOverflowPolicy(core.TaskQueueOverflowPolicy(cfg.Queue.Overflow))
 	if cfg.Recovery != nil {
 		recovery := core.DefaultConnectionStateRecovery()
 		recovery.SetMaxDisconnectionDuration(int64(cfg.Recovery.MaxDisconnectionDuration / time.Millisecond))

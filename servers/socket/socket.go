@@ -23,6 +23,7 @@ var (
 	socketLog                      = log.NewLog("socket.io:socket")
 	SOCKET_RESERVED_EVENTS         = types.NewSet("connect", "connect_error", "disconnect", "disconnecting", "newListener", "removeListener")
 	RECOVERABLE_DISCONNECT_REASONS = types.NewSet("transport error", "transport close", "forced close", "ping timeout", "server shutting down", "forced server close")
+	ErrTaskQueueOverflow           = errors.New("socket.io: inbound event queue overflow")
 )
 
 type (
@@ -142,6 +143,7 @@ type (
 		fns                   *types.Slice[SocketMiddleware]
 		joinFns               *types.Slice[JoinMiddleware]
 		flags                 atomic.Pointer[BroadcastFlags]
+		flagsMu               sync.Mutex
 		_anyListeners         *types.Slice[types.EventListener]
 		_anyOutgoingListeners *types.Slice[types.EventListener]
 
@@ -256,6 +258,9 @@ func (s *Socket) Construct(nsp Namespace, client *Client, auth map[string]any, p
 
 	s.server = nsp.Server()
 	s.adapter = s.nsp.Adapter()
+	if s.server != nil && s.server.Opts() != nil {
+		s.taskQueue.SetMaxPending(s.server.Opts().TaskQueueMaxPending())
+	}
 	if previousSession != nil {
 		s.id = previousSession.Sid
 		s.pid = previousSession.Pid
@@ -341,6 +346,28 @@ func compactHandshakeValues(values map[string][]string, lowerKeys bool) map[stri
 	return result
 }
 
+func (s *Socket) updateFlags(update func(*BroadcastFlags)) *Socket {
+	s.flagsMu.Lock()
+	defer s.flagsMu.Unlock()
+	flags := s.flags.Load()
+	if flags == nil {
+		flags = &BroadcastFlags{}
+		s.flags.Store(flags)
+	}
+	update(flags)
+	return s
+}
+
+func (s *Socket) takeFlags() BroadcastFlags {
+	s.flagsMu.Lock()
+	defer s.flagsMu.Unlock()
+	flags := s.flags.Swap(&BroadcastFlags{})
+	if flags == nil {
+		return BroadcastFlags{}
+	}
+	return *flags
+}
+
 // Emits to this client.
 //
 //	io.On("connection", func(args ...any) {
@@ -365,7 +392,7 @@ func (s *Socket) Emit(ev string, args ...any) error {
 		Type: parser.EVENT,
 		Data: data,
 	}
-	flags := *s.flags.Swap(&BroadcastFlags{})
+	flags := s.takeFlags()
 
 	// access last argument to see if it's an ACK callback
 	if fn, ok := data[data_len-1].(Ack); ok {
@@ -754,6 +781,7 @@ func (s *Socket) _cleanup() {
 
 	s.leaveAll()
 	s.nsp.Remove(s)
+	s.markConnectReady()
 	// Clear pending ack callbacks to prevent memory leaks
 	s.acks.Clear()
 	s.taskQueue.TryClose()
@@ -763,7 +791,24 @@ func (s *Socket) _cleanup() {
 // This ensures that events and packet processing for this socket are serialized,
 // preventing race conditions from Go's preemptive scheduling.
 func (s *Socket) Enqueue(task func()) {
-	s.taskQueue.Enqueue(task)
+	result := s.taskQueue.TryEnqueue(task)
+	if result != queue.EnqueueFull {
+		return
+	}
+
+	policy := TaskQueueOverflowDisconnect
+	if s.server != nil && s.server.Opts() != nil {
+		policy = s.server.Opts().TaskQueueOverflowPolicy()
+	}
+	switch policy {
+	case TaskQueueOverflowDropNewest:
+		socketLog.Debug("dropping inbound event for socket %s: queue full", s.id)
+	case TaskQueueOverflowReject:
+		s._onerror(ErrTaskQueueOverflow)
+	default:
+		socketLog.Debug("disconnecting socket %s: inbound event queue full", s.id)
+		go s.Disconnect(true)
+	}
 }
 
 // Produces an `error` packet.
@@ -815,8 +860,9 @@ func (s *Socket) Disconnect(status bool) *Socket {
 //
 // Param: compress - if `true`, compresses the sending data
 func (s *Socket) Compress(compress bool) *Socket {
-	s.flags.Load().Compress = &compress
-	return s
+	return s.updateFlags(func(flags *BroadcastFlags) {
+		flags.Compress = &compress
+	})
 }
 
 // Sets a modifier for a subsequent event emission that the event data may be lost if the client is not ready to
@@ -828,8 +874,9 @@ func (s *Socket) Compress(compress bool) *Socket {
 //		socket.Volatile().Emit("hello") // the client may or may not receive it
 //	})
 func (s *Socket) Volatile() *Socket {
-	s.flags.Load().Volatile = true
-	return s
+	return s.updateFlags(func(flags *BroadcastFlags) {
+		flags.Volatile = true
+	})
 }
 
 // Sets a modifier for a subsequent event emission that the event data will only be broadcast to every sockets but the
@@ -871,8 +918,9 @@ func (s *Socket) Local() *BroadcastOperator {
 //		})
 //	})
 func (s *Socket) Timeout(timeout time.Duration) *Socket {
-	s.flags.Load().Timeout = &timeout
-	return s
+	return s.updateFlags(func(flags *BroadcastFlags) {
+		flags.Timeout = &timeout
+	})
 }
 
 // Dispatch incoming event to socket listeners.
@@ -1119,6 +1167,6 @@ func (s *Socket) NotifyOutgoingListeners() func(*parser.Packet) {
 }
 
 func (s *Socket) newBroadcastOperator() *BroadcastOperator {
-	flags := *s.flags.Swap(&BroadcastFlags{})
+	flags := s.takeFlags()
 	return NewBroadcastOperator(s.adapter, types.NewSet[Room](), types.NewSet(Room(s.id)), &flags)
 }

@@ -108,6 +108,8 @@ type (
 		_corsMiddleware engine.Middleware
 		stateMu         sync.RWMutex
 
+		namespaceMu sync.Mutex
+
 		// dynamicNamespaceMu makes creation of a child namespace atomic when
 		// several clients concurrently match the same parent namespace.
 		dynamicNamespaceMu sync.Mutex
@@ -678,10 +680,18 @@ func (s *Server) Of(name any, fn types.EventListener) Namespace {
 			return namespace
 		}
 
-		serverLog.Debug("initializing namespace %s", n)
-		namespace = NewNamespace(s, n)
-		s._nsps.Store(n, namespace)
-		if n != "/" {
+		created := false
+		s.namespaceMu.Lock()
+		if existing, exists := s._nsps.Load(n); exists {
+			namespace = existing
+		} else {
+			serverLog.Debug("initializing namespace %s", n)
+			namespace = NewNamespace(s, n)
+			s._nsps.Store(n, namespace)
+			created = true
+		}
+		s.namespaceMu.Unlock()
+		if created && n != "/" {
 			s.sockets.EmitReserved("new_namespace", namespace)
 		}
 	}
