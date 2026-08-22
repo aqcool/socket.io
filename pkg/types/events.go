@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"runtime/debug"
 	"sync"
+	"sync/atomic"
 
 	"github.com/aqcool/socket.io/v3/pkg/log"
 )
@@ -56,7 +57,15 @@ type (
 		Len() int
 	}
 
+	// Subscription identifies one exact listener registration. Unlike
+	// RemoveListener(fn), it does not depend on a Go function code pointer, so
+	// separate closure instances can always be removed independently.
+	Subscription interface {
+		Close() bool
+	}
+
 	eventEntry struct {
+		id  uint64
 		fn  EventListener
 		ptr uintptr
 	}
@@ -64,6 +73,14 @@ type (
 	emmiter struct {
 		mutationMu   sync.Mutex
 		evtListeners Map[EventName, *Slice[*eventEntry]]
+		nextID       atomic.Uint64
+	}
+
+	eventSubscription struct {
+		emitter *emmiter
+		event   EventName
+		id      uint64
+		closed  atomic.Bool
 	}
 )
 
@@ -88,6 +105,10 @@ func NewEventEmitter() EventEmitter {
 	return emmiter
 }
 
+func (e *emmiter) nextListenerID() uint64 {
+	return e.nextID.Add(1)
+}
+
 func (e *emmiter) addListeners(evt EventName, listeners []*eventEntry) error {
 	if len(listeners) == 0 {
 		return nil
@@ -108,11 +129,30 @@ func (e *emmiter) AddListener(evt EventName, listeners ...EventListener) error {
 	var events []*eventEntry
 	for _, event := range listeners {
 		if event != nil {
-			events = append(events, &eventEntry{fn: event, ptr: reflect.ValueOf(event).Pointer()})
+			events = append(events, &eventEntry{id: e.nextListenerID(), fn: event, ptr: reflect.ValueOf(event).Pointer()})
 		}
 	}
 
 	return e.addListeners(evt, events)
+}
+
+// Subscribe registers one listener and returns an exact removal token. This is
+// the preferred API when callers need to remove closures reliably.
+func Subscribe(emitter EventEmitter, evt EventName, listener EventListener) (Subscription, error) {
+	if listener == nil {
+		return nil, nil
+	}
+	if e, ok := emitter.(*emmiter); ok {
+		id := e.nextListenerID()
+		if err := e.addListeners(evt, []*eventEntry{{id: id, fn: listener, ptr: reflect.ValueOf(listener).Pointer()}}); err != nil {
+			return nil, err
+		}
+		return &eventSubscription{emitter: e, event: evt, id: id}, nil
+	}
+	if err := emitter.On(evt, listener); err != nil {
+		return nil, err
+	}
+	return &fallbackSubscription{emitter: emitter, event: evt, listener: listener}, nil
 }
 
 // Alias: [AddListener]
@@ -179,11 +219,12 @@ type oneTimeListener struct {
 	evt     EventName
 	emitter *emmiter
 	fn      EventListener
+	id      uint64
 }
 
 func (l *oneTimeListener) execute(vals ...any) {
 	l.fired.Do(func() {
-		l.emitter.RemoveListener(l.evt, l.fn)
+		l.emitter.removeListenerID(l.evt, l.id)
 		l.fn(vals...)
 	})
 }
@@ -196,14 +237,19 @@ func (e *emmiter) Once(evt EventName, listeners ...EventListener) error {
 	var events []*eventEntry
 	for _, event := range listeners {
 		if event != nil {
-			oneTime := &oneTimeListener{fired: &sync.Once{}, evt: evt, emitter: e, fn: event}
-			events = append(events, &eventEntry{fn: oneTime.execute, ptr: reflect.ValueOf(event).Pointer()})
+			id := e.nextListenerID()
+			oneTime := &oneTimeListener{fired: &sync.Once{}, evt: evt, emitter: e, fn: event, id: id}
+			events = append(events, &eventEntry{id: id, fn: oneTime.execute, ptr: reflect.ValueOf(event).Pointer()})
 		}
 	}
 	return e.addListeners(evt, events)
 }
 
 // RemoveListener removes the specified listener from the listener array for the event named eventName.
+//
+// This compatibility API matches listeners by function code address. Go does
+// not expose closure identity through reflect, so callers that need exact
+// removal of closure instances should use Subscribe and Subscription.Close.
 func (e *emmiter) RemoveListener(evt EventName, listener EventListener) bool {
 	if listener == nil {
 		return false
@@ -231,6 +277,46 @@ func (e *emmiter) RemoveListener(evt EventName, listener EventListener) bool {
 		e.evtListeners.CompareAndDelete(evt, evtEntry)
 	}
 	return removed
+}
+
+func (e *emmiter) removeListenerID(evt EventName, id uint64) bool {
+	e.mutationMu.Lock()
+	defer e.mutationMu.Unlock()
+
+	evtEntry, ok := e.evtListeners.Load(evt)
+	if !ok || evtEntry.Len() == 0 {
+		return false
+	}
+
+	removedEntries, _ := evtEntry.RangeAndSplice(func(entry *eventEntry, i int) (bool, int, int, []*eventEntry) {
+		return entry.id == id, i, 1, nil
+	})
+	removed := len(removedEntries) > 0
+	if removed && evtEntry.Len() == 0 {
+		e.evtListeners.CompareAndDelete(evt, evtEntry)
+	}
+	return removed
+}
+
+func (s *eventSubscription) Close() bool {
+	if s == nil || s.emitter == nil || !s.closed.CompareAndSwap(false, true) {
+		return false
+	}
+	return s.emitter.removeListenerID(s.event, s.id)
+}
+
+type fallbackSubscription struct {
+	emitter  EventEmitter
+	event    EventName
+	listener EventListener
+	closed   atomic.Bool
+}
+
+func (s *fallbackSubscription) Close() bool {
+	if s == nil || s.emitter == nil || !s.closed.CompareAndSwap(false, true) {
+		return false
+	}
+	return s.emitter.RemoveListener(s.event, s.listener)
 }
 
 func (e *emmiter) RemoveAllListeners(evt EventName) bool {
