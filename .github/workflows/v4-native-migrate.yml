@@ -17,7 +17,7 @@ jobs:
   migrate:
     if: ${{ github.event.pull_request.head.ref == 'feat/v4-native-core' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout migration branch
         uses: actions/checkout@v6
@@ -53,6 +53,33 @@ jobs:
             -not -path './vendor/*' \
             -not -path '*/vendor/*' \
             -print0 | xargs -0 gofmt -w
+
+      - name: Wire local module graph
+        if: steps.marker.outputs.done != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t mods < <(find . -name go.mod -not -path '*/vendor/*' | sort)
+          declare -a module_names=()
+          declare -a module_dirs=()
+          for mod in "${mods[@]}"; do
+            dir=$(dirname "$mod")
+            name=$(awk '/^module / {print $2; exit}' "$mod")
+            if [[ "$name" == github.com/aqcool/socket.io* ]]; then
+              module_names+=("$name")
+              module_dirs+=("$dir")
+            fi
+          done
+
+          for mod in "${mods[@]}"; do
+            dir=$(dirname "$mod")
+            for i in "${!module_names[@]}"; do
+              target=${module_dirs[$i]}
+              [[ "$dir" == "$target" ]] && continue
+              rel=$(realpath --relative-to="$dir" "$target")
+              (cd "$dir" && go mod edit -replace="${module_names[$i]}=$rel")
+            done
+          done
 
       - name: Tidy modules
         if: steps.marker.outputs.done != 'true'
