@@ -141,6 +141,8 @@ type NamespaceMatcher func(context.Context, string, map[string]any) (bool, error
 type Namespace interface {
 	RawEmitter
 	RawRegistrar
+	MultiAckEmitter
+	ValueDecoder
 
 	Name() string
 	Use(...Middleware)
@@ -169,6 +171,7 @@ type ParentNamespace interface {
 type Socket interface {
 	RawEmitter
 	RawRegistrar
+	AckEmitter
 	ValueDecoder
 
 	ID() SocketID
@@ -198,6 +201,9 @@ type Socket interface {
 
 type SocketOperator interface {
 	RawEmitter
+	AckEmitter
+	ValueDecoder
+
 	Volatile() SocketOperator
 	Compress(bool) SocketOperator
 	Timeout(time.Duration) SocketOperator
@@ -205,6 +211,7 @@ type SocketOperator interface {
 
 type BroadcastOperator interface {
 	RawEmitter
+	MultiAckEmitter
 	ValueDecoder
 
 	To(...Room) BroadcastOperator
