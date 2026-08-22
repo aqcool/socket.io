@@ -16,15 +16,13 @@ func TestDispatchQueueOverflowPolicies(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		policy        OverflowPolicy
-		wantErr       bool
-		wantOverflow  bool
-		wantCallback  bool
+		name    string
+		policy  OverflowPolicy
+		wantErr bool
 	}{
-		{name: "drop newest", policy: OverflowDropNewest, wantOverflow: true},
-		{name: "reject", policy: OverflowReject, wantErr: true, wantOverflow: true},
-		{name: "disconnect", policy: OverflowDisconnect, wantErr: true, wantOverflow: true, wantCallback: true},
+		{name: "drop newest", policy: OverflowDropNewest},
+		{name: "reject", policy: OverflowReject, wantErr: true},
+		{name: "disconnect", policy: OverflowDisconnect, wantErr: true},
 	}
 
 	for _, test := range tests {
@@ -64,27 +62,17 @@ func TestDispatchQueueOverflowPolicies(t *testing.T) {
 			if !test.wantErr && err != nil {
 				t.Fatalf("overflow error = %v, want nil", err)
 			}
-			if test.wantOverflow && queue.Overflows() != 1 {
+			if queue.Overflows() != 1 {
 				t.Fatalf("overflow count = %d, want 1", queue.Overflows())
 			}
 
-			if test.wantCallback {
-				select {
-				case policy := <-overflow:
-					if policy != test.policy {
-						t.Fatalf("overflow callback policy = %d, want %d", policy, test.policy)
-					}
-				case <-time.After(time.Second):
-					t.Fatal("overflow callback was not invoked")
+			select {
+			case policy := <-overflow:
+				if policy != test.policy {
+					t.Fatalf("overflow callback policy = %d, want %d", policy, test.policy)
 				}
-			} else {
-				select {
-				case policy := <-overflow:
-					if policy != test.policy {
-						t.Fatalf("overflow callback policy = %d, want %d", policy, test.policy)
-					}
-				default:
-				}
+			case <-time.After(time.Second):
+				t.Fatal("overflow callback was not invoked")
 			}
 
 			queue.Close(true)
@@ -195,8 +183,8 @@ func TestNativeRecoveryFiltersMissedPackets(t *testing.T) {
 		Rooms: []Room{"socket-1", "room-a"},
 		Data:  map[string]any{"user": "alice"},
 	}
-	if err := adapter.PersistSession(context.Background(), session); err != nil {
-		t.Fatalf("persist session: %v", err)
+	if persistErr := adapter.PersistSession(context.Background(), session); persistErr != nil {
+		t.Fatalf("persist session: %v", persistErr)
 	}
 
 	adapter.persistRecoverablePacket(Packet{
