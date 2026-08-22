@@ -47,7 +47,6 @@ jobs:
           - "adapters/valkey"
           - "clients/engine"
           - "clients/socket"
-          - "v4"
 
     steps:
       - name: Checkout code
@@ -84,10 +83,10 @@ jobs:
           go-version-file: "go.mod"
           cache-dependency-path: "**/go.sum"
 
-      - name: Test v4
+      - name: Test canonical v4 root
         env:
           TEST_TIMEOUT: "5m"
-        run: make test MODULE="v4"
+        run: make test MODULE="."
 
   build-and-test:
     name: Build, Test and Analyze
