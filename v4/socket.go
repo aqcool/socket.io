@@ -2,6 +2,7 @@ package socketio
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"net/url"
 	"sync"
@@ -33,9 +34,7 @@ func newSocket(server *Server, raw *legacy.Socket) *Socket {
 		data:   make(map[string]any),
 	}
 	if existing, ok := raw.Data().(map[string]any); ok {
-		for key, value := range existing {
-			socket.data[key] = value
-		}
+		maps.Copy(socket.data, existing)
 	}
 	socket.hub = newEventHub(
 		func(event string, listener func(...any)) error {
@@ -133,9 +132,7 @@ func convertHandshake(raw *legacy.Handshake) Handshake {
 		}
 	}
 	auth := make(map[string]any, len(raw.Auth))
-	for key, value := range raw.Auth {
-		auth[key] = value
-	}
+	maps.Copy(auth, raw.Auth)
 	return Handshake{
 		Headers: headers,
 		Time:    issued,
@@ -246,9 +243,7 @@ func (s *Socket) Data() map[string]any {
 	s.dataMu.RLock()
 	defer s.dataMu.RUnlock()
 	result := make(map[string]any, len(s.data))
-	for key, value := range s.data {
-		result[key] = value
-	}
+	maps.Copy(result, s.data)
 	return result
 }
 
@@ -257,9 +252,7 @@ func (s *Socket) syncLegacyDataLocked() {
 		return
 	}
 	copy := make(map[string]any, len(s.data))
-	for key, value := range s.data {
-		copy[key] = value
-	}
+	maps.Copy(copy, s.data)
 	s.raw.SetData(copy)
 }
 
@@ -362,12 +355,12 @@ func (s *Socket) emitAckWithFlags(ctx context.Context, event string, args []any,
 		err    error
 	}
 	ch := make(chan result, 1)
-	ack := legacy.Ack(func(values []any, err error) {
+	ack := func(values []any, err error) {
 		select {
 		case ch <- result{values: values, err: err}:
 		default:
 		}
-	})
+	}
 
 	s.emitMu.Lock()
 	s.applyFlags(flags)
