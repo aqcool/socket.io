@@ -77,6 +77,9 @@ jobs:
               target=${module_dirs[$i]}
               [[ "$dir" == "$target" ]] && continue
               rel=$(realpath --relative-to="$dir" "$target")
+              if [[ "$rel" != .* ]]; then
+                rel="./$rel"
+              fi
               (cd "$dir" && go mod edit -replace="${module_names[$i]}=$rel")
             done
           done
