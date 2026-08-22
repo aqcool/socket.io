@@ -1,6 +1,9 @@
 package socketio
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type AdapterCapabilities struct {
 	Broadcast               bool
@@ -22,7 +25,7 @@ type BroadcastFlags struct {
 	Local                bool
 	Broadcast            bool
 	Binary               bool
-	Timeout              *int64
+	Timeout              *time.Duration
 	ExpectSingleResponse bool
 }
 
