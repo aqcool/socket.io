@@ -2,6 +2,7 @@ package socketio
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -103,7 +104,7 @@ func (c *client) connect(name string, auth map[string]any) {
 	if _, err = nsp.connect(c, auth); err != nil {
 		data := map[string]any{"message": err.Error()}
 		var connectErr *ConnectError
-		if errorsAs(err, &connectErr) && connectErr.Data != nil {
+		if errors.As(err, &connectErr) && connectErr.Data != nil {
 			data["data"] = connectErr.Data
 		}
 		_ = c.writePacket(Packet{
@@ -114,10 +115,6 @@ func (c *client) connect(name string, auth map[string]any) {
 	}
 }
 
-func errorsAs(err error, target any) bool {
-	return errorAs(err, target)
-}
-
 func (c *client) register(namespace string, socket *Socket) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -125,7 +122,7 @@ func (c *client) register(namespace string, socket *Socket) error {
 		return ErrClosed
 	}
 	if existing := c.sockets[namespace]; existing != nil && existing != socket {
-		return ErrAlreadyConnected
+		return fmt.Errorf("%w: namespace %s is already connected", ErrInvalidArgument, namespace)
 	}
 	c.sockets[namespace] = socket
 	return nil
