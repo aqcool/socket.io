@@ -1,0 +1,68 @@
+name: V4 Native Migration
+
+on:
+  push:
+    branches:
+      - feat/v4-native-core
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v4-native-migration-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(v4): apply native module migration') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: feat/v4-native-core
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Apply native v4 migration
+        run: python3 .github/scripts/native_v4_migrate.py
+
+      - name: Format Go sources
+        run: |
+          find . -type f -name '*.go' \
+            -not -path './vendor/*' \
+            -not -path '*/vendor/*' \
+            -print0 | xargs -0 gofmt -w
+
+      - name: Tidy modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r mod; do
+            dir=$(dirname "$mod")
+            echo "tidy: $dir"
+            (cd "$dir" && go mod tidy)
+          done < <(find . -name go.mod -not -path '*/vendor/*' | sort)
+
+      - name: Smoke compile native root
+        run: go test -run '^$' ./...
+
+      - name: Commit migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No migration changes"
+            exit 0
+          fi
+          git commit -m "chore(v4): apply native module migration"
+          git push origin HEAD:feat/v4-native-core
