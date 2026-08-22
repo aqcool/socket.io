@@ -1,39 +1,53 @@
 name: V4 Native Migration
 
 on:
-  push:
+  pull_request:
     branches:
-      - feat/v4-native-core
+      - main
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 concurrency:
-  group: v4-native-migration-${{ github.ref }}
+  group: v4-native-migration-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
   migrate:
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(v4): apply native module migration') }}
+    if: ${{ github.event.pull_request.head.ref == 'feat/v4-native-core' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Checkout
+      - name: Checkout migration branch
         uses: actions/checkout@v6
         with:
           ref: feat/v4-native-core
           fetch-depth: 0
 
+      - name: Skip completed migration
+        id: marker
+        shell: bash
+        run: |
+          if [ -f .native-v4-migrated ]; then
+            echo "done=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "done=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Go
+        if: steps.marker.outputs.done != 'true'
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: false
 
       - name: Apply native v4 migration
+        if: steps.marker.outputs.done != 'true'
         run: python3 .github/scripts/native_v4_migrate.py
 
       - name: Format Go sources
+        if: steps.marker.outputs.done != 'true'
         run: |
           find . -type f -name '*.go' \
             -not -path './vendor/*' \
@@ -41,6 +55,7 @@ jobs:
             -print0 | xargs -0 gofmt -w
 
       - name: Tidy modules
+        if: steps.marker.outputs.done != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -51,9 +66,11 @@ jobs:
           done < <(find . -name go.mod -not -path '*/vendor/*' | sort)
 
       - name: Smoke compile native root
+        if: steps.marker.outputs.done != 'true'
         run: go test -run '^$' ./...
 
       - name: Commit migration
+        if: steps.marker.outputs.done != 'true'
         shell: bash
         run: |
           set -euo pipefail
