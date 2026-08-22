@@ -3,6 +3,7 @@ package socketio
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"time"
 )
@@ -423,17 +424,11 @@ func shouldIncludeRecoveredPacket(sessionRooms []Room, opts *BroadcastOptions) b
 	included := len(opts.Rooms) == 0
 	excluded := false
 	for _, sessionRoom := range sessionRooms {
-		for _, room := range opts.Rooms {
-			if sessionRoom == room {
-				included = true
-				break
-			}
+		if slices.Contains(opts.Rooms, sessionRoom) {
+			included = true
 		}
-		for _, room := range opts.Except {
-			if sessionRoom == room {
-				excluded = true
-				break
-			}
+		if slices.Contains(opts.Except, sessionRoom) {
+			excluded = true
 		}
 		if included && excluded {
 			break
