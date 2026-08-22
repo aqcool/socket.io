@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 )
 
 type MemoryAdapterFactory struct{}
@@ -15,12 +16,27 @@ func (MemoryAdapterFactory) New(namespace *Namespace) (Adapter, error) {
 	return newMemoryAdapter(namespace), nil
 }
 
+type sessionRecord struct {
+	session        Session
+	disconnectedAt time.Time
+}
+
+type persistedPacket struct {
+	id        string
+	emittedAt time.Time
+	data      []any
+	opts      *BroadcastOptions
+}
+
 type memoryAdapter struct {
-	nsp      *Namespace
-	mu       sync.RWMutex
-	rooms    map[Room]map[SocketID]struct{}
-	sids     map[SocketID]map[Room]struct{}
-	sessions map[PrivateSessionID]Session
+	nsp *Namespace
+	mu  sync.RWMutex
+
+	rooms map[Room]map[SocketID]struct{}
+	sids  map[SocketID]map[Room]struct{}
+
+	sessions map[PrivateSessionID]sessionRecord
+	packets  []persistedPacket
 }
 
 func newMemoryAdapter(nsp *Namespace) *memoryAdapter {
@@ -28,7 +44,7 @@ func newMemoryAdapter(nsp *Namespace) *memoryAdapter {
 		nsp:      nsp,
 		rooms:    make(map[Room]map[SocketID]struct{}),
 		sids:     make(map[SocketID]map[Room]struct{}),
-		sessions: make(map[PrivateSessionID]Session),
+		sessions: make(map[PrivateSessionID]sessionRecord),
 	}
 }
 
@@ -39,6 +55,7 @@ func (a *memoryAdapter) Close() error {
 	clear(a.rooms)
 	clear(a.sids)
 	clear(a.sessions)
+	a.packets = nil
 	a.mu.Unlock()
 	return nil
 }
@@ -143,7 +160,10 @@ func (a *memoryAdapter) SocketRooms(ctx context.Context, id SocketID) ([]Room, e
 func (a *memoryAdapter) matchingIDs(opts *BroadcastOptions) []SocketID {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
+	return a.matchingIDsLocked(opts)
+}
 
+func (a *memoryAdapter) matchingIDsLocked(opts *BroadcastOptions) []SocketID {
 	if opts == nil {
 		opts = &BroadcastOptions{}
 	}
@@ -183,6 +203,8 @@ func (a *memoryAdapter) Broadcast(ctx context.Context, packet Packet, opts *Broa
 	if opts == nil {
 		opts = &BroadcastOptions{}
 	}
+
+	packet = a.persistRecoverablePacket(packet, opts)
 	var firstErr error
 	for _, id := range a.matchingIDs(opts) {
 		if socket, ok := a.nsp.Socket(id); ok {
@@ -192,6 +214,30 @@ func (a *memoryAdapter) Broadcast(ctx context.Context, packet Packet, opts *Broa
 		}
 	}
 	return firstErr
+}
+
+func (a *memoryAdapter) persistRecoverablePacket(packet Packet, opts *BroadcastOptions) Packet {
+	if a.nsp.server.cfg.Recovery == nil || packet.Type != PacketEvent || packet.ID != nil || opts.Flags.Volatile {
+		return packet
+	}
+	data, ok := packet.Data.([]any)
+	if !ok {
+		return packet
+	}
+	offset := randomID()
+	data = append(append([]any(nil), data...), offset)
+	packet.Data = data
+
+	a.mu.Lock()
+	a.cleanupExpiredLocked(time.Now())
+	a.packets = append(a.packets, persistedPacket{
+		id:        offset,
+		emittedAt: time.Now(),
+		data:      append([]any(nil), data...),
+		opts:      cloneBroadcastOptions(opts),
+	})
+	a.mu.Unlock()
+	return packet
 }
 
 func (a *memoryAdapter) BroadcastWithAck(
@@ -305,7 +351,8 @@ func (a *memoryAdapter) PersistSession(ctx context.Context, session Session) err
 		return ErrInvalidArgument
 	}
 	a.mu.Lock()
-	a.sessions[session.PID] = session
+	a.cleanupExpiredLocked(time.Now())
+	a.sessions[session.PID] = sessionRecord{session: session, disconnectedAt: time.Now()}
 	a.mu.Unlock()
 	return nil
 }
@@ -313,16 +360,84 @@ func (a *memoryAdapter) PersistSession(ctx context.Context, session Session) err
 func (a *memoryAdapter) RestoreSession(
 	ctx context.Context,
 	pid PrivateSessionID,
-	_ string,
+	offset string,
 ) (*RecoveredSession, error) {
 	if err := contextError(ctx); err != nil {
 		return nil, err
 	}
-	a.mu.RLock()
-	session, ok := a.sessions[pid]
-	a.mu.RUnlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.cleanupExpiredLocked(time.Now())
+
+	record, ok := a.sessions[pid]
 	if !ok {
 		return nil, nil
 	}
-	return &RecoveredSession{Session: session}, nil
+	index := -1
+	for i := range a.packets {
+		if a.packets[i].id == offset {
+			index = i
+			break
+		}
+	}
+	if index == -1 {
+		return nil, nil
+	}
+
+	missed := make([]any, 0, len(a.packets)-index-1)
+	for i := index + 1; i < len(a.packets); i++ {
+		packet := &a.packets[i]
+		if shouldIncludeRecoveredPacket(record.session.Rooms, packet.opts) {
+			missed = append(missed, append([]any(nil), packet.data...))
+		}
+	}
+	return &RecoveredSession{Session: record.session, MissedPackets: missed}, nil
+}
+
+func (a *memoryAdapter) cleanupExpiredLocked(now time.Time) {
+	recovery := a.nsp.server.cfg.Recovery
+	if recovery == nil || recovery.MaxDisconnectionDuration <= 0 {
+		return
+	}
+	threshold := now.Add(-recovery.MaxDisconnectionDuration)
+	for pid, record := range a.sessions {
+		if record.disconnectedAt.Before(threshold) {
+			delete(a.sessions, pid)
+		}
+	}
+	firstValid := 0
+	for firstValid < len(a.packets) && a.packets[firstValid].emittedAt.Before(threshold) {
+		firstValid++
+	}
+	if firstValid > 0 {
+		copy(a.packets, a.packets[firstValid:])
+		clear(a.packets[len(a.packets)-firstValid:])
+		a.packets = a.packets[:len(a.packets)-firstValid]
+	}
+}
+
+func shouldIncludeRecoveredPacket(sessionRooms []Room, opts *BroadcastOptions) bool {
+	if opts == nil {
+		return true
+	}
+	included := len(opts.Rooms) == 0
+	excluded := false
+	for _, sessionRoom := range sessionRooms {
+		for _, room := range opts.Rooms {
+			if sessionRoom == room {
+				included = true
+				break
+			}
+		}
+		for _, room := range opts.Except {
+			if sessionRoom == room {
+				excluded = true
+				break
+			}
+		}
+		if included && excluded {
+			break
+		}
+	}
+	return included && !excluded
 }
