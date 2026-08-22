@@ -142,7 +142,8 @@ func (n *Namespace) connect(c *client, auth map[string]any) (*Socket, error) {
 	n.sockets[socket.ID()] = socket
 	n.mu.Unlock()
 
-	if err := n.adapter.AddAll(socket.Context(), socket.ID(), Room(socket.ID())); err != nil {
+	rooms := appendUniqueRooms([]Room{Room(socket.ID())}, socket.recoveredRooms...)
+	if err := n.adapter.AddAll(socket.Context(), socket.ID(), rooms...); err != nil {
 		n.remove(socket)
 		socket.close("adapter error")
 		return nil, err
@@ -167,16 +168,20 @@ func (n *Namespace) connect(c *client, auth map[string]any) (*Socket, error) {
 		return nil, err
 	}
 
-	// Recovered packets are replayed before the connection handlers, matching
-	// Socket.IO's recovery contract while preserving ordered dispatch.
+	// Missed packets are server-to-client broadcasts. Replay them on the wire
+	// before invoking application connection handlers, preserving their offset.
 	for _, missed := range socket.missedPackets {
 		values, ok := missed.([]any)
 		if !ok || len(values) == 0 {
 			continue
 		}
-		event, ok := values[0].(string)
-		if ok {
-			socket.hub.dispatch(event, append([]any(nil), values[1:]...))
+		if err := c.writePacket(Packet{
+			Type:      PacketEvent,
+			Namespace: n.name,
+			Data:      append([]any(nil), values...),
+		}, BroadcastFlags{}); err != nil {
+			socket.close("transport error")
+			return nil, err
 		}
 	}
 
@@ -259,44 +264,57 @@ func (n *Namespace) Except(rooms ...Room) *BroadcastOperator {
 	return newBroadcastOperator(n, &BroadcastOptions{Except: append([]Room(nil), rooms...)})
 }
 
-func (n *Namespace) Local() *BroadcastOperator            { return n.To().Local() }
-func (n *Namespace) Volatile() *BroadcastOperator         { return n.To().Volatile() }
+func (n *Namespace) Local() *BroadcastOperator { return n.To().Local() }
+
+func (n *Namespace) Volatile() *BroadcastOperator { return n.To().Volatile() }
+
 func (n *Namespace) Compress(enabled bool) *BroadcastOperator {
 	return n.To().Compress(enabled)
 }
+
 func (n *Namespace) Timeout(timeout time.Duration) *BroadcastOperator {
 	return n.To().Timeout(timeout)
 }
+
 func (n *Namespace) FetchSockets(ctx context.Context) ([]*RemoteSocket, error) {
 	return n.To().FetchSockets(ctx)
 }
+
 func (n *Namespace) CountSockets(ctx context.Context) (uint64, error) {
 	return n.adapter.CountSockets(ctx, &BroadcastOptions{})
 }
+
 func (n *Namespace) ListRooms(ctx context.Context) (map[Room]uint64, error) {
 	return n.adapter.ListRooms(ctx, &BroadcastOptions{})
 }
+
 func (n *Namespace) SocketsJoin(ctx context.Context, rooms ...Room) error {
 	return n.adapter.AddSockets(ctx, &BroadcastOptions{}, rooms...)
 }
+
 func (n *Namespace) SocketsLeave(ctx context.Context, rooms ...Room) error {
 	return n.adapter.DeleteSockets(ctx, &BroadcastOptions{}, rooms...)
 }
+
 func (n *Namespace) DisconnectSockets(ctx context.Context, closeTransport bool) error {
 	return n.adapter.DisconnectSockets(ctx, &BroadcastOptions{}, closeTransport)
 }
+
 func (n *Namespace) ServerSideEmit(ctx context.Context, event string, args ...any) error {
 	return n.adapter.ServerSideEmit(ctx, append([]any{event}, args...))
 }
+
 func (n *Namespace) ServerSideEmitAck(ctx context.Context, event string, args ...any) ([]any, error) {
 	if err := n.ServerSideEmit(ctx, event, args...); err != nil {
 		return nil, err
 	}
 	return nil, nil
 }
+
 func (n *Namespace) EmitAcks(ctx context.Context, event string, args ...any) ([][]any, error) {
 	return n.To().EmitAcks(ctx, event, args...)
 }
+
 func (n *Namespace) DecodeValue(src any, dst any) error {
 	return n.server.DecodeValue(src, dst)
 }
