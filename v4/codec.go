@@ -56,10 +56,17 @@ type PacketCodec interface {
 
 type DefaultPacketCodec struct{}
 
-func (DefaultPacketCodec) NewEncoder() PacketEncoder { return &defaultPacketEncoder{raw: socketparser.NewEncoder()} }
-func (DefaultPacketCodec) NewDecoder() PacketDecoder { return newDefaultPacketDecoder() }
+func (DefaultPacketCodec) NewEncoder() PacketEncoder {
+	return &defaultPacketEncoder{raw: socketparser.NewEncoder()}
+}
 
-type defaultPacketEncoder struct{ raw socketparser.Encoder }
+func (DefaultPacketCodec) NewDecoder() PacketDecoder {
+	return newDefaultPacketDecoder()
+}
+
+type defaultPacketEncoder struct {
+	raw socketparser.Encoder
+}
 
 func (e *defaultPacketEncoder) Encode(packet Packet) (readers []io.Reader, err error) {
 	defer func() {
@@ -81,24 +88,24 @@ func (e *defaultPacketEncoder) Encode(packet Packet) (readers []io.Reader, err e
 }
 
 type defaultPacketDecoder struct {
-	raw socketparser.Decoder
-	mu sync.Mutex
+	raw     socketparser.Decoder
+	mu      sync.Mutex
 	decoded []Packet
 }
 
 func newDefaultPacketDecoder() *defaultPacketDecoder {
-	d := &defaultPacketDecoder{raw: socketparser.NewDecoder()}
-	_ = d.raw.On("decoded", func(args ...any) {
+	decoder := &defaultPacketDecoder{raw: socketparser.NewDecoder()}
+	_ = decoder.raw.On("decoded", func(args ...any) {
 		if len(args) == 0 {
 			return
 		}
 		if raw, ok := args[0].(*socketparser.Packet); ok && raw != nil {
-			d.mu.Lock()
-			d.decoded = append(d.decoded, fromParserPacket(raw))
-			d.mu.Unlock()
+			decoder.mu.Lock()
+			decoder.decoded = append(decoder.decoded, fromParserPacket(raw))
+			decoder.mu.Unlock()
 		}
 	})
-	return d
+	return decoder
 }
 
 func (d *defaultPacketDecoder) Add(data any) ([]Packet, error) {
@@ -118,7 +125,11 @@ func (d *defaultPacketDecoder) Close() error {
 }
 
 func toParserPacket(packet Packet) (*socketparser.Packet, error) {
-	raw := &socketparser.Packet{Nsp: packet.Namespace, Id: packet.ID, Data: packet.Data}
+	raw := &socketparser.Packet{
+		Nsp:  packet.Namespace,
+		Id:   packet.ID,
+		Data: packet.Data,
+	}
 	switch packet.Type {
 	case PacketConnect:
 		raw.Type = socketparser.CONNECT
@@ -141,7 +152,11 @@ func toParserPacket(packet Packet) (*socketparser.Packet, error) {
 }
 
 func fromParserPacket(packet *socketparser.Packet) Packet {
-	result := Packet{Namespace: packet.Nsp, ID: packet.Id, Data: packet.Data}
+	result := Packet{
+		Namespace: packet.Nsp,
+		ID:        packet.Id,
+		Data:      packet.Data,
+	}
 	switch packet.Type {
 	case socketparser.CONNECT:
 		result.Type = PacketConnect
