@@ -40,12 +40,12 @@ func (a *LocalAdapter) BroadcastWithOffset(
 		opts = &BroadcastOptions{}
 	}
 	if offset == "" || a.nsp.server.cfg.Recovery == nil || packet.Type != PacketEvent || packet.ID != nil || opts.Flags.Volatile {
-		return a.memoryAdapter.Broadcast(ctx, packet, opts)
+		return a.Broadcast(ctx, packet, opts)
 	}
 
 	data, ok := packet.Data.([]any)
 	if !ok {
-		return a.memoryAdapter.Broadcast(ctx, packet, opts)
+		return a.Broadcast(ctx, packet, opts)
 	}
 	data = append(append([]any(nil), data...), offset)
 	packet.Data = data
