@@ -3,7 +3,7 @@
 package mongo
 
 import (
-	"github.com/aqcool/socket.io/adapters/adapter/v3"
+	"github.com/aqcool/socket.io/adapters/adapter/v4"
 )
 
 // Message types for Socket.IO MongoDB adapter inter-node communication.

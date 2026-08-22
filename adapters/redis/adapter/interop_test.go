@@ -19,10 +19,10 @@ import (
 	"testing"
 	"time"
 
-	redisbridge "github.com/aqcool/socket.io/adapters/redis/v3"
-	redisemitter "github.com/aqcool/socket.io/adapters/redis/v3/emitter"
-	"github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	redisbridge "github.com/aqcool/socket.io/adapters/redis/v4"
+	redisemitter "github.com/aqcool/socket.io/adapters/redis/v4/emitter"
+	"github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 	rds "github.com/redis/go-redis/v9"
 )
 

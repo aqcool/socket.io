@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	socketmongo "github.com/aqcool/socket.io/adapters/mongo/v3"
-	"github.com/aqcool/socket.io/reliability/v3"
+	socketmongo "github.com/aqcool/socket.io/adapters/mongo/v4"
+	"github.com/aqcool/socket.io/reliability/v4"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )

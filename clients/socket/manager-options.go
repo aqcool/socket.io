@@ -3,9 +3,9 @@ package socket
 import (
 	"time"
 
-	"github.com/aqcool/socket.io/clients/engine/v3"
-	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/clients/engine/v4"
+	"github.com/aqcool/socket.io/parsers/socket/v4/parser"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 // ManagerOptionsInterface defines the configuration interface for a Socket.IO Manager.

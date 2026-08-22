@@ -1,7 +1,7 @@
 # socket.io-go-mongo
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/mongo/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/mongo/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/mongo/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/mongo/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/adapters/mongo/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/adapters/mongo/v4)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/adapters/mongo/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/adapters/mongo/v4)
 
 ## 简介
 
@@ -14,7 +14,7 @@ Socket.IO Go 服务端的 MongoDB 适配器，通过 MongoDB 变更流将 Socket
 ## 安装
 
 ```bash
-go get github.com/aqcool/socket.io/adapters/mongo/v3
+go get github.com/aqcool/socket.io/adapters/mongo/v4
 ```
 
 ## 特性
@@ -41,9 +41,9 @@ import (
 
     "go.mongodb.org/mongo-driver/v2/mongo"
     "go.mongodb.org/mongo-driver/v2/mongo/options"
-    mgadapter "github.com/aqcool/socket.io/adapters/mongo/v3/adapter"
-    mgclient "github.com/aqcool/socket.io/adapters/mongo/v3"
-    "github.com/aqcool/socket.io/servers/socket/v3"
+    mgadapter "github.com/aqcool/socket.io/adapters/mongo/v4/adapter"
+    mgclient "github.com/aqcool/socket.io/adapters/mongo/v4"
+    "github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 func main() {
@@ -100,8 +100,8 @@ import (
 
     "go.mongodb.org/mongo-driver/v2/mongo"
     "go.mongodb.org/mongo-driver/v2/mongo/options"
-    mgclient "github.com/aqcool/socket.io/adapters/mongo/v3"
-    mgemitter "github.com/aqcool/socket.io/adapters/mongo/v3/emitter"
+    mgclient "github.com/aqcool/socket.io/adapters/mongo/v4"
+    mgemitter "github.com/aqcool/socket.io/adapters/mongo/v4/emitter"
 )
 
 func main() {

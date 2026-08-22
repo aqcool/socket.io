@@ -23,7 +23,7 @@ CORE_DEP       := github.com/aqcool/socket.io
 # V3_MODULES remain on the existing lockstep v3 release train. Experimental
 # major-version modules participate in development/build/test commands but must
 # never inherit the v3 VERSION/tag automatically.
-V3_MODULES := parsers/engine \
+MODULES := parsers/engine \
               parsers/socket \
               servers/engine \
               servers/socket \
@@ -45,8 +45,6 @@ V3_MODULES := parsers/engine \
               clients/engine \
               clients/socket
 
-EXPERIMENTAL_MODULES := v4
-MODULES := $(V3_MODULES) $(EXPERIMENTAL_MODULES)
 
 # Scope Logic: If MODULE=... is passed, use it; otherwise Root (.) + All Modules
 SCOPE := $(if $(MODULE),$(MODULE),. $(MODULES))
@@ -205,7 +203,7 @@ endif
 		mv "$(VERSION_FILE).tmp" "$(VERSION_FILE)"
 
 	@# Update Dependencies in v3 Submodules only
-	@for mod in $(V3_MODULES); do \
+	@for mod in $(MODULES); do \
 		if [ -d "$$mod" ]; then \
 			printf "$(C_CYAN)[Version] Syncing $$mod$(C_RESET)\n"; \
 			(cd "$$mod" && \
@@ -227,8 +225,8 @@ release:
 
 	$(eval TAG_OPTS := $(if $(filter 1,$(FORCE)),-f,))
 ifdef MODULE
-	@if [ "$(MODULE)" != "." ] && [ -z "$(filter $(MODULE),$(V3_MODULES))" ]; then \
-		printf "$(C_RED)[Error] release only supports v3 modules: . $(V3_MODULES)$(C_RESET)\n"; \
+	@if [ "$(MODULE)" != "." ] && [ -z "$(filter $(MODULE),$(MODULES))" ]; then \
+		printf "$(C_RED)[Error] release only supports v3 modules: . $(MODULES)$(C_RESET)\n"; \
 		exit 1; \
 	fi
 	@[ -d "$(MODULE)" ] || { printf "$(C_RED)[Error] Module path not found: $(MODULE)$(C_RESET)\n"; exit 1; }
@@ -243,7 +241,7 @@ else
 	@git tag $(TAG_OPTS) "$(CUR_VER)" || exit 1
 
 	@# Tag v3 Modules
-	@for mod in $(V3_MODULES); do \
+	@for mod in $(MODULES); do \
 		if [ -d "$$mod" ]; then \
 			printf "  Tagging $$mod/$(CUR_VER)\n"; \
 			git tag $(TAG_OPTS) "$$mod/$(CUR_VER)" || exit 1; \
@@ -253,7 +251,7 @@ else
 	@# Verification
 	@printf "$(C_GREEN)[Release] Verifying tags...$(C_RESET)\n"
 	@git show "$(CUR_VER)" >/dev/null 2>&1 || exit 1
-	@for mod in $(V3_MODULES); do \
+	@for mod in $(MODULES); do \
 		[ -d "$$mod" ] && git show "$$mod/$(CUR_VER)" >/dev/null 2>&1 || exit 1; \
 	done
 	@printf "$(C_GREEN)[Release] All v3 tags verified.$(C_RESET)\n"

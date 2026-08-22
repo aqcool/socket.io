@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	postgresio "github.com/aqcool/socket.io/adapters/postgres/v3"
-	pgemitter "github.com/aqcool/socket.io/adapters/postgres/v3/emitter"
-	"github.com/aqcool/socket.io/servers/socket/v3"
+	postgresio "github.com/aqcool/socket.io/adapters/postgres/v4"
+	pgemitter "github.com/aqcool/socket.io/adapters/postgres/v4/emitter"
+	"github.com/aqcool/socket.io/servers/socket/v4"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

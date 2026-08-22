@@ -1,7 +1,7 @@
 package socket
 
 import (
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 // Strictly typed version of an `EventEmitter`. A `TypedEventEmitter` takes type

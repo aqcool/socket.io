@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"sync"
 
-	socket "github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	socket "github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 // Emitter is any Socket.IO value that exposes Emit. Socket, Namespace,

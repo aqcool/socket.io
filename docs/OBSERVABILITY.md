@@ -6,7 +6,7 @@
 
 ```go
 import (
-    socketmetrics "github.com/aqcool/socket.io/observability/v3/prometheus"
+    socketmetrics "github.com/aqcool/socket.io/observability/v4/prometheus"
     "github.com/prometheus/client_golang/prometheus"
     "github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -61,7 +61,7 @@ sum(rate(socketio_connection_recoveries_total{result="recovered"}[5m]))
 ## OpenTelemetry tracing
 
 ```go
-import socketotel "github.com/aqcool/socket.io/observability/v3/otel"
+import socketotel "github.com/aqcool/socket.io/observability/v4/otel"
 
 tracing, err := socketotel.InstrumentServer(io, &socketotel.Options{
     TracerProvider: tracerProvider,

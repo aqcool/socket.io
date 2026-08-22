@@ -1,7 +1,7 @@
 # socket.io-go-parser
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/parsers/socket/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/parsers/socket/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/parsers/socket/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/parsers/socket/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/parsers/socket/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/parsers/socket/v4)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/parsers/socket/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/parsers/socket/v4)
 
 ## 概述
 
@@ -26,7 +26,7 @@
 运行以下命令安装本包：
 
 ```bash
-go get github.com/aqcool/socket.io/parsers/socket/v3
+go get github.com/aqcool/socket.io/parsers/socket/v4
 ```
 
 ## 使用示例
@@ -37,8 +37,8 @@ go get github.com/aqcool/socket.io/parsers/socket/v3
 package main
 
 import (
-    "github.com/aqcool/socket.io/v3/pkg/utils"
-    "github.com/aqcool/socket.io/parsers/socket/v3/parser"
+    "github.com/aqcool/socket.io/v4/pkg/utils"
+    "github.com/aqcool/socket.io/parsers/socket/v4/parser"
 )
 
 func main() {
@@ -72,8 +72,8 @@ func main() {
 package main
 
 import (
-    "github.com/aqcool/socket.io/v3/pkg/utils"
-    "github.com/aqcool/socket.io/parsers/socket/v3/parser"
+    "github.com/aqcool/socket.io/v4/pkg/utils"
+    "github.com/aqcool/socket.io/parsers/socket/v4/parser"
 )
 
 func main() {

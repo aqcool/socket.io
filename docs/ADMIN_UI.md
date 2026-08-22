@@ -8,8 +8,8 @@
 import (
     "os"
 
-    instrumentation "github.com/aqcool/socket.io/instrumentation/v3"
-    socket "github.com/aqcool/socket.io/servers/socket/v3"
+    instrumentation "github.com/aqcool/socket.io/instrumentation/v4"
+    socket "github.com/aqcool/socket.io/servers/socket/v4"
     "golang.org/x/crypto/bcrypt"
 )
 

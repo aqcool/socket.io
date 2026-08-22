@@ -16,7 +16,7 @@ Pub/Sub、Valkey 分片 Pub/Sub（Valkey 7+）及 Valkey Streams 提供 Socket.I
 ## 安装
 
 ```bash
-go get github.com/aqcool/socket.io/adapters/valkey/v3
+go get github.com/aqcool/socket.io/adapters/valkey/v4
 ```
 
 ## 用法
@@ -28,9 +28,9 @@ import (
     "context"
 
     vk "github.com/valkey-io/valkey-go"
-    io "github.com/aqcool/socket.io/servers/socket/v3"
-    vkadapter "github.com/aqcool/socket.io/adapters/valkey/v3/adapter"
-    valkey "github.com/aqcool/socket.io/adapters/valkey/v3"
+    io "github.com/aqcool/socket.io/servers/socket/v4"
+    vkadapter "github.com/aqcool/socket.io/adapters/valkey/v4/adapter"
+    valkey "github.com/aqcool/socket.io/adapters/valkey/v4"
 )
 
 client, err := vk.NewClient(vk.ClientOption{
@@ -80,8 +80,8 @@ import (
     "context"
 
     vk "github.com/valkey-io/valkey-go"
-    valkey "github.com/aqcool/socket.io/adapters/valkey/v3"
-    "github.com/aqcool/socket.io/adapters/valkey/v3/emitter"
+    valkey "github.com/aqcool/socket.io/adapters/valkey/v4"
+    "github.com/aqcool/socket.io/adapters/valkey/v4/emitter"
 )
 
 client, _ := vk.NewClient(vk.ClientOption{InitAddress: []string{"localhost:6379"}})

@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	serversocket "github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/servers/socket/v3/presence"
-	"github.com/aqcool/socket.io/v3/pkg/utils"
+	serversocket "github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/servers/socket/v4/presence"
+	"github.com/aqcool/socket.io/v4/pkg/utils"
 )
 
 const (

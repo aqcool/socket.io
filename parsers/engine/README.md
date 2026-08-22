@@ -1,7 +1,7 @@
 # engine.io-go-parser
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/parsers/engine/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/parsers/engine/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/parsers/engine/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/parsers/engine/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/parsers/engine/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/parsers/engine/v4)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/parsers/engine/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/parsers/engine/v4)
 
 ## 简介
 
@@ -10,7 +10,7 @@ Engine.IO 协议解析器的 Go 实现。[Engine.IO 客户端](../../clients/eng
 ## 安装
 
 ```bash
-go get github.com/aqcool/socket.io/parsers/engine/v3
+go get github.com/aqcool/socket.io/parsers/engine/v4
 ```
 
 ## 特性
@@ -38,8 +38,8 @@ import (
     "io"
     "strings"
 
-    "github.com/aqcool/socket.io/parsers/engine/v3/packet"
-    engineparser "github.com/aqcool/socket.io/parsers/engine/v3/parser"
+    "github.com/aqcool/socket.io/parsers/engine/v4/packet"
+    engineparser "github.com/aqcool/socket.io/parsers/engine/v4/parser"
 )
 
 func main() {

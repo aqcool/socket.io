@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
-	"github.com/aqcool/socket.io/v3/pkg/log"
-	"github.com/aqcool/socket.io/v3/pkg/queue"
-	"github.com/aqcool/socket.io/v3/pkg/slices"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/parsers/engine/v4/packet"
+	"github.com/aqcool/socket.io/v4/pkg/log"
+	"github.com/aqcool/socket.io/v4/pkg/queue"
+	"github.com/aqcool/socket.io/v4/pkg/slices"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 	ws "github.com/gorilla/websocket"
 )
 

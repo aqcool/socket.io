@@ -3,7 +3,7 @@ package adapter
 import (
 	"fmt"
 
-	"github.com/aqcool/socket.io/v3/pkg/utils"
+	"github.com/aqcool/socket.io/v4/pkg/utils"
 	"github.com/vmihailenco/msgpack/v5"
 )
 

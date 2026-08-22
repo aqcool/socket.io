@@ -67,19 +67,19 @@
 
 | Go 模块                                                    | 说明                                                                                                                                    |
 |------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| `github.com/aqcool/socket.io/v3`                       | 定义共享类型、接口和入口的根模块。                                                                                                    |
-| `github.com/aqcool/socket.io/servers/engine/v3`        | Engine.IO 服务端：通过各类传输方式管理底层通信。                                                                                       |
-| `github.com/aqcool/socket.io/clients/engine/v3`        | Engine.IO 客户端：建立到服务端的底层传输连接。                                                                                         |
-| `github.com/aqcool/socket.io/parsers/engine/v3`        | Engine.IO 数据包解析器：编解码传输层消息。                                                                                             |
-| `github.com/aqcool/socket.io/servers/socket/v3`        | Socket.IO 服务端：构建于 Engine.IO 服务端之上，提供实时双向通信。                                                                      |
-| `github.com/aqcool/socket.io/clients/socket/v3`        | Socket.IO 客户端：构建于 Engine.IO 客户端之上，支持房间、命名空间等功能。                                                              |
-| `github.com/aqcool/socket.io/parsers/socket/v3`        | Socket.IO 数据包解析器：处理基于事件的消息编解码。                                                                                     |
-| `github.com/aqcool/socket.io/adapters/adapter/v3`      | 适配器接口：用于多节点通信的可插拔广播层。                                                                                             |
-| `github.com/aqcool/socket.io/adapters/redis/v3`        | Redis 适配器：通过 Redis Pub/Sub 实现消息广播。                                                                                        |
-| `github.com/aqcool/socket.io/adapters/valkey/v3`       | Valkey 适配器：通过 Valkey Pub/Sub 实现消息广播。                                                                                      |
-| `github.com/aqcool/socket.io/adapters/postgres/v3`     | PostgreSQL 适配器：通过 LISTEN/NOTIFY 实现消息广播。                                                                                    |
-| `github.com/aqcool/socket.io/adapters/mongo/v3`        | MongoDB 适配器：通过 MongoDB 变更流实现消息广播。                                                                                      |
-| `github.com/aqcool/socket.io/adapters/unix/v3`         | Unix 域套接字适配器：在同一主机的进程间进行低延迟消息广播。                                                                            |
+| `github.com/aqcool/socket.io/v4`                       | 定义共享类型、接口和入口的根模块。                                                                                                    |
+| `github.com/aqcool/socket.io/servers/engine/v4`        | Engine.IO 服务端：通过各类传输方式管理底层通信。                                                                                       |
+| `github.com/aqcool/socket.io/clients/engine/v4`        | Engine.IO 客户端：建立到服务端的底层传输连接。                                                                                         |
+| `github.com/aqcool/socket.io/parsers/engine/v4`        | Engine.IO 数据包解析器：编解码传输层消息。                                                                                             |
+| `github.com/aqcool/socket.io/servers/socket/v4`        | Socket.IO 服务端：构建于 Engine.IO 服务端之上，提供实时双向通信。                                                                      |
+| `github.com/aqcool/socket.io/clients/socket/v4`        | Socket.IO 客户端：构建于 Engine.IO 客户端之上，支持房间、命名空间等功能。                                                              |
+| `github.com/aqcool/socket.io/parsers/socket/v4`        | Socket.IO 数据包解析器：处理基于事件的消息编解码。                                                                                     |
+| `github.com/aqcool/socket.io/adapters/adapter/v4`      | 适配器接口：用于多节点通信的可插拔广播层。                                                                                             |
+| `github.com/aqcool/socket.io/adapters/redis/v4`        | Redis 适配器：通过 Redis Pub/Sub 实现消息广播。                                                                                        |
+| `github.com/aqcool/socket.io/adapters/valkey/v4`       | Valkey 适配器：通过 Valkey Pub/Sub 实现消息广播。                                                                                      |
+| `github.com/aqcool/socket.io/adapters/postgres/v4`     | PostgreSQL 适配器：通过 LISTEN/NOTIFY 实现消息广播。                                                                                    |
+| `github.com/aqcool/socket.io/adapters/mongo/v4`        | MongoDB 适配器：通过 MongoDB 变更流实现消息广播。                                                                                      |
+| `github.com/aqcool/socket.io/adapters/unix/v4`         | Unix 域套接字适配器：在同一主机的进程间进行低延迟消息广播。                                                                            |
 
 ## 开发环境
 

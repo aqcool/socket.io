@@ -3,7 +3,7 @@ package auth
 import (
 	"sync"
 
-	socket "github.com/aqcool/socket.io/servers/socket/v3"
+	socket "github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 type UserIDResolver func(any) (string, bool)

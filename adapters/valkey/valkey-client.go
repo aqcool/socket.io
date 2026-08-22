@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 	vk "github.com/valkey-io/valkey-go"
 )
 

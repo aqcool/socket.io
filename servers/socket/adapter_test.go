@@ -3,7 +3,7 @@ package socket
 import (
 	"testing"
 
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 // newTestAdapter creates a fully initialized adapter via a real server.

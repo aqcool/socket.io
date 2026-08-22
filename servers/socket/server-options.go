@@ -3,9 +3,17 @@ package socket
 import (
 	"time"
 
-	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
-	"github.com/aqcool/socket.io/servers/engine/v3/config"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/parsers/socket/v4/parser"
+	"github.com/aqcool/socket.io/servers/engine/v4/config"
+	"github.com/aqcool/socket.io/v4/pkg/types"
+)
+
+type TaskQueueOverflowPolicy uint8
+
+const (
+	TaskQueueOverflowDisconnect TaskQueueOverflowPolicy = iota
+	TaskQueueOverflowDropNewest
+	TaskQueueOverflowReject
 )
 
 type (
@@ -64,6 +72,11 @@ type (
 		SetCleanupEmptyChildNamespaces(bool)
 		GetRawCleanupEmptyChildNamespaces() types.Optional[bool]
 		CleanupEmptyChildNamespaces() bool
+
+		SetTaskQueueMaxPending(int)
+		TaskQueueMaxPending() int
+		SetTaskQueueOverflowPolicy(TaskQueueOverflowPolicy)
+		TaskQueueOverflowPolicy() TaskQueueOverflowPolicy
 	}
 
 	ServerOptions struct {
@@ -91,6 +104,9 @@ type (
 
 		// Whether to remove child namespaces that have no sockets connected to them
 		cleanupEmptyChildNamespaces types.Optional[bool]
+
+		taskQueueMaxPending     int
+		taskQueueOverflowPolicy TaskQueueOverflowPolicy
 	}
 )
 
@@ -117,7 +133,10 @@ func (c *ConnectionStateRecovery) Assign(data ConnectionStateRecoveryInterface) 
 }
 
 func DefaultServerOptions() *ServerOptions {
-	return &ServerOptions{}
+	return &ServerOptions{
+		taskQueueMaxPending:     4096,
+		taskQueueOverflowPolicy: TaskQueueOverflowDisconnect,
+	}
 }
 
 func (s *ServerOptions) Assign(data ServerOptionsInterface) ServerOptionsInterface {
@@ -148,6 +167,8 @@ func (s *ServerOptions) Assign(data ServerOptionsInterface) ServerOptionsInterfa
 	if data.GetRawCleanupEmptyChildNamespaces() != nil {
 		s.SetCleanupEmptyChildNamespaces(data.CleanupEmptyChildNamespaces())
 	}
+	s.SetTaskQueueMaxPending(data.TaskQueueMaxPending())
+	s.SetTaskQueueOverflowPolicy(data.TaskQueueOverflowPolicy())
 
 	return s
 }
@@ -295,4 +316,26 @@ func (s *ServerOptions) CleanupEmptyChildNamespaces() bool {
 	}
 
 	return s.cleanupEmptyChildNamespaces.Get()
+}
+
+func (s *ServerOptions) SetTaskQueueMaxPending(maxPending int) {
+	if maxPending < 0 {
+		maxPending = 0
+	}
+	s.taskQueueMaxPending = maxPending
+}
+
+func (s *ServerOptions) TaskQueueMaxPending() int {
+	return s.taskQueueMaxPending
+}
+
+func (s *ServerOptions) SetTaskQueueOverflowPolicy(policy TaskQueueOverflowPolicy) {
+	if policy > TaskQueueOverflowReject {
+		policy = TaskQueueOverflowDisconnect
+	}
+	s.taskQueueOverflowPolicy = policy
+}
+
+func (s *ServerOptions) TaskQueueOverflowPolicy() TaskQueueOverflowPolicy {
+	return s.taskQueueOverflowPolicy
 }

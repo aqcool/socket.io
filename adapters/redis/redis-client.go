@@ -5,7 +5,7 @@ package redis
 import (
 	"context"
 
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 	"github.com/redis/go-redis/v9"
 )
 

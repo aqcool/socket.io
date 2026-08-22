@@ -2,8 +2,8 @@
 package adapter
 
 import (
-	"github.com/aqcool/socket.io/adapters/adapter/v3"
-	valkey "github.com/aqcool/socket.io/adapters/valkey/v3"
+	"github.com/aqcool/socket.io/adapters/adapter/v4"
+	valkey "github.com/aqcool/socket.io/adapters/valkey/v4"
 )
 
 type (

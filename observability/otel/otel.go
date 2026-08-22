@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"sync"
 
-	socket "github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	socket "github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 	api "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -66,7 +66,7 @@ func InstrumentServer(server *socket.Server, options *Options) (*Instrumentation
 		}
 	}
 	instrumentation := &Instrumentation{
-		tracer:           opts.TracerProvider.Tracer("github.com/aqcool/socket.io/observability/v3"),
+		tracer:           opts.TracerProvider.Tracer("github.com/aqcool/socket.io/observability/v4"),
 		propagator:       opts.Propagator,
 		contextExtractor: opts.ContextExtractor,
 		includeSocketID:  opts.IncludeSocketID,

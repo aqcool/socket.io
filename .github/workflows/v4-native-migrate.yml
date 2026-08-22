@@ -1,0 +1,110 @@
+name: V4 Native Migration
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v4-native-migration-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: ${{ github.event.pull_request.head.ref == 'feat/v4-native-core' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout native v4 branch
+        uses: actions/checkout@v6
+        with:
+          ref: feat/v4-native-core
+          fetch-depth: 0
+
+      - name: Detect migration state
+        id: state
+        shell: bash
+        run: |
+          test -f .native-v4-migrated && echo "migrated=true" >> "$GITHUB_OUTPUT" || echo "migrated=false" >> "$GITHUB_OUTPUT"
+          test -f .native-v4-core-finalized && echo "finalized=true" >> "$GITHUB_OUTPUT" || echo "finalized=false" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Apply module migration
+        if: steps.state.outputs.migrated != 'true'
+        run: python3 .github/scripts/native_v4_migrate.py
+
+      - name: Apply native core finalization
+        if: steps.state.outputs.finalized != 'true'
+        run: python3 .github/scripts/native_v4_finalize.py
+
+      - name: Format Go sources
+        run: |
+          find . -type f -name '*.go' \
+            -not -path './vendor/*' \
+            -not -path '*/vendor/*' \
+            -print0 | xargs -0 gofmt -w
+
+      - name: Wire local module graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t mods < <(find . -name go.mod -not -path '*/vendor/*' | sort)
+          declare -a module_names=()
+          declare -a module_dirs=()
+          for mod in "${mods[@]}"; do
+            dir=$(dirname "$mod")
+            name=$(awk '/^module / {print $2; exit}' "$mod")
+            if [[ "$name" == github.com/aqcool/socket.io* ]]; then
+              module_names+=("$name")
+              module_dirs+=("$dir")
+            fi
+          done
+          for mod in "${mods[@]}"; do
+            dir=$(dirname "$mod")
+            for i in "${!module_names[@]}"; do
+              target=${module_dirs[$i]}
+              [[ "$dir" == "$target" ]] && continue
+              rel=$(realpath --relative-to="$dir" "$target")
+              if [[ "$rel" != .* ]]; then rel="./$rel"; fi
+              (cd "$dir" && go mod edit -replace="${module_names[$i]}=$rel")
+            done
+          done
+
+      - name: Tidy modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r mod; do
+            dir=$(dirname "$mod")
+            echo "tidy: $dir"
+            (cd "$dir" && go mod tidy)
+          done < <(find . -name go.mod -not -path '*/vendor/*' | sort)
+
+      - name: Test native root
+        run: go test -race ./...
+
+      - name: Test native Socket.IO core
+        run: cd servers/socket && go test -race ./...
+
+      - name: Commit generated native changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- ':!.github/workflows'
+          if git diff --cached --quiet; then
+            echo "No generated source changes"
+            exit 0
+          fi
+          git commit -m "refactor(v4): finalize native core concurrency and lifecycle"
+          git push origin HEAD:feat/v4-native-core

@@ -5,8 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/aqcool/socket.io/v3/pkg/log"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/log"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 var (
@@ -72,8 +72,9 @@ type namespace struct {
 
 	// #readonly
 
-	name    string
-	sockets *types.Map[SocketId, *Socket]
+	name              string
+	sockets           *types.Map[SocketId, *Socket]
+	preConnectSockets *types.Map[SocketId, *Socket]
 
 	adapter Adapter
 
@@ -90,9 +91,10 @@ func MakeNamespace() Namespace {
 	n := &namespace{
 		StrictEventEmitter: NewStrictEventEmitter(),
 
-		sockets:  &types.Map[SocketId, *Socket]{},
-		_fns:     types.NewSlice[NamespaceMiddleware](),
-		_cleanup: nil,
+		sockets:           &types.Map[SocketId, *Socket]{},
+		preConnectSockets: &types.Map[SocketId, *Socket]{},
+		_fns:              types.NewSlice[NamespaceMiddleware](),
+		_cleanup:          nil,
 	}
 
 	n.Prototype(n)
@@ -264,6 +266,12 @@ func (n *namespace) Except(room ...Room) *BroadcastOperator {
 func (n *namespace) Add(client *Client, auth map[string]any, fn func(*Socket)) {
 	namespaceLog.Debug("adding socket to nsp %s", n.name)
 	socket := n._createSocket(client, auth)
+	n.preConnectSockets.Store(socket.Id(), socket)
+	_ = socket.Conn().Once("close", func(...any) {
+		if _, pending := n.preConnectSockets.Load(socket.Id()); pending {
+			socket._cleanup()
+		}
+	})
 	if connectionStateRecovery := n.server.Opts().ConnectionStateRecovery(); connectionStateRecovery != nil && connectionStateRecovery.SkipMiddlewares() && socket.Recovered() && client.Conn().ReadyState() == "open" {
 		n._doConnect(socket, fn)
 		return
@@ -334,7 +342,8 @@ func (n *namespace) _doConnect(socket *Socket, fn func(*Socket)) {
 	// all connection callbacks have installed their handlers.
 	defer socket.markConnectReady()
 
-	// track socket
+	// move the Socket from pre-connect tracking into the connected registry.
+	n.preConnectSockets.Delete(socket.Id())
 	n.sockets.Store(socket.Id(), socket)
 	// Register the socket in the owning Client before writing the namespace
 	// CONNECT packet. The official implementation gets this ordering from the
@@ -377,6 +386,7 @@ func (n *namespace) Cleanup(cleanup func()) {
 
 // Removes a client. Called by each [Socket].
 func (n *namespace) Remove(socket *Socket) {
+	n.preConnectSockets.Delete(socket.Id())
 	if _, ok := n.sockets.LoadAndDelete(socket.Id()); !ok {
 		namespaceLog.Debug("ignoring remove for %s", socket.Id())
 	}

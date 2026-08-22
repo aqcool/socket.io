@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
-	engineServer "github.com/aqcool/socket.io/servers/engine/v3"
-	serverConfig "github.com/aqcool/socket.io/servers/engine/v3/config"
-	"github.com/aqcool/socket.io/servers/engine/v3/transports"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/parsers/engine/v4/packet"
+	engineServer "github.com/aqcool/socket.io/servers/engine/v4"
+	serverConfig "github.com/aqcool/socket.io/servers/engine/v4/config"
+	"github.com/aqcool/socket.io/servers/engine/v4/transports"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 	gorillaws "github.com/gorilla/websocket"
 )
 

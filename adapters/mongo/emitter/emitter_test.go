@@ -3,7 +3,7 @@ package emitter
 import (
 	"testing"
 
-	"github.com/aqcool/socket.io/servers/socket/v3"
+	"github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 func TestEmitterOptionsAndNamespace(t *testing.T) {

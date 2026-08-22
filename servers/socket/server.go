@@ -15,12 +15,12 @@ import (
 	"time"
 
 	"github.com/andybalholm/brotli"
-	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
-	"github.com/aqcool/socket.io/servers/engine/v3"
-	"github.com/aqcool/socket.io/v3/pkg/log"
-	"github.com/aqcool/socket.io/v3/pkg/slices"
-	"github.com/aqcool/socket.io/v3/pkg/types"
-	"github.com/aqcool/socket.io/v3/pkg/utils"
+	"github.com/aqcool/socket.io/parsers/socket/v4/parser"
+	"github.com/aqcool/socket.io/servers/engine/v4"
+	"github.com/aqcool/socket.io/v4/pkg/log"
+	"github.com/aqcool/socket.io/v4/pkg/slices"
+	"github.com/aqcool/socket.io/v4/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/utils"
 	"github.com/klauspost/compress/zstd"
 )
 
@@ -55,8 +55,8 @@ type (
 	// Represents a Socket.IO server.
 	//
 	//	import (
-	//		"github.com/aqcool/socket.io/v3/pkg/utils"
-	//		"github.com/aqcool/socket.io/servers/socket/v3"
+	//		"github.com/aqcool/socket.io/v4/pkg/utils"
+	//		"github.com/aqcool/socket.io/servers/socket/v4"
 	//	)
 	//
 	//	io := socket.NewServer(nil, nil)
@@ -107,6 +107,8 @@ type (
 		httpServer      *types.HttpServer
 		_corsMiddleware engine.Middleware
 		stateMu         sync.RWMutex
+
+		namespaceMu sync.Mutex
 
 		// dynamicNamespaceMu makes creation of a child namespace atomic when
 		// several clients concurrently match the same parent namespace.
@@ -678,10 +680,18 @@ func (s *Server) Of(name any, fn types.EventListener) Namespace {
 			return namespace
 		}
 
-		serverLog.Debug("initializing namespace %s", n)
-		namespace = NewNamespace(s, n)
-		s._nsps.Store(n, namespace)
-		if n != "/" {
+		created := false
+		s.namespaceMu.Lock()
+		if existing, exists := s._nsps.Load(n); exists {
+			namespace = existing
+		} else {
+			serverLog.Debug("initializing namespace %s", n)
+			namespace = NewNamespace(s, n)
+			s._nsps.Store(n, namespace)
+			created = true
+		}
+		s.namespaceMu.Unlock()
+		if created && n != "/" {
 			s.sockets.EmitReserved("new_namespace", namespace)
 		}
 	}

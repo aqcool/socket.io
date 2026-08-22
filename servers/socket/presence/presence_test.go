@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	socket "github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	socket "github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 func TestClusterQueriesAndMultiDeviceUserMapping(t *testing.T) {

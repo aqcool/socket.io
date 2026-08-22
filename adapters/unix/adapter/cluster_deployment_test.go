@@ -18,12 +18,12 @@ import (
 	"testing"
 	"time"
 
-	unixbridge "github.com/aqcool/socket.io/adapters/unix/v3"
-	engine "github.com/aqcool/socket.io/servers/engine/v3"
-	engineconfig "github.com/aqcool/socket.io/servers/engine/v3/config"
-	"github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/sticky/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	unixbridge "github.com/aqcool/socket.io/adapters/unix/v4"
+	engine "github.com/aqcool/socket.io/servers/engine/v4"
+	engineconfig "github.com/aqcool/socket.io/servers/engine/v4/config"
+	"github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/sticky/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 const (

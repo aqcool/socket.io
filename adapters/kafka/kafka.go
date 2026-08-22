@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/IBM/sarama"
-	broker "github.com/aqcool/socket.io/adapters/broker/v3"
+	broker "github.com/aqcool/socket.io/adapters/broker/v4"
 )
 
 type Options struct {

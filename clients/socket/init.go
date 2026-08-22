@@ -15,10 +15,10 @@ package socket
 import (
 	"sync"
 
-	"github.com/aqcool/socket.io/clients/engine/v3/transports"
-	"github.com/aqcool/socket.io/v3/pkg/log"
-	"github.com/aqcool/socket.io/v3/pkg/types"
-	"github.com/aqcool/socket.io/v3/pkg/utils"
+	"github.com/aqcool/socket.io/clients/engine/v4/transports"
+	"github.com/aqcool/socket.io/v4/pkg/log"
+	"github.com/aqcool/socket.io/v4/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/utils"
 )
 
 var (

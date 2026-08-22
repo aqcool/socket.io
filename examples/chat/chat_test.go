@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	io_client "github.com/aqcool/socket.io/clients/socket/v3"
-	io "github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	io_client "github.com/aqcool/socket.io/clients/socket/v4"
+	io "github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 // setupServer creates a chat server for testing and returns the server, address, and cleanup function.

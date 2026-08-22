@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aqcool/socket.io/servers/engine/v3/config"
+	"github.com/aqcool/socket.io/servers/engine/v4/config"
 	"github.com/gorilla/websocket"
 )
 

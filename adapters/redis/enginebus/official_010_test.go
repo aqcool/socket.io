@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	engine "github.com/aqcool/socket.io/servers/engine/v3"
-	"github.com/aqcool/socket.io/servers/engine/v3/config"
+	engine "github.com/aqcool/socket.io/servers/engine/v4"
+	"github.com/aqcool/socket.io/servers/engine/v4/config"
 	"github.com/redis/go-redis/v9"
 )
 

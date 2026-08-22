@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
-	legacy "github.com/aqcool/socket.io/servers/socket/v3"
+	core "github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 type Socket struct {
 	server *Server
-	raw    *legacy.Socket
+	raw    *core.Socket
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -24,7 +24,7 @@ type Socket struct {
 	data   map[string]any
 }
 
-func newSocket(server *Server, raw *legacy.Socket) *Socket {
+func newSocket(server *Server, raw *core.Socket) *Socket {
 	ctx, cancel := context.WithCancel(server.Context())
 	socket := &Socket{
 		server: server,
@@ -55,7 +55,7 @@ func newSocket(server *Server, raw *legacy.Socket) *Socket {
 	return socket
 }
 
-func (s *Server) wrapSocket(raw *legacy.Socket) *Socket {
+func (s *Server) wrapSocket(raw *core.Socket) *Socket {
 	if s == nil || raw == nil {
 		return nil
 	}
@@ -69,7 +69,7 @@ func (s *Server) wrapSocket(raw *legacy.Socket) *Socket {
 	return socket
 }
 
-func (s *Server) dropSocket(raw *legacy.Socket) {
+func (s *Server) dropSocket(raw *core.Socket) {
 	if s == nil || raw == nil {
 		return
 	}
@@ -99,7 +99,7 @@ func (s *Socket) Handshake() Handshake {
 	return convertHandshake(s.raw.Handshake())
 }
 
-func convertHandshake(raw *legacy.Handshake) Handshake {
+func convertHandshake(raw *core.Handshake) Handshake {
 	if raw == nil {
 		return Handshake{}
 	}
@@ -187,7 +187,7 @@ func (s *Socket) Leave(ctx context.Context, rooms ...Room) error {
 		return ErrNotConnected
 	}
 	for _, room := range rooms {
-		s.raw.Leave(legacy.Room(room))
+		s.raw.Leave(core.Room(room))
 	}
 	return nil
 }
@@ -279,7 +279,7 @@ func (s *Socket) RemoveAllListeners(event string) {
 func (s *Socket) transformArgs(_ string, args []any) []any {
 	result := append([]any(nil), args...)
 	for i, value := range result {
-		if rawAck, ok := value.(legacy.Ack); ok {
+		if rawAck, ok := value.(core.Ack); ok {
 			result[i] = Ack(func(values []any, err error) {
 				rawAck(values, err)
 			})

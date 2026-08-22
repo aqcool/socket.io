@@ -6,8 +6,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/parsers/engine/v4/packet"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 // maxSafePayloadLength mirrors Number.MAX_SAFE_INTEGER, which is the largest

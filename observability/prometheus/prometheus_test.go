@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	client "github.com/aqcool/socket.io/clients/socket/v3"
-	socket "github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	client "github.com/aqcool/socket.io/clients/socket/v4"
+	socket "github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 	prom "github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 )

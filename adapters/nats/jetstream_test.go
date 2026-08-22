@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	broker "github.com/aqcool/socket.io/adapters/broker/v3"
+	broker "github.com/aqcool/socket.io/adapters/broker/v4"
 	natsgo "github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 )

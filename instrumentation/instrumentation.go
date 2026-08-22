@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
-	enginepacket "github.com/aqcool/socket.io/parsers/engine/v3/packet"
-	engine "github.com/aqcool/socket.io/servers/engine/v3"
-	socket "github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	enginepacket "github.com/aqcool/socket.io/parsers/engine/v4/packet"
+	engine "github.com/aqcool/socket.io/servers/engine/v4"
+	socket "github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 	"golang.org/x/crypto/bcrypt"
 )
 

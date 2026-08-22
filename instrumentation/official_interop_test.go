@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	server "github.com/aqcool/socket.io/servers/socket/v3"
+	server "github.com/aqcool/socket.io/servers/socket/v4"
 	"golang.org/x/crypto/bcrypt"
 )
 

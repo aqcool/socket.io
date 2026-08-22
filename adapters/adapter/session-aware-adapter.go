@@ -1,7 +1,7 @@
 package adapter
 
 import (
-	"github.com/aqcool/socket.io/servers/socket/v3"
+	"github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 // SessionAwareAdapterBuilder is a builder for creating SessionAwareAdapter instances.

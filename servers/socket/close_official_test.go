@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 func socketIOPollingHandshake(t *testing.T, baseURL string) string {

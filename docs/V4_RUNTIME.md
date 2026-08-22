@@ -28,7 +28,7 @@ Not implemented natively yet:
 - v4 Adapter providers (Redis/Valkey/Postgres/Mongo/NATS/Kafka/AMQP)
 - custom v4 PacketCodec integration
 - bounded per-Socket dispatch queue enforcement (the bridge still uses the v3 queue)
-- removal of the v3 protocol-core dependency
+- v3 protocol-core dependency removed
 
 `WithAdapter` and `WithParser` therefore return `ErrUnsupported` in the current bridge implementation rather than silently accepting contracts that are not actually wired.
 

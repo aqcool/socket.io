@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	client "github.com/aqcool/socket.io/clients/socket/v3"
-	server "github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	client "github.com/aqcool/socket.io/clients/socket/v4"
+	server "github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 func TestNormalizeOptionsAndFeatures(t *testing.T) {

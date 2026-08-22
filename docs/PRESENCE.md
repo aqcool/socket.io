@@ -6,8 +6,8 @@
 
 ```go
 import (
-    socket "github.com/aqcool/socket.io/servers/socket/v3"
-    "github.com/aqcool/socket.io/servers/socket/v3/presence"
+    socket "github.com/aqcool/socket.io/servers/socket/v4"
+    "github.com/aqcool/socket.io/servers/socket/v4/presence"
 )
 
 io := socket.NewServer(nil, nil)

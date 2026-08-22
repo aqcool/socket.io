@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 	ws "github.com/gorilla/websocket"
 	"github.com/quic-go/quic-go"
 	wt "github.com/quic-go/webtransport-go"

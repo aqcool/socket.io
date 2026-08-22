@@ -3,9 +3,9 @@ package reliability
 import (
 	"sync"
 
-	clientsocket "github.com/aqcool/socket.io/clients/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
-	"github.com/aqcool/socket.io/v3/pkg/utils"
+	clientsocket "github.com/aqcool/socket.io/clients/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/utils"
 )
 
 type Client struct {

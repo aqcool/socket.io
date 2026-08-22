@@ -6,8 +6,8 @@ import (
 	"os"
 	"os/signal"
 
-	io "github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	io "github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 // Middleware authentication example - demonstrates server-side middleware

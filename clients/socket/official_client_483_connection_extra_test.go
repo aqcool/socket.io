@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	server "github.com/aqcool/socket.io/servers/socket/v3"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	server "github.com/aqcool/socket.io/servers/socket/v4"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 const officialClient483ConnectionExtraWait = 5 * time.Second

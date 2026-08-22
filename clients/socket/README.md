@@ -1,7 +1,7 @@
 # Socket.IO Go 客户端
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/clients/socket/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/clients/socket/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/clients/socket/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/clients/socket/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/clients/socket/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/clients/socket/v4)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/clients/socket/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/clients/socket/v4)
 
 一个稳定可靠的 [Socket.IO](https://socket.io/) Go 客户端实现，提供基于事件的实时双向通信。
 
@@ -36,7 +36,7 @@
 ## 安装
 
 ```bash
-go get github.com/aqcool/socket.io/clients/socket/v3
+go get github.com/aqcool/socket.io/clients/socket/v4
 ```
 
 ## 快速开始
@@ -49,7 +49,7 @@ package main
 import (
     "log"
 
-    "github.com/aqcool/socket.io/clients/socket/v3"
+    "github.com/aqcool/socket.io/clients/socket/v4"
 )
 
 func main() {
@@ -79,9 +79,9 @@ package main
 import (
     "time"
 
-    "github.com/aqcool/socket.io/clients/socket/v3"
-    "github.com/aqcool/socket.io/clients/engine/v3/transports"
-    "github.com/aqcool/socket.io/v3/pkg/types"
+    "github.com/aqcool/socket.io/clients/socket/v4"
+    "github.com/aqcool/socket.io/clients/engine/v4/transports"
+    "github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 func main() {
@@ -158,7 +158,7 @@ opts.SetTimeout(20000)                       // Connection timeout
 
 
 ```go
-import "github.com/aqcool/socket.io/v3/pkg/log"
+import "github.com/aqcool/socket.io/v4/pkg/log"
 
 log.DEBUG = true
 ```

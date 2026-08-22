@@ -52,7 +52,7 @@ func TestGeneratedClientOfficialTypeContract(t *testing.T) {
 
 	endpointSource := `package contract
 
-import "github.com/aqcool/socket.io/v3/pkg/types"
+import "github.com/aqcool/socket.io/v4/pkg/types"
 
 type endpoint struct{}
 func (*endpoint) Emit(string, ...any) error { return nil }
@@ -62,7 +62,7 @@ func (*endpoint) On(string, ...types.EventListener) error { return nil }
 
 import (
 	"context"
-	sockettyped "github.com/aqcool/socket.io/typed/v3"
+	sockettyped "github.com/aqcool/socket.io/typed/v4"
 )
 
 func positiveClientContract(value *endpoint) {
@@ -99,15 +99,15 @@ func negativeClientContract(value *endpoint) {
 
 go 1.26.0
 
-require github.com/aqcool/socket.io/typed/v3 v3.0.4
+require github.com/aqcool/socket.io/typed/v4 v3.0.4
 
 replace (
-	github.com/aqcool/socket.io/typed/v3 => %s
-	github.com/aqcool/socket.io/servers/socket/v3 => %s
-	github.com/aqcool/socket.io/servers/engine/v3 => %s
-	github.com/aqcool/socket.io/parsers/socket/v3 => %s
-	github.com/aqcool/socket.io/parsers/engine/v3 => %s
-	github.com/aqcool/socket.io/v3 => %s
+	github.com/aqcool/socket.io/typed/v4 => %s
+	github.com/aqcool/socket.io/servers/socket/v4 => %s
+	github.com/aqcool/socket.io/servers/engine/v4 => %s
+	github.com/aqcool/socket.io/parsers/socket/v4 => %s
+	github.com/aqcool/socket.io/parsers/engine/v4 => %s
+	github.com/aqcool/socket.io/v4 => %s
 )
 `, name, typedRoot,
 			filepath.Join(repositoryRoot, "servers", "socket"),

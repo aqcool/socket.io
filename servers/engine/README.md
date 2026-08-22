@@ -1,7 +1,7 @@
 # Engine.IO：Go 实时通信引擎
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/servers/engine/v3.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/servers/engine/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/servers/engine/v3)](https://goreportcard.com/report/github.com/aqcool/socket.io/servers/engine/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aqcool/socket.io/servers/engine/v4.svg)](https://pkg.go.dev/github.com/aqcool/socket.io/servers/engine/v4)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aqcool/socket.io/servers/engine/v4)](https://goreportcard.com/report/github.com/aqcool/socket.io/servers/engine/v4)
 
 ## 概述
 
@@ -20,7 +20,7 @@ Engine.IO 是 [Socket.IO Go 实现](../socket)基于传输层的跨浏览器、�
 ## 安装
 
 ```bash
-go get github.com/aqcool/socket.io/servers/engine/v3
+go get github.com/aqcool/socket.io/servers/engine/v4
 ```
 
 ## 快速开始
@@ -29,9 +29,9 @@ go get github.com/aqcool/socket.io/servers/engine/v3
 package main
 
 import (
-    "github.com/aqcool/socket.io/servers/engine/v3"
-    "github.com/aqcool/socket.io/servers/engine/v3/config"
-    "github.com/aqcool/socket.io/v3/pkg/types"
+    "github.com/aqcool/socket.io/servers/engine/v4"
+    "github.com/aqcool/socket.io/servers/engine/v4/config"
+    "github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 func main() {
@@ -188,5 +188,5 @@ DEBUG=engine*
 
 ## 支持
 
-- [API 文档](https://pkg.go.dev/github.com/aqcool/socket.io/servers/engine/v3)
+- [API 文档](https://pkg.go.dev/github.com/aqcool/socket.io/servers/engine/v4)
 - [问题跟踪](https://github.com/aqcool/socket.io/issues)

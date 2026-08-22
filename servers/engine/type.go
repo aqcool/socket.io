@@ -5,10 +5,10 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/aqcool/socket.io/parsers/engine/v3/packet"
-	"github.com/aqcool/socket.io/servers/engine/v3/config"
-	"github.com/aqcool/socket.io/servers/engine/v3/transports"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/parsers/engine/v4/packet"
+	"github.com/aqcool/socket.io/servers/engine/v4/config"
+	"github.com/aqcool/socket.io/servers/engine/v4/transports"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 	"github.com/quic-go/webtransport-go"
 )
 

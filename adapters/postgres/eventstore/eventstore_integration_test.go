@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	socketpostgres "github.com/aqcool/socket.io/adapters/postgres/v3"
-	"github.com/aqcool/socket.io/reliability/v3"
+	socketpostgres "github.com/aqcool/socket.io/adapters/postgres/v4"
+	"github.com/aqcool/socket.io/reliability/v4"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

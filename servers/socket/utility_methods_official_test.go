@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 func newOfficialUtilitySockets(t *testing.T) (*Server, []*Socket) {

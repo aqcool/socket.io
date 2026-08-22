@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	socketredis "github.com/aqcool/socket.io/adapters/redis/v3"
-	"github.com/aqcool/socket.io/reliability/v3"
+	socketredis "github.com/aqcool/socket.io/adapters/redis/v4"
+	"github.com/aqcool/socket.io/reliability/v4"
 	"github.com/redis/go-redis/v9"
 )
 

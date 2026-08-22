@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/aqcool/socket.io/v3/pkg/log"
+	"github.com/aqcool/socket.io/v4/pkg/log"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"

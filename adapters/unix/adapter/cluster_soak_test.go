@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	enginetransports "github.com/aqcool/socket.io/servers/engine/v3/transports"
-	"github.com/aqcool/socket.io/sticky/v3"
+	enginetransports "github.com/aqcool/socket.io/servers/engine/v4/transports"
+	"github.com/aqcool/socket.io/sticky/v4"
 )
 
 const clusterSoakEnv = "SOCKET_IO_CLUSTER_SOAK"

@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	socketlog "github.com/aqcool/socket.io/v3/pkg/log"
-	"github.com/aqcool/socket.io/v3/pkg/types"
+	socketlog "github.com/aqcool/socket.io/v4/pkg/log"
+	"github.com/aqcool/socket.io/v4/pkg/types"
 )
 
 const compatibilityTestEnv = "SOCKET_IO_COMPAT_TEST"

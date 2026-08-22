@@ -1,6 +1,6 @@
 package parser
 
-import "github.com/aqcool/socket.io/v3/pkg/types"
+import "github.com/aqcool/socket.io/v4/pkg/types"
 
 // JSONReviver transforms a decoded JSON value. It is called bottom-up for
 // every array item and object property, followed by the root value with an

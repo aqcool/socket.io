@@ -5,9 +5,9 @@ import (
 	"errors"
 	"strings"
 
-	cluster "github.com/aqcool/socket.io/adapters/adapter/v3"
-	"github.com/aqcool/socket.io/parsers/socket/v3/parser"
-	socket "github.com/aqcool/socket.io/servers/socket/v3"
+	cluster "github.com/aqcool/socket.io/adapters/adapter/v4"
+	"github.com/aqcool/socket.io/parsers/socket/v4/parser"
+	socket "github.com/aqcool/socket.io/servers/socket/v4"
 )
 
 // Emitter publishes Socket.IO cluster commands without hosting a Socket.IO

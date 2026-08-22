@@ -8,7 +8,7 @@ JWT 中间件支持 `HS256/384/512`、`RS256/384/512` 和 `ES256/384/512`，并�
 
 ```go
 import (
-    socketauth "github.com/aqcool/socket.io/servers/socket/v3/auth"
+    socketauth "github.com/aqcool/socket.io/servers/socket/v4/auth"
 )
 
 keys, err := socketauth.NewRemoteJWKSet(socketauth.JWKSetOptions{
