@@ -132,7 +132,8 @@ func pollingRequest(t *testing.T, method, target, payload string) string {
 	if method == http.MethodPost {
 		request.Header.Set("Content-Type", "text/plain;charset=UTF-8")
 	}
-	response, err := http.DefaultClient.Do(request)
+	client := &http.Client{Timeout: 3 * time.Second}
+	response, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("%s %s: %v", method, target, err)
 	}
