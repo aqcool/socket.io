@@ -78,6 +78,7 @@ type Adapter interface {
 	DisconnectSockets(context.Context, *BroadcastOptions, bool) error
 
 	ServerSideEmit(context.Context, []any) error
+	ServerSideEmitAck(context.Context, []any) ([]any, error)
 
 	PersistSession(context.Context, Session) error
 	RestoreSession(context.Context, PrivateSessionID, string) (*RecoveredSession, error)
