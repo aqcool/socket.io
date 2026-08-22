@@ -105,7 +105,7 @@ func (s *Server) serveClientAsset(w http.ResponseWriter, r *http.Request, filena
 }
 
 func preferredEncoding(value string) string {
-	for _, candidate := range strings.Split(value, ",") {
+	for candidate := range strings.SplitSeq(value, ",") {
 		name := strings.TrimSpace(strings.SplitN(candidate, ";", 2)[0])
 		if name == "gzip" || name == "deflate" {
 			return name
